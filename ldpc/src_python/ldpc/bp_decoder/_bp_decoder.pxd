@@ -48,15 +48,11 @@ cdef extern from "bp.hpp" namespace "ldpc::bp":
     cdef cppclass BpDecoderCpp "ldpc::bp::BpDecoder":
             BpDecoderCpp(
                 BpSparse& parity_check_matrix,
-                vector[double] channel_probabilities,
                 int maximum_iterations,
                 BpMethod bp_method,
                 BpSchedule schedule,
-                double min_sum_scaling_factor,
-                int omp_threads,
-                BpInputType bp_input_type) except +
+                double min_sum_scaling_factor) except +
             BpSparse& pcm
-            vector[double] channel_probabilities
             int check_count
             int bit_count
             int maximum_iterations
@@ -67,15 +63,11 @@ cdef extern from "bp.hpp" namespace "ldpc::bp":
             vector[uint8_t] candidate_syndrome
             vector[double] log_prob_ratios
             vector[double] initial_log_prob_ratios
-            vector[double] soft_syndrome
             int iterations
-            int omp_thread_count
             bool converge
             vector[uint8_t] decode(vector[double]& llr_vector)
             void bp_decode_cluster(vector[double]& llr_vector, const vector[int]& cluster_checks)
             vector[uint8_t] soft_info_decode_serial(vector[double]& soft_syndrome, double cutoff, double sigma)
-            void set_omp_thread_count(int count)
-            BpInputType bp_input_type
 
 cdef class BpDecoderBase:
     cdef BpSparse *pcm
@@ -85,6 +77,8 @@ cdef class BpDecoderBase:
     cdef bool MEMORY_ALLOCATED
     cdef BpDecoderCpp *bpd
     cdef str user_dtype
+    cdef str _bp_input_type
+    cdef int _omp_thread_count
     # cdef int random_schedule_seed
     
 cdef class BpDecoder(BpDecoderBase):
@@ -94,4 +88,5 @@ cdef class BpDecoder(BpDecoderBase):
 cdef class SoftInfoBpDecoder(BpDecoderBase):
     cdef double sigma
     cdef double cutoff
+    cdef vector[double] _soft_syndrome
     pass

@@ -61,7 +61,7 @@ cdef class BpOsdDecoder(BpDecoderBase):
         self.MEMORY_ALLOCATED=False
 
         ## set up OSD with default values and channel probs from BP
-        self.osdD = new OsdDecoderCpp(self.pcm[0], OSD_OFF, 0, self.bpd.channel_probabilities)
+        self.osdD = new OsdDecoderCpp(self.pcm[0], OSD_OFF, 0, self._error_channel)
         self.osd_method=osd_method
         self.osd_order=osd_order
 
@@ -126,7 +126,7 @@ cdef class BpOsdDecoder(BpDecoderBase):
         cdef vector[double] llr_vector
         llr_vector.resize(self.n)
         for i in range(self.n):
-            p = self.bpd.channel_probabilities[i]
+            p = self._error_channel[i]
             if p <= 0.0:
                 p = 1e-12
             elif p >= 1.0:

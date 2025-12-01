@@ -54,34 +54,27 @@ namespace ldpc {
         class BpDecoder {
         public:
             BpSparse &pcm;
-            std::vector<double> channel_probabilities;
             int check_count;
             int bit_count;
             int maximum_iterations;
             BpMethod bp_method;
             BpSchedule schedule;
-            BpInputType bp_input_type;
             double ms_scaling_factor;
             std::vector<uint8_t> decoding;
             std::vector<uint8_t> candidate_syndrome;
 
             std::vector<double> log_prob_ratios;
             std::vector<double> initial_log_prob_ratios;
-            std::vector<double> soft_syndrome;
             int iterations;
-            int omp_thread_count;
             bool converge;
 
             BpDecoder(
                     BpSparse &parity_check_matrix,
-                    std::vector<double> channel_probabilities,
                     int maximum_iterations = 0,
                     BpMethod bp_method = PRODUCT_SUM,
                     BpSchedule schedule = PARALLEL,
-                    double min_sum_scaling_factor = 0.625,
-                    int omp_threads = 1,
-                    BpInputType bp_input_type = AUTO) :
-                    pcm(parity_check_matrix), channel_probabilities(std::move(channel_probabilities)),
+                    double min_sum_scaling_factor = 0.625) :
+                    pcm(parity_check_matrix),
                     check_count(pcm.m), bit_count(pcm.n), maximum_iterations(maximum_iterations), bp_method(bp_method),
                     schedule(schedule), ms_scaling_factor(min_sum_scaling_factor),
                     iterations(0) //the parity check matrix is passed in by reference
@@ -92,20 +85,9 @@ namespace ldpc {
                 this->candidate_syndrome.resize(check_count);
                 this->decoding.resize(bit_count);
                 this->converge = 0;
-                this->omp_thread_count = omp_threads;
-                this->bp_input_type = bp_input_type;
-
-                if (this->channel_probabilities.size() != this->bit_count) {
-                    throw std::runtime_error(
-                            "Channel probabilities vector must have length equal to the number of bits");
-                }
             }
 
             ~BpDecoder() = default;
-
-            void set_omp_thread_count(int count) {
-                this->omp_thread_count = count;
-            }
 
             // NOTE: Kept this arround just in case 
     

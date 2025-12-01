@@ -141,7 +141,7 @@ cdef class BpLsdDecoder(BpDecoderBase):
         cdef vector[double] llr_vector
         llr_vector.resize(self.n)
         for i in range(self.n):
-            p = self.bpd.channel_probabilities[i]
+            p = self._error_channel[i]
             if p <= 0.0:
                 p = 1e-12
             elif p >= 1.0:

@@ -123,30 +123,30 @@ cdef class BpDecoderBase:
         self._syndrome.resize(self.m) #C++ vector for the syndrome
 
         ## initialise the decoder with default values
-        self.bpd = new BpDecoderCpp(self.pcm[0],self._error_channel,0,PRODUCT_SUM,PARALLEL,1.0,1,SYNDROME)
+        self.bpd = new BpDecoderCpp(self.pcm[0],0,PRODUCT_SUM,PARALLEL,1.0)
 
         ## set the decoder parameters
         self.bp_method = bp_method
         self.max_iter = max_iter
         self.ms_scaling_factor = ms_scaling_factor
         self.schedule = schedule
-        self.omp_thread_count = omp_thread_count
+        self._omp_thread_count = omp_thread_count
+        self._bp_input_type = 'auto'
 
         ## the ldpc_v1 backwards compatibility
         if isinstance(channel_probs, list) or isinstance(channel_probs, np.ndarray):
             if(len(channel_probs)>0) and (channel_probs[0] is not None):
                 error_channel = channel_probs
 
+        # Initialize error channel with default uniform probabilities if not specified
         if error_channel is not None:
             self.error_channel = error_channel
         elif error_rate is not None:
             self.error_rate = error_rate
         else:
-            raise ValueError("Please specify the error channel. Either: 1) error_rate: float or 2) error_channel:\
-            list of floats of length equal to the block length of the code {self.n}.")
-
-
-        
+            # Default: uniform channel with very low error probability (won't affect LLR-based decoding)
+            for i in range(self.n):
+                self._error_channel[i] = 0.01
 
         self.MEMORY_ALLOCATED=True
 
@@ -165,7 +165,7 @@ cdef class BpDecoderBase:
         """
         out = np.zeros(self.n).astype(float)
         for i in range(self.n):
-            out[i] = self.bpd.channel_probabilities[i]
+            out[i] = self._error_channel[i]
         return out
 
     @error_rate.setter
@@ -180,7 +180,7 @@ cdef class BpDecoderBase:
             if not isinstance(value, float):
                 raise ValueError("The `error_rate` parameter must be specified as a single float value.")
             for i in range(self.n):
-                self.bpd.channel_probabilities[i] = value
+                self._error_channel[i] = value
 
     @property
     def error_channel(self) -> np.ndarray:
@@ -192,7 +192,7 @@ cdef class BpDecoderBase:
         """
         out = np.zeros(self.n).astype(float)
         for i in range(self.n):
-            out[i] = self.bpd.channel_probabilities[i]
+            out[i] = self._error_channel[i]
         return out
 
     @error_channel.setter
@@ -208,7 +208,7 @@ cdef class BpDecoderBase:
             if len(value) != self.n:
                 raise ValueError(f"The error channel vector must have length {self.n}, not {len(value)}.")
             for i in range(self.n):
-                self.bpd.channel_probabilities[i] = value[i]
+                self._error_channel[i] = value[i]
 
     def update_channel_probs(self, value: Union[List[float],np.ndarray]) -> None:
         self.error_channel = value
@@ -217,7 +217,7 @@ cdef class BpDecoderBase:
     def channel_probs(self) -> np.ndarray:
         out = np.zeros(self.n).astype(float)
         for i in range(self.n):
-            out[i] = self.bpd.channel_probabilities[i]
+            out[i] = self._error_channel[i]
         return out
 
 
@@ -229,16 +229,7 @@ cdef class BpDecoderBase:
         Returns:
             str: The current input vector type.
         """
-        if self.bpd.bp_input_type == SYNDROME:
-            return 'syndrome'
-        elif self.bpd.bp_input_type == RECEIVED_VECTOR:
-            return 'received_vector'
-        elif self.bpd.bp_input_type == AUTO:
-            return 'auto'
-        else:
-            raise ValueError(f"The input vector type is invalid. \
-                    Please choose from the following methods: \
-                    'input_vector_type=syndrome', 'input_vector_type=received_vector'")
+        return self._bp_input_type
 
 
     @input_vector_type.setter
@@ -254,12 +245,12 @@ cdef class BpDecoderBase:
                 raise ValueError("Please specify the input vector type. Either: 1) input_vector_type: 'syndrome' or 2) input_vector_type:\
                 'received_vector'.")
             else:
-                self.bpd.bp_input_type = AUTO
+                self._bp_input_type = 'auto'
 
         elif input_type.lower() in ['syndrome', 's', '0']:
-            self.bpd.bp_input_type = SYNDROME
+            self._bp_input_type = 'syndrome'
         elif input_type.lower() in ['received_vector', 'r', '1']:
-            self.bpd.bp_input_type = RECEIVED_VECTOR
+            self._bp_input_type = 'received_vector'
         else:
             raise ValueError(f"The input vector type '{input_type}' is invalid. \
                     Please choose from the following methods: \
@@ -459,9 +450,9 @@ cdef class BpDecoderBase:
         Returns:
             int: The number of threads used.
         """
-        if self.bpd.omp_thread_count != 1:
+        if self._omp_thread_count != 1:
             warnings.warn("The OpenMP functionality is not yet implemented")
-        return self.bpd.omp_thread_count
+        return self._omp_thread_count
 
     @omp_thread_count.setter
     def omp_thread_count(self, value: int) -> None:
@@ -476,8 +467,8 @@ cdef class BpDecoderBase:
         if not isinstance(value, int) or value < 1:
             raise TypeError("The omp_thread_count must be specified as a\
             positive integer.")
-        self.bpd.set_omp_thread_count(value)
-        if self.bpd.omp_thread_count != 1:
+        self._omp_thread_count = value
+        if self._omp_thread_count != 1:
             warnings.warn("The OpenMP functionality is not yet implemented")
 
 cdef class BpDecoder(BpDecoderBase):
@@ -656,6 +647,7 @@ cdef class SoftInfoBpDecoder(BpDecoderBase):
         self.schedule = "serial"
         self.bp_method = "minimum_sum"
         self.input_vector_type = "syndrome"
+        self._soft_syndrome.resize(self.m)
 
     # def __init__(self, pcm: Union[np.ndarray, spmatrix], error_rate: Optional[float] = None,
     #              error_channel: Optional[List[float]] = None, max_iter: Optional[int] = 0, bp_method: Optional[str] = 'minimum_sum',
@@ -699,7 +691,7 @@ cdef class SoftInfoBpDecoder(BpDecoderBase):
         """
         out = np.zeros(self.m)
         for i in range(self.m):
-            out[i] = self.bpd.soft_syndrome[i]
+            out[i] = self._soft_syndrome[i]
         return out
 
 
