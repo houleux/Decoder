@@ -94,8 +94,6 @@ cdef class BpDecoderBase:
         ms_scaling_factor=kwargs.get("ms_scaling_factor",1.0)
         schedule=kwargs.get("schedule", 0)
         omp_thread_count = kwargs.get("omp_thread_count", 1)
-        random_schedule_seed = kwargs.get("random_schedule_seed", 0)
-        serial_schedule_order = kwargs.get("serial_schedule_order", None)
         channel_probs = kwargs.get("channel_probs", [None])
         
         # input_vector_type = kwargs.get("input_vector_type", "auto")
@@ -123,20 +121,15 @@ cdef class BpDecoderBase:
         # allocate vectors for decoder input
         self._error_channel.resize(self.n) #C++ vector for the error channel
         self._syndrome.resize(self.m) #C++ vector for the syndrome
-        self._serial_schedule_order = NULL_INT_VECTOR
-
-
 
         ## initialise the decoder with default values
-        self.bpd = new BpDecoderCpp(self.pcm[0],self._error_channel,0,PRODUCT_SUM,PARALLEL,1.0,1,self._serial_schedule_order,0,True,SYNDROME)
+        self.bpd = new BpDecoderCpp(self.pcm[0],self._error_channel,0,PRODUCT_SUM,PARALLEL,1.0,1,SYNDROME)
 
         ## set the decoder parameters
         self.bp_method = bp_method
         self.max_iter = max_iter
         self.ms_scaling_factor = ms_scaling_factor
         self.schedule = schedule
-        self.serial_schedule_order = serial_schedule_order
-        self.random_schedule_seed = random_schedule_seed
         self.omp_thread_count = omp_thread_count
 
         ## the ldpc_v1 backwards compatibility
@@ -437,46 +430,6 @@ cdef class BpDecoderBase:
                     'schedule=parallel', 'schedule=serial', 'schedule=serial_relative', 'schedule=cluster'")
 
     @property
-    def serial_schedule_order(self) -> Union[None, np.ndarray]:
-        """
-        Returns the serial schedule order.
-
-        Returns:
-            Union[None, np.ndarray]: The serial schedule order as a numpy array, or None if no schedule has been set.
-        """
-        if self.bpd.serial_schedule_order.size() == 0:
-            return None
-
-        out = np.zeros(self.n).astype(int)
-        for i in range(self.n):
-            out[i] = self.bpd.serial_schedule_order[i]
-        return out
-
-    @serial_schedule_order.setter
-    def serial_schedule_order(self, value: Union[None, List[int], np.ndarray]) -> None:
-        """
-        Sets the serial schedule order.
-
-        Args:
-            value (Union[None, List[int]]): The serial schedule order to set. Must have length equal to the block
-            length of the code `self.n`.
-
-        Raises:
-            Exception: If value does not have the correct length.
-            ValueError: If value contains an invalid integer value.
-        """
-        if value is None:
-            self._serial_schedule_order = NULL_INT_VECTOR
-            return
-        if not len(value) == self.n:
-            raise Exception("Input error. The `serial_schedule_order` input parameter must have length equal to the length of the code.")
-        for i in range(self.n):
-            if not isinstance(value[i], (int, np.int64, np.int32)) or value[i] < 0 or value[i] >= self.n:
-                print(type(value[i]),"Value:", value[i], "i:", i, "n:", self.n)
-                raise ValueError(f"serial_schedule_order[{i}] is invalid. It must be a non-negative integer less than {self.n}.")
-            self.bpd.serial_schedule_order[i] = value[i]
-
-    @property
     def ms_scaling_factor(self) -> float:
         """Get the scaling factor for minimum sum method.
 
@@ -527,32 +480,6 @@ cdef class BpDecoderBase:
         if self.bpd.omp_thread_count != 1:
             warnings.warn("The OpenMP functionality is not yet implemented")
 
-    @property
-    def random_schedule_seed(self) -> int:
-        """Get the value of random_schedule_seed.
-
-        Returns:
-            int: The current value of random_schedule_seed.
-        """
-        return self.bpd.random_schedule_seed
-
-    @random_schedule_seed.setter
-    def random_schedule_seed(self, value: int) -> None:
-        """Set the value of random_schedule_seed.
-
-        Args:
-            value (int): The new value of random_schedule_seed.
-
-        Raises:
-            ValueError: If the input value is not a postive integer.
-        """
-        if not isinstance(value, int) or value < -2:
-            raise ValueError("The value of random_schedule_seed must\
-            be a positive integer. Set as -1 to disable to the random\
-            schedule. Set as 0 to use the system clock.")
-
-        self.bpd.random_schedule_seed = value
-
 cdef class BpDecoder(BpDecoderBase):
     """
     Belief propagation decoder for binary linear codes.
@@ -579,10 +506,6 @@ cdef class BpDecoder(BpDecoderBase):
         The scheduling method for belief propagation: 'parallel', 'serial', or 'serial_relative'. By default 'parallel'.
     omp_thread_count : Optional[int], optional
         The number of OpenMP threads to use, by default 1.
-    random_schedule_seed : Optional[int], optional
-        The seed for the random serial schedule, by default 0. If set to 0, the seed is set according the system clock.
-    serial_schedule_order : Optional[List[int]], optional
-        The custom order for serial scheduling, by default None.
     input_vector_type: str, optional
         Use this paramter to specify the input type. Choose either: 1) 'syndrome' or 2) 'received_vector' or 3) 'auto'.
         Note, it is only necessary to specify this value when the parity check matrix is square. When the
@@ -592,7 +515,7 @@ cdef class BpDecoder(BpDecoderBase):
     def __cinit__(self, pcm: Union[np.ndarray, scipy.sparse.spmatrix], error_rate: Optional[float] = None,
                  error_channel: Optional[Union[np.ndarray,List[float]]] = None, max_iter: Optional[int] = 0, bp_method: Optional[str] = 'minimum_sum',
                  ms_scaling_factor: Optional[float] = 1.0, schedule: Optional[str] = 'parallel', omp_thread_count: Optional[int] = 1,
-                 random_schedule_seed: Optional[int] = 0, serial_schedule_order: Optional[List[int]] = None, input_vector_type: str = "auto", **kwargs):
+                 input_vector_type: str = "auto", **kwargs):
 
         for key in kwargs.keys():
             if key not in ["channel_probs"]:
@@ -606,7 +529,6 @@ cdef class BpDecoder(BpDecoderBase):
     def __init__(self, pcm: Union[np.ndarray, scipy.sparse.spmatrix], error_rate: Optional[float] = None,
                  error_channel: Optional[Union[np.ndarray,List[float]]] = None, max_iter: Optional[int] = 0, bp_method: Optional[str] = 'minimum_sum',
                  ms_scaling_factor: Optional[float] = 1.0, schedule: Optional[str] = 'parallel', omp_thread_count: Optional[int] = 1,
-                 random_schedule_seed: Optional[int] = 0, serial_schedule_order: Optional[List[int]] = None,
                  input_vector_type: str = "auto", **kwargs):
         
         pass

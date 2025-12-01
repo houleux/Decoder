@@ -68,13 +68,9 @@ namespace ldpc {
             std::vector<double> log_prob_ratios;
             std::vector<double> initial_log_prob_ratios;
             std::vector<double> soft_syndrome;
-            std::vector<int> serial_schedule_order;
             int iterations;
             int omp_thread_count;
             bool converge;
-            int random_schedule_seed;
-            bool random_schedule_at_every_iteration;
-            ldpc::rng::RandomListShuffle<int> rng_list_shuffle;
 
             BpDecoder(
                     BpSparse &parity_check_matrix,
@@ -84,9 +80,6 @@ namespace ldpc {
                     BpSchedule schedule = PARALLEL,
                     double min_sum_scaling_factor = 0.625,
                     int omp_threads = 1,
-                    const std::vector<int> &serial_schedule = NULL_INT_VECTOR,
-                    int random_schedule_seed = -1, // TODO what should be default here? 0 is set but -1 is checked in decode method?
-                    bool random_schedule_at_every_iteration = true,
                     BpInputType bp_input_type = AUTO) :
                     pcm(parity_check_matrix), channel_probabilities(std::move(channel_probabilities)),
                     check_count(pcm.m), bit_count(pcm.n), maximum_iterations(maximum_iterations), bp_method(bp_method),
@@ -100,24 +93,11 @@ namespace ldpc {
                 this->decoding.resize(bit_count);
                 this->converge = 0;
                 this->omp_thread_count = omp_threads;
-                this->random_schedule_seed = random_schedule_seed;
-                this->random_schedule_at_every_iteration = random_schedule_at_every_iteration;
                 this->bp_input_type = bp_input_type;
-
 
                 if (this->channel_probabilities.size() != this->bit_count) {
                     throw std::runtime_error(
                             "Channel probabilities vector must have length equal to the number of bits");
-                }
-                if (serial_schedule != NULL_INT_VECTOR) {
-                    this->serial_schedule_order = serial_schedule;
-                    this->random_schedule_seed = -1;
-                } else {
-                    this->serial_schedule_order.resize(bit_count);
-                    for (int i = 0; i < bit_count; i++) {
-                        this->serial_schedule_order[i] = i;
-                    }
-                    this->rng_list_shuffle.seed(this->random_schedule_seed);
                 }
             }
 

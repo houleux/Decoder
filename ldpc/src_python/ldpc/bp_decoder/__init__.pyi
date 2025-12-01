@@ -194,31 +194,6 @@ class BpDecoderBase:
 
 
     @property
-    def serial_schedule_order(self) -> Union[None, np.ndarray]:
-        """
-        Returns the serial schedule order.
-
-        Returns:
-            Union[None, np.ndarray]: The serial schedule order as a numpy array, or None if no schedule has been set.
-        """
-
-
-    @serial_schedule_order.setter
-    def serial_schedule_order(self, value: Union[None, List[int], np.ndarray]) -> None:
-        """
-        Sets the serial schedule order.
-
-        Args:
-            value (Union[None, List[int]]): The serial schedule order to set. Must have length equal to the block
-            length of the code `self.n`.
-
-        Raises:
-            Exception: If value does not have the correct length.
-            ValueError: If value contains an invalid integer value.
-        """
-
-
-    @property
     def ms_scaling_factor(self) -> float:
         """Get the scaling factor for minimum sum method.
 
@@ -260,27 +235,6 @@ class BpDecoderBase:
         """
 
 
-    @property
-    def random_schedule_seed(self) -> int:
-        """Get the value of random_schedule_seed.
-
-        Returns:
-            int: The current value of random_schedule_seed.
-        """
-
-
-    @random_schedule_seed.setter
-    def random_schedule_seed(self, value: int) -> None:
-        """Set the value of random_schedule_seed.
-
-        Args:
-            value (int): The new value of random_schedule_seed.
-
-        Raises:
-            ValueError: If the input value is not a postive integer.
-        """
-
-
 class BpDecoder(BpDecoderBase):
     """
     Belief propagation decoder for binary linear codes.
@@ -307,10 +261,6 @@ class BpDecoder(BpDecoderBase):
         The scheduling method for belief propagation: 'parallel', 'serial', or 'serial_relative'. By default 'parallel'.
     omp_thread_count : Optional[int], optional
         The number of OpenMP threads to use, by default 1.
-    random_schedule_seed : Optional[int], optional
-        The seed for the random serial schedule, by default 0. If set to 0, the seed is set according the system clock.
-    serial_schedule_order : Optional[List[int]], optional
-        The custom order for serial scheduling, by default None.
     input_vector_type: str, optional
         Use this paramter to specify the input type. Choose either: 1) 'syndrome' or 2) 'received_vector' or 3) 'auto'.
         Note, it is only necessary to specify this value when the parity check matrix is square. When the
