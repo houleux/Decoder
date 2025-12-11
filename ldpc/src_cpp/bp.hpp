@@ -144,12 +144,8 @@ namespace ldpc {
                 throw std::runtime_error("Invalid BP schedule");
             }
 
-            // TODO: Check if the function is algorithmically correct or not
 
-            void bp_decode_cluster(std::vector<double> &llr_vector, const std::vector<int> &cluster_checks) {
-                if (llr_vector.size() != static_cast<size_t>(bit_count)) {
-                    throw std::runtime_error("LLR vector length does not match number of variable nodes");
-                }
+            void bp_decode_cluster(const std::vector<int> &cluster_checks) {
                 if (cluster_checks.empty()) {
                     return; // nothing to update
                 }
@@ -165,9 +161,6 @@ namespace ldpc {
                 const double EPS_TANH = 1e-12;
                 const double MIN_ARG = 1e-308;
 
-                for (int i = 0; i < this->bit_count; ++i) {
-                    this->log_prob_ratios[i] = llr_vector[i];
-                }
 
                 for (int col = 0; col < this->bit_count; ++col) {
                     for (auto &edge : pcm.iterate_column(col)) {

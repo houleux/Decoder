@@ -316,12 +316,9 @@ class BpDecoder(BpDecoderBase):
                 raise ValueError(f"The llr_vector must have length {self.n}. Not length {llr_array.shape[0]}.")
             
             for i in range(self.n):
-                self._llr_vector[i] = llr_array[i]
-        else:
-            for i in range(self.n):
-                self._llr_vector[i] = self.bpd.log_prob_ratios[i]
+                self.bpd.log_prob_ratios[i] = llr_array[i]
 
-        self.bpd.bp_decode_cluster(self._llr_vector, c_cluster)
+        self.bpd.bp_decode_cluster(c_cluster)
 
         DTYPE = np.float64
         out = np.zeros(self.n, dtype=DTYPE)

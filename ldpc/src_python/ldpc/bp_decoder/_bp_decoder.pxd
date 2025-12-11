@@ -66,7 +66,7 @@ cdef extern from "bp.hpp" namespace "ldpc::bp":
             int iterations
             bool converge
             vector[uint8_t] decode(vector[double]& llr_vector)
-            void bp_decode_cluster(vector[double]& llr_vector, const vector[int]& cluster_checks)
+            void bp_decode_cluster(const vector[int]& cluster_checks)
             vector[uint8_t] soft_info_decode_serial(vector[double]& soft_syndrome, double cutoff, double sigma)
             void initialise_log_domain_bp(const vector[double] &llr_vector_channel)
             void reset()
