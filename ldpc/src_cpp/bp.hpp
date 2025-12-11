@@ -148,7 +148,16 @@ namespace ldpc {
                     check_mask[check_index] = 1;
                 }
 
-                initialise_log_domain_bp(llr_vector);
+                // initialise_log_domain_bp(llr_vector);
+
+                // Bit-to-check messages
+
+                for (int i = 0; i < bit_count; i++) {
+                    for (auto &e: this->pcm.iterate_column(i)) {
+                        e.bit_to_check_msg = llr_vector[i];
+                    }
+                }
+
 
                 // Only the selected checks respond and compute check-to-bit messages
                 if (bp_method == PRODUCT_SUM) {
@@ -169,39 +178,7 @@ namespace ldpc {
                         }
                     }
                 } else { // MINIMUM_SUM
-                    for (int check_index: cluster_checks) {
-                        int total_sgn = 0;
-                        double min_val = std::numeric_limits<double>::max();
-
-                        for (auto &edge: pcm.iterate_row(check_index)) {
-                            if (edge.bit_to_check_msg <= 0.0) {
-                                total_sgn ^= 1;
-                            }
-                            edge.check_to_bit_msg = min_val;
-                            const double abs_val = std::abs(edge.bit_to_check_msg);
-                            if (abs_val < min_val) {
-                                min_val = abs_val;
-                            }
-                        }
-
-                        min_val = std::numeric_limits<double>::max();
-                        for (auto &edge: pcm.reverse_iterate_row(check_index)) {
-                            int sgn = total_sgn;
-                            if (edge.bit_to_check_msg <= 0.0) {
-                                sgn ^= 1;
-                            }
-                            if (min_val < edge.check_to_bit_msg) {
-                                edge.check_to_bit_msg = min_val;
-                            }
-                            const double message_sign = (sgn % 2 == 0) ? 1.0 : -1.0;
-                            edge.check_to_bit_msg *= message_sign * ms_scaling_factor;
-
-                            const double abs_val = std::abs(edge.bit_to_check_msg);
-                            if (abs_val < min_val) {
-                                min_val = abs_val;
-                            }
-                        }
-                    }
+                    throw std::runtime_error("Cluster decoding with Minimum-Sum method is not yet implemented");
                 }
 
                 // Accumulate only the participating check contributions back into the LLR vector
