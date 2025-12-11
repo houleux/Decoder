@@ -292,12 +292,8 @@ class BpDecoder(BpDecoderBase):
         """
 
 
-    def decode_cluster(self, llr_vector: np.ndarray, cluster_checks) -> np.ndarray:
+    def decode_cluster(self, cluster_checks, llr_vector: Optional[np.ndarray] = None) -> np.ndarray:
         """Run a cluster-local BP update and return the updated LLRs."""
-
-        llr_array = np.ascontiguousarray(llr_vector, dtype=np.float64)
-        if llr_array.ndim != 1 or llr_array.shape[0] != self.n:
-            raise ValueError(f"The llr_vector must have length {self.n}. Not length {llr_array.shape[0]}.")
 
         cluster_array = np.ascontiguousarray(cluster_checks, dtype=np.int32)
         if cluster_array.ndim != 1:
@@ -308,24 +304,29 @@ class BpDecoder(BpDecoderBase):
         c_cluster.resize(cluster_len)
 
         cdef Py_ssize_t i
-        for i in range(self.n):
-            self._llr_vector[i] = llr_array[i]
-
         for i in range(cluster_len):
             idx = int(cluster_array[i])
             if idx < 0 or idx >= self.m:
                 raise ValueError(f"cluster_checks[{i}]={idx} is out of range for {self.m} checks")
             c_cluster[i] = idx
 
-        if cluster_len == 0:
-            return llr_array.copy()
+        if llr_vector is not None:
+            llr_array = np.ascontiguousarray(llr_vector, dtype=np.float64)
+            if llr_array.ndim != 1 or llr_array.shape[0] != self.n:
+                raise ValueError(f"The llr_vector must have length {self.n}. Not length {llr_array.shape[0]}.")
+            
+            for i in range(self.n):
+                self._llr_vector[i] = llr_array[i]
+        else:
+            for i in range(self.n):
+                self._llr_vector[i] = self.bpd.log_prob_ratios[i]
 
         self.bpd.bp_decode_cluster(self._llr_vector, c_cluster)
 
-        DTYPE = llr_vector.dtype
+        DTYPE = np.float64
         out = np.zeros(self.n, dtype=DTYPE)
         for i in range(self.n):
-            out[i] = self._llr_vector[i]
+            out[i] = self.bpd.log_prob_ratios[i]
         return out
         
     @property
