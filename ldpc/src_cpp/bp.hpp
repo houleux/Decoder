@@ -89,6 +89,23 @@ namespace ldpc {
 
             ~BpDecoder() = default;
 
+            void reset() {
+                this->iterations = 0;
+                this->converge = false;
+                
+                std::fill(this->decoding.begin(), this->decoding.end(), 0);
+                std::fill(this->candidate_syndrome.begin(), this->candidate_syndrome.end(), 0);
+                std::fill(this->log_prob_ratios.begin(), this->log_prob_ratios.end(), 0.0);
+                std::fill(this->initial_log_prob_ratios.begin(), this->initial_log_prob_ratios.end(), 0.0);
+
+                for (int i = 0; i < this->bit_count; i++) {
+                    for (auto &e: this->pcm.iterate_column(i)) {
+                        e.bit_to_check_msg = 0.0;
+                        e.check_to_bit_msg = 0.0;
+                    }
+                }
+            }
+
             // NOTE: Kept this arround just in case 
     
             // void initialise_log_domain_bp() {
@@ -103,13 +120,10 @@ namespace ldpc {
             // }
 
             // NOTE: initialise log_domain only does i_llr = llr; bit_check_msg = i_llr
-            void initialise_log_domain_bp(const std::vector<double> &llr_vector) {
+            void initialise_log_domain_bp(const std::vector<double> &llr_vector_channel) {
                 for (int i = 0; i < this->bit_count; i++) {
-                    this->initial_log_prob_ratios[i] = llr_vector[i];
-
-                    for (auto &e: this->pcm.iterate_column(i)) {
-                        e.bit_to_check_msg = this->initial_log_prob_ratios[i];
-                    }
+                    this->initial_log_prob_ratios[i] = llr_vector_channel[i];
+                    this->log_prob_ratios[i] = llr_vector_channel[i];
                 }
             }
 
@@ -148,49 +162,79 @@ namespace ldpc {
                     check_mask[check_index] = 1;
                 }
 
-                // initialise_log_domain_bp(llr_vector);
+                const double EPS_TANH = 1e-12;
+                const double MIN_ARG = 1e-308;
 
-                // Bit-to-check messages
+                for (int i = 0; i < this->bit_count; ++i) {
+                    this->log_prob_ratios[i] = llr_vector[i];
+                }
 
-                for (int i = 0; i < bit_count; i++) {
-                    for (auto &e: this->pcm.iterate_column(i)) {
-                        e.bit_to_check_msg = llr_vector[i];
+                for (int col = 0; col < this->bit_count; ++col) {
+                    for (auto &edge : pcm.iterate_column(col)) {
+                        if (check_mask[edge.row_index]) {
+                            edge.bit_to_check_msg = this->log_prob_ratios[col] - edge.check_to_bit_msg; 
+                        }
                     }
                 }
 
-
-                // Only the selected checks respond and compute check-to-bit messages
                 if (bp_method == PRODUCT_SUM) {
-                    for (int check_index: cluster_checks) {
-                        double prefix = 1.0;
-                        for (auto &edge: pcm.iterate_row(check_index)) {
-                            edge.check_to_bit_msg = prefix;
-                            prefix *= std::tanh(edge.bit_to_check_msg / 2.0);
+                    for (int check_index : cluster_checks) {
+                        double Am = 0.0;
+                        for (auto &edge : pcm.iterate_row(check_index)) {
+                            double t = std::tanh(edge.bit_to_check_msg / 2.0);
+                            if (std::abs(t) < EPS_TANH) {
+                                t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+                            }
+                            Am += std::log(std::abs(t));
                         }
 
-                        double suffix = 1.0;
-                        for (auto &edge: pcm.reverse_iterate_row(check_index)) {
-                            edge.check_to_bit_msg *= suffix;
-                            edge.check_to_bit_msg =
-                                    std::log((1.0 + edge.check_to_bit_msg) /
-                                             (1.0 - edge.check_to_bit_msg));
-                            suffix *= std::tanh(edge.bit_to_check_msg / 2.0);
+                        int sm = 1;
+                        for (auto &edge : pcm.iterate_row(check_index)) {
+                            if (edge.bit_to_check_msg < 0.0) sm = -sm;
+                        }
+
+                        for (auto &edge : pcm.iterate_row(check_index)) {
+                            double oldR = edge.check_to_bit_msg;
+
+                            double t_self = std::tanh(edge.bit_to_check_msg/2.0);
+                            if (std::abs(t_self) < EPS_TANH) {
+                                t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+                            }
+
+                            double log_abs_t_self = std::log(std::abs(t_self));
+
+                            double temp = Am - log_abs_t_self;
+
+                            double tanh_arg = std::tanh(temp / 2.0);
+                            if (std::abs(tanh_arg) < EPS_TANH) {
+                                tanh_arg = (tanh_arg >= 0.0 ? EPS_TANH : -EPS_TANH);
+                            }
+
+                            double psi = std::log(std::abs(tanh_arg));
+
+                            int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+                            int sign_factor = sm * sign_Lmj;
+
+                            double newR = - (double)sign_factor * psi;
+
+                            if (!std::isfinite(newR)) {
+                                // fallback — small value or clamp
+                                if (std::isnan(newR)) newR = 0.0;
+                                else if (newR > 1e300) newR = 1e300;
+                                else if (newR < -1e300) newR = -1e300;
+                            }
+
+                            edge.check_to_bit_msg = newR;
+
+                            this->log_prob_ratios[edge.col_index] += (newR - oldR);
+
                         }
                     }
+                    
                 } else { // MINIMUM_SUM
                     throw std::runtime_error("Cluster decoding with Minimum-Sum method is not yet implemented");
                 }
 
-                // Accumulate only the participating check contributions back into the LLR vector
-                for (int col = 0; col < bit_count; ++col) {
-                    double updated = llr_vector[col];
-                    for (auto &edge: pcm.iterate_column(col)) {
-                        if (check_mask[edge.row_index]) {
-                            updated += edge.check_to_bit_msg;
-                        }
-                    }
-                    llr_vector[col] = updated;
-                }
             }
 
             // TODO: Check if function is correct/ and compare against matlab flood decoder

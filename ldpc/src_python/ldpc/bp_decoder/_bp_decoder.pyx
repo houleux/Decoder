@@ -524,6 +524,27 @@ cdef class BpDecoder(BpDecoderBase):
         
         pass
 
+    def reset(self):
+        """
+        Resets the decoder state (iterations, convergence, messages, LLRs).
+        """
+        self.bpd.reset()
+
+    def initialise_log_domain_bp(self, llr_vector: np.ndarray):
+        """
+        Initialises the log domain BP with the given LLR vector.
+        Sets both initial and current LLRs.
+        """
+        llr_array = np.ascontiguousarray(llr_vector, dtype=np.float64)
+        if llr_array.ndim != 1 or llr_array.shape[0] != self.n:
+            raise ValueError(f"The llr_vector must have length {self.n}.")
+        
+        cdef int i
+        for i in range(self.n):
+            self._llr_vector[i] = llr_array[i]
+            
+        self.bpd.initialise_log_domain_bp(self._llr_vector)
+
     def decode(self, llr_vector: np.ndarray) -> np.ndarray:
         """Decode a vector of per-bit log-likelihood ratios (LLRs).
 
@@ -593,6 +614,22 @@ cdef class BpDecoder(BpDecoderBase):
             out[i] = self._llr_vector[i]
         return out
         
+    @property
+    def llr_vector(self) -> np.ndarray:
+        """
+        Returns the current log probability ratio vector (LLR vector).
+        """
+        return self.log_prob_ratios
+
+    @llr_vector.setter
+    def llr_vector(self, value: np.ndarray):
+        """
+        Sets the current log probability ratio vector (LLR vector).
+        """
+        if len(value) != self.n:
+            raise ValueError(f"Length mismatch: expected {self.n}, got {len(value)}")
+        for i in range(self.n):
+            self.bpd.log_prob_ratios[i] = value[i]
 
     @property
     def decoding(self) -> np.ndarray:

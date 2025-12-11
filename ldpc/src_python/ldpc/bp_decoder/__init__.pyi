@@ -269,6 +269,19 @@ class BpDecoder(BpDecoderBase):
 
 
     def __init__(self, pcm: Union[np.ndarray, scipy.sparse.spmatrix], error_rate: Optional[float] = None,
+    def reset(self):
+        """
+        Resets the decoder state (iterations, convergence, messages, LLRs).
+        """
+
+
+    def initialise_log_domain_bp(self, llr_vector: np.ndarray):
+        """
+        Initialises the log domain BP with the given LLR vector.
+        Sets both initial and current LLRs.
+        """
+
+
     def decode(self, llr_vector: np.ndarray) -> np.ndarray:
         """Decode a vector of per-bit log-likelihood ratios (LLRs).
 
@@ -315,9 +328,25 @@ class BpDecoder(BpDecoderBase):
             out[i] = self._llr_vector[i]
         return out
         
+    @property
+    def llr_vector(self) -> np.ndarray:
+        """
+
+
+    @llr_vector.setter
+    def llr_vector(self, value: np.ndarray):
+        """
+        Sets the current log probability ratio vector (LLR vector).
+        """
+
 
     @property
     def decoding(self) -> np.ndarray:
+        """
+        Returns the current decoded output.
+
+        Returns:
+            np.ndarray: A numpy array containing the current decoded output.
         """
 
 
