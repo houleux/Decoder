@@ -11,6 +11,12 @@
 #include <chrono>
 #include <stdexcept> // required for std::runtime_error
 #include <set>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+#include <functional>
+#include <algorithm>
+
 
 #include "math.h"
 #include "sparse_matrix_base.hpp"
@@ -105,19 +111,6 @@ namespace ldpc {
                     }
                 }
             }
-
-            // NOTE: Kept this arround just in case 
-    
-            // void initialise_log_domain_bp() {
-            //     for (int i = 0; i < this->bit_count; i++) {
-            //         this->initial_log_prob_ratios[i] = std::log(
-            //                 (1 - this->channel_probabilities[i]) / this->channel_probabilities[i]);
-
-            //         for (auto &e: this->pcm.iterate_column(i)) {
-            //             e.bit_to_check_msg = this->initial_log_prob_ratios[i];
-            //         }
-            //     }
-            // }
 
             // NOTE: initialise log_domain only does i_llr = llr; bit_check_msg = i_llr
             void initialise_log_domain_bp(const std::vector<double> &llr_vector_channel) {
@@ -229,6 +222,189 @@ namespace ldpc {
                 }
 
             }
+
+            // Node-wise Residual Belief Propagation (node-wise RBP / ARBP)
+            // - max_updates: stop after this many check-node selections (<=0 = no limit)
+            // - residual_eps: stop if top residual <= residual_eps (<=0 disables)
+            // - use_approx_residual: if true compute residuals with min-sum approx (ARBP), else exact sum-product residual
+            // - check_syndrome_cb: optional callback to stop early if decoded word valid; pass nullptr to ignore
+            void nodewise_rbp(int max_updates = -1,
+                            double residual_eps = 0.0,
+                            bool use_approx_residual = true,
+                            std::function<bool()> check_syndrome_cb = nullptr)
+            {
+                const double EPS_TANH = 1e-12;
+
+                // helper: unique key for an edge (m, j)
+                auto edge_key = [&](int m, int j) -> int {
+                    return m * this->bit_count + j;
+                };
+
+                // Sum-product exact check->var computation for propagation (returns new R_mj)
+                auto compute_check_to_var_sumproduct = [&](int m, int exclude_col) -> double {
+                    double Am = 0.0;
+                    int sm = 1;
+                    // compute Am and product of signs
+                    for (auto &edge : pcm.iterate_row(m)) {
+                        double Lmn = edge.bit_to_check_msg;
+                        double t = std::tanh(Lmn / 2.0);
+                        if (std::abs(t) < EPS_TANH) t = std::copysign(EPS_TANH, t);
+                        Am += std::log(std::abs(t));
+                        if (Lmn < 0.0) sm = -sm;
+                    }
+                    // find L_mj for excluded edge
+                    double Lmj = 0.0;
+                    for (auto &edge : pcm.iterate_row(m)) {
+                        if (edge.col_index == exclude_col) { Lmj = edge.bit_to_check_msg; break; }
+                    }
+                    double t_self = std::tanh(Lmj / 2.0);
+                    if (std::abs(t_self) < EPS_TANH) t_self = std::copysign(EPS_TANH, t_self);
+                    double log_abs_t_self = std::log(std::abs(t_self));
+                    double temp = Am - log_abs_t_self;
+
+                    double tanh_arg = std::tanh(temp / 2.0);
+                    if (std::abs(tanh_arg) < EPS_TANH) tanh_arg = std::copysign(EPS_TANH, tanh_arg);
+                    double psi = std::log(std::abs(tanh_arg)); // <= 0
+
+                    int sign_Lmj = (Lmj < 0.0) ? -1 : 1;
+                    int sign_factor = sm * sign_Lmj;
+                    double newR = - static_cast<double>(sign_factor) * psi;
+                    return newR;
+                };
+
+                // Min-sum approximation for residual computation only (ARBP)
+                auto compute_check_to_var_minsum_approx = [&](int m, int exclude_col) -> double {
+                    double min1 = std::numeric_limits<double>::infinity();
+                    double min2 = std::numeric_limits<double>::infinity();
+                    int sign_product = 1;
+                    int sign_excluded = 1;
+
+                    for (auto &edge : pcm.iterate_row(m)) {
+                        if (edge.col_index == exclude_col) {
+                            sign_excluded = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+                            continue;
+                        }
+                        double Labs = std::abs(edge.bit_to_check_msg);
+                        if (Labs <= min1) { min2 = min1; min1 = Labs; }
+                        else if (Labs < min2) { min2 = Labs; }
+                        if (edge.bit_to_check_msg < 0.0) sign_product = -sign_product;
+                    }
+
+                    int sign_factor = sign_product * sign_excluded;
+                    double approx_mag = (min1 == std::numeric_limits<double>::infinity()) ? 0.0 : min1;
+                    double t = std::tanh(approx_mag / 2.0);
+                    if (std::abs(t) < EPS_TANH) t = std::copysign(EPS_TANH, t);
+                    double psi = std::log(std::abs(t)); // <=0
+                    double newR_approx = - static_cast<double>(sign_factor) * psi;
+                    return newR_approx;
+                };
+
+                // 1) initialize bit_to_check_msg for all edges from current L(q_j) and stored R_mj
+                for (int col = 0; col < this->bit_count; ++col) {
+                    for (auto &edge : pcm.iterate_column(col)) {
+                        edge.bit_to_check_msg = this->log_prob_ratios[col] - edge.check_to_bit_msg;
+                    }
+                }
+
+                // 2) prepare priority queue of residuals (max-heap)
+                struct ResidualEntry { double residual; int m; int col; };
+                struct ResidualCmp { bool operator()(ResidualEntry const &a, ResidualEntry const &b) const { return a.residual < b.residual; } };
+                std::priority_queue<ResidualEntry, std::vector<ResidualEntry>, ResidualCmp> pq;
+
+                std::unordered_map<int,double> current_residual; // edge_key -> residual
+                current_residual.reserve(this->check_count * 2);
+
+                // compute initial residuals
+                for (int m = 0; m < this->check_count; ++m) {
+                    for (auto &edge : pcm.iterate_row(m)) {
+                        double newR = use_approx_residual ? compute_check_to_var_minsum_approx(m, edge.col_index)
+                                                        : compute_check_to_var_sumproduct(m, edge.col_index);
+                        double oldR = edge.check_to_bit_msg;
+                        double r = std::abs(newR - oldR);
+                        int k = edge_key(m, edge.col_index);
+                        current_residual[k] = r;
+                        pq.push({r, m, edge.col_index});
+                    }
+                }
+
+                // main loop
+                int updates_done = 0;
+                while (!pq.empty()) {
+                    // pop top, skip stale
+                    ResidualEntry top = pq.top(); pq.pop();
+                    int k = edge_key(top.m, top.col);
+                    auto it = current_residual.find(k);
+                    if (it == current_residual.end()) continue;
+                    if (std::abs(it->second - top.residual) > 1e-15) continue; // stale
+
+                    if (residual_eps > 0.0 && top.residual <= residual_eps) break;
+
+                    int chosen_m = top.m;
+
+                    // 3) For chosen check node: compute exact new R for all its outgoing edges (propagate full sum-product)
+                    std::vector<std::pair<int,double>> updates; updates.reserve(32);
+                    for (auto &edge : pcm.iterate_row(chosen_m)) {
+                        double newR_exact = compute_check_to_var_sumproduct(chosen_m, edge.col_index);
+                        updates.emplace_back(edge.col_index, newR_exact);
+                    }
+
+                    // 4) apply updates: store oldR, write newR to edges, update global L(q_j) incrementally
+                    for (auto &p : updates) {
+                        int col = p.first;
+                        double newR = p.second;
+
+                        // find reference to the edge to read oldR and update it
+                        double oldR = 0.0;
+                        for (auto &edge : pcm.iterate_row(chosen_m)) {
+                            if (edge.col_index == col) { oldR = edge.check_to_bit_msg; break; }
+                        }
+                        // now write newR into that edge
+                        for (auto &edge : pcm.iterate_row(chosen_m)) {
+                            if (edge.col_index == col) { edge.check_to_bit_msg = newR; break; }
+                        }
+
+                        // incremental update to L(q_j)
+                        this->log_prob_ratios[col] += (newR - oldR);
+                    }
+
+                    // 5) update bit_to_check_msg for affected variable nodes and recompute residuals
+                    std::vector<int> affected_checks;
+                    affected_checks.reserve(64);
+                    for (auto &edge : pcm.iterate_row(chosen_m)) {
+                        int col = edge.col_index;
+                        for (auto &e2 : pcm.iterate_column(col)) {
+                            // update bit_to_check_msg now that R may have changed
+                            e2.bit_to_check_msg = this->log_prob_ratios[col] - e2.check_to_bit_msg;
+                            affected_checks.push_back(e2.row_index);
+                        }
+                    }
+
+                    // remove duplicates
+                    std::sort(affected_checks.begin(), affected_checks.end());
+                    affected_checks.erase(std::unique(affected_checks.begin(), affected_checks.end()), affected_checks.end());
+
+                    // recompute residuals for edges in affected checks and push to pq
+                    for (int m : affected_checks) {
+                        for (auto &edge : pcm.iterate_row(m)) {
+                            double approxNewR = use_approx_residual ? compute_check_to_var_minsum_approx(m, edge.col_index)
+                                                                    : compute_check_to_var_sumproduct(m, edge.col_index);
+                            double oldR = edge.check_to_bit_msg;
+                            double r = std::abs(approxNewR - oldR);
+                            int key = edge_key(m, edge.col_index);
+                            current_residual[key] = r;
+                            pq.push({r, m, edge.col_index});
+                        }
+                    }
+
+                    ++updates_done;
+                    if (max_updates > 0 && updates_done >= max_updates) break;
+
+                    if (check_syndrome_cb) {
+                        if (check_syndrome_cb()) break;
+                    }
+                } // end while
+            }
+
 
             // TODO: Check if function is correct/ and compare against matlab flood decoder
 
