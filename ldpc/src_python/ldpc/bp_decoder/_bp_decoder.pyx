@@ -545,20 +545,20 @@ cdef class BpDecoder(BpDecoderBase):
             
         self.bpd.initialise_log_domain_bp(self._llr_vector)
 
-    def nodewise_rbp(self, max_updates: int = -1, residual_eps: float = 0.0, use_approx_residual: bool = True):
-        """
-        Runs the nodewise residual belief propagation decoder.
+    # def nodewise_rbp(self, max_updates: int = -1, residual_eps: float = 0.0, use_approx_residual: bool = True):
+    #     """
+    #     Runs the nodewise residual belief propagation decoder.
 
-        Parameters
-        ----------
-        max_updates : int, optional
-            The maximum number of updates to perform. Default is -1 (no limit).
-        residual_eps : float, optional
-            The residual epsilon threshold. Default is 0.0.
-        use_approx_residual : bool, optional
-            Whether to use approximate residual calculation. Default is True.
-        """
-        self.bpd.nodewise_rbp(max_updates, residual_eps, use_approx_residual)
+    #     Parameters
+    #     ----------
+    #     max_updates : int, optional
+    #         The maximum number of updates to perform. Default is -1 (no limit).
+    #     residual_eps : float, optional
+    #         The residual epsilon threshold. Default is 0.0.
+    #     use_approx_residual : bool, optional
+    #         Whether to use approximate residual calculation. Default is True.
+    #     """
+    #     self.bpd.nodewise_rbp(max_updates, residual_eps, use_approx_residual)
 
     def decode(self, llr_vector: np.ndarray) -> np.ndarray:
         """Decode a vector of per-bit log-likelihood ratios (LLRs).
@@ -625,6 +625,20 @@ cdef class BpDecoder(BpDecoderBase):
         out = np.zeros(self.n, dtype=DTYPE)
         for i in range(self.n):
             out[i] = self.bpd.log_prob_ratios[i]
+        return out
+
+    def get_residuals(self) -> np.ndarray:
+        """
+        Returns the residuals for each check node.
+        The residual is defined as the maximum change in the check-to-bit messages for that check node.
+
+        Returns:
+            np.ndarray: A numpy array containing the residuals for each check node.
+        """
+        cdef vector[double] residuals = self.bpd.get_residuals()
+        out = np.zeros(self.m, dtype=np.float64)
+        for i in range(self.m):
+            out[i] = residuals[i]
         return out
         
     @property

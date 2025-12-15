@@ -117,6 +117,11 @@ namespace ldpc {
                 for (int i = 0; i < this->bit_count; i++) {
                     this->initial_log_prob_ratios[i] = llr_vector_channel[i];
                     this->log_prob_ratios[i] = llr_vector_channel[i];
+
+                    for (auto &e: this->pcm.iterate_column(i)) {
+                        e.bit_to_check_msg = llr_vector_channel[i];
+                        e.check_to_bit_msg = 0.0;
+                    }
                 }
             }
 
@@ -191,17 +196,16 @@ namespace ldpc {
 
                             double temp = Am - log_abs_t_self;
 
-                            double tanh_arg = std::tanh(temp / 2.0);
-                            if (std::abs(tanh_arg) < EPS_TANH) {
-                                tanh_arg = (tanh_arg >= 0.0 ? EPS_TANH : -EPS_TANH);
-                            }
-
-                            double psi = std::log(std::abs(tanh_arg));
-
                             int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
                             int sign_factor = sm * sign_Lmj;
 
-                            double newR = - (double)sign_factor * psi;
+                            double prod_others = sign_factor * std::exp(temp);
+
+                            // Clamp prod_others to avoid singularity at +/- 1
+                            if (prod_others > 1.0 - 1e-15) prod_others = 1.0 - 1e-15;
+                            if (prod_others < -1.0 + 1e-15) prod_others = -1.0 + 1e-15;
+
+                            double newR = std::log((1.0 + prod_others) / (1.0 - prod_others));
 
                             if (!std::isfinite(newR)) {
                                 // fallback — small value or clamp
@@ -226,62 +230,84 @@ namespace ldpc {
             std::vector<double> get_residuals() {
                 std::vector<double> residuals(this->check_count, 0.0);
 
-                const double EPS_TANH = 1e-12;
-                const double MIN_ARG = 1e-308;
-
-                for (int row = 0; row < this->check_count; ++row) {
-                    double max_residual = 0.0;
-
-                    double Am = 0.0;
-                    int sm = 1;
-                    for (auto &edge : pcm.iterate_row(row)) {
-                        double t = std::tanh(edge.bit_to_check_msg / 2.0);
-                        if (std::abs(t) < EPS_TANH) {
-                            t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+                if (this->bp_method == PRODUCT_SUM) {
+                    for (int row = 0; row < this->check_count; ++row) {
+                        double max_residual = 0.0;
+                        
+                        const double EPS_TANH = 1e-12;
+                        double Am = 0.0;
+                        int sm = 1;
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            double t = std::tanh(edge.bit_to_check_msg / 2.0);
+                            if (std::abs(t) < EPS_TANH) {
+                                t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+                            }
+                            Am += std::log(std::abs(t));
+                            if (edge.bit_to_check_msg < 0.0) sm = -sm;
                         }
-                        Am += std::log(std::abs(t));
-                        if (edge.bit_to_check_msg < 0.0) sm = -sm;
+
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            double old_msg = edge.check_to_bit_msg;
+                            
+                            double t_self = std::tanh(edge.bit_to_check_msg / 2.0);
+                            if (std::abs(t_self) < EPS_TANH) {
+                                t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+                            }
+                            double log_abs_t_self = std::log(std::abs(t_self));
+                            
+                            double temp = Am - log_abs_t_self; // log(|prod_others|)
+                            
+                            int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+                            int sign_factor = sm * sign_Lmj;
+                            
+                            double prod_others = sign_factor * std::exp(temp);
+                            
+                            // Clamp prod_others to avoid singularity at +/- 1
+                            if (prod_others > 1.0 - 1e-15) prod_others = 1.0 - 1e-15;
+                            if (prod_others < -1.0 + 1e-15) prod_others = -1.0 + 1e-15;
+                            
+                            double new_msg = std::log((1.0 + prod_others) / (1.0 - prod_others));
+                            
+                            double residual = std::abs(new_msg - old_msg);
+                            if (residual > max_residual) max_residual = residual;
+                        }
+                        residuals[row] = max_residual;
                     }
-
-                    for (auto &edge : pcm.iterate_row(row)) {
-                        double old_msg = edge.check_to_bit_msg;
-
-                        double t_self = std::tanh(edge.bit_to_check_msg/2.0);
-                        if (std::abs(t_self) < EPS_TANH) {
-                            t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+                } else if (this->bp_method == MINIMUM_SUM) {
+                     for (int row = 0; row < this->check_count; ++row) {
+                        double max_residual = 0.0;
+                        
+                        double min1 = std::numeric_limits<double>::max();
+                        double min2 = std::numeric_limits<double>::max();
+                        int total_sgn = 0;
+                        
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            if (edge.bit_to_check_msg <= 0.0) total_sgn ^= 1;
+                            double abs_val = std::abs(edge.bit_to_check_msg);
+                            if (abs_val < min1) {
+                                min2 = min1;
+                                min1 = abs_val;
+                            } else if (abs_val < min2) {
+                                min2 = abs_val;
+                            }
                         }
-
-                        double log_abs_t_self = std::log(std::abs(t_self));
-
-                        double temp = Am - log_abs_t_self;
-
-                        double tanh_arg = std::tanh(temp / 2.0);
-                        if (std::abs(tanh_arg) < EPS_TANH) {
-                            tanh_arg = (tanh_arg >= 0.0 ? EPS_TANH : -EPS_TANH);
+                        
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            double old_msg = edge.check_to_bit_msg;
+                            
+                            int sgn = total_sgn;
+                            if (edge.bit_to_check_msg <= 0.0) sgn ^= 1;
+                            
+                            double abs_val = std::abs(edge.bit_to_check_msg);
+                            double val = (abs_val == min1) ? min2 : min1;
+                            
+                            double new_msg = (sgn == 0 ? 1.0 : -1.0) * val * this->ms_scaling_factor;
+                            
+                            double residual = std::abs(new_msg - old_msg);
+                            if (residual > max_residual) max_residual = residual;
                         }
-
-                        double psi = std::log(std::abs(tanh_arg));
-
-                        int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
-                        int sign_factor = sm * sign_Lmj;
-
-                        double new_msg = - (double)sign_factor * psi;
-
-                        if (!std::isfinite(new_msg)) {
-                            // fallback — small value or clamp
-                            if (std::isnan(new_msg)) new_msg = 0.0;
-                            else if (new_msg > 1e300) new_msg = 1e300;
-                            else if (new_msg < -1e300) new_msg = -1e300;
-                        }
-
-                        double residual = std::abs(new_msg - old_msg);
-                        if (residual > max_residual) {
-                            max_residual = residual;
-                        }
-
-                    }
-
-                    residuals[row] = max_residual;
+                        residuals[row] = max_residual;
+                     }
                 }
 
                 return residuals;
