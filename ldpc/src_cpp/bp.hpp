@@ -223,7 +223,69 @@ namespace ldpc {
 
             }
 
-            
+            std::vector<double> get_residuals() {
+                std::vector<double> residuals(this->check_count, 0.0);
+
+                const double EPS_TANH = 1e-12;
+                const double MIN_ARG = 1e-308;
+
+                for (int row = 0; row < this->check_count; ++row) {
+                    double max_residual = 0.0;
+
+                    double Am = 0.0;
+                    int sm = 1;
+                    for (auto &edge : pcm.iterate_row(row)) {
+                        double t = std::tanh(edge.bit_to_check_msg / 2.0);
+                        if (std::abs(t) < EPS_TANH) {
+                            t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+                        }
+                        Am += std::log(std::abs(t));
+                        if (edge.bit_to_check_msg < 0.0) sm = -sm;
+                    }
+
+                    for (auto &edge : pcm.iterate_row(row)) {
+                        double old_msg = edge.check_to_bit_msg;
+
+                        double t_self = std::tanh(edge.bit_to_check_msg/2.0);
+                        if (std::abs(t_self) < EPS_TANH) {
+                            t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+                        }
+
+                        double log_abs_t_self = std::log(std::abs(t_self));
+
+                        double temp = Am - log_abs_t_self;
+
+                        double tanh_arg = std::tanh(temp / 2.0);
+                        if (std::abs(tanh_arg) < EPS_TANH) {
+                            tanh_arg = (tanh_arg >= 0.0 ? EPS_TANH : -EPS_TANH);
+                        }
+
+                        double psi = std::log(std::abs(tanh_arg));
+
+                        int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+                        int sign_factor = sm * sign_Lmj;
+
+                        double new_msg = - (double)sign_factor * psi;
+
+                        if (!std::isfinite(new_msg)) {
+                            // fallback — small value or clamp
+                            if (std::isnan(new_msg)) new_msg = 0.0;
+                            else if (new_msg > 1e300) new_msg = 1e300;
+                            else if (new_msg < -1e300) new_msg = -1e300;
+                        }
+
+                        double residual = std::abs(new_msg - old_msg);
+                        if (residual > max_residual) {
+                            max_residual = residual;
+                        }
+
+                    }
+
+                    residuals[row] = max_residual;
+                }
+
+                return residuals;
+            }
 
 
             // TODO: Check if function is correct/ and compare against matlab flood decoder
