@@ -1,29 +1,38 @@
-from ldpc.bp_decoder import BpDecoder
+import random
 
 def pick_max_avg_residual_cluster(residuals, clusters):
     max_residual = -float('inf')
-    selected_cluster = None
-    selected_index = -1
+    best_candidates = []
 
     for i, cluster in enumerate(clusters):
         cluster_residual = sum(residuals[j] for j in cluster)
         cluster_avg_residual = cluster_residual / len(cluster) if len(cluster) > 0 else 0
+        
         if cluster_avg_residual > max_residual:
             max_residual = cluster_avg_residual
-            selected_cluster = cluster
-            selected_index = i
+            best_candidates = [(i, cluster)]
+        elif cluster_avg_residual == max_residual:
+            best_candidates.append((i, cluster))
 
-    return selected_index, selected_cluster
+    if not best_candidates:
+        return -1, None
+
+    return random.choice(best_candidates)
 
 def pick_max_max_residual_cluster(residuals, clusters):
     max_residual = -float('inf')
-    selected_cluster = None
+    best_candidates = []
 
     for i, cluster in enumerate(clusters):
         cluster_max_residual = max(residuals[j] for j in cluster) if len(cluster) > 0 else -float('inf')
+        
         if cluster_max_residual > max_residual:
             max_residual = cluster_max_residual
-            selected_cluster = cluster
-            selected_index = i
+            best_candidates = [(i, cluster)]
+        elif cluster_max_residual == max_residual:
+            best_candidates.append((i, cluster))
 
-    return selected_index, selected_cluster
+    if not best_candidates:
+        return -1, None
+
+    return random.choice(best_candidates)

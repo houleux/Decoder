@@ -274,40 +274,7 @@ namespace ldpc {
                         residuals[row] = max_residual;
                     }
                 } else if (this->bp_method == MINIMUM_SUM) {
-                     for (int row = 0; row < this->check_count; ++row) {
-                        double max_residual = 0.0;
-                        
-                        double min1 = std::numeric_limits<double>::max();
-                        double min2 = std::numeric_limits<double>::max();
-                        int total_sgn = 0;
-                        
-                        for (auto &edge : pcm.iterate_row(row)) {
-                            if (edge.bit_to_check_msg <= 0.0) total_sgn ^= 1;
-                            double abs_val = std::abs(edge.bit_to_check_msg);
-                            if (abs_val < min1) {
-                                min2 = min1;
-                                min1 = abs_val;
-                            } else if (abs_val < min2) {
-                                min2 = abs_val;
-                            }
-                        }
-                        
-                        for (auto &edge : pcm.iterate_row(row)) {
-                            double old_msg = edge.check_to_bit_msg;
-                            
-                            int sgn = total_sgn;
-                            if (edge.bit_to_check_msg <= 0.0) sgn ^= 1;
-                            
-                            double abs_val = std::abs(edge.bit_to_check_msg);
-                            double val = (abs_val == min1) ? min2 : min1;
-                            
-                            double new_msg = (sgn == 0 ? 1.0 : -1.0) * val * this->ms_scaling_factor;
-                            
-                            double residual = std::abs(new_msg - old_msg);
-                            if (residual > max_residual) max_residual = residual;
-                        }
-                        residuals[row] = max_residual;
-                     }
+                    throw std::runtime_error("Minsum is not implemented yet");
                 }
 
                 return residuals;
