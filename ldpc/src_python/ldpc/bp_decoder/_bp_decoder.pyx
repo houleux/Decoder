@@ -640,6 +640,19 @@ cdef class BpDecoder(BpDecoderBase):
         for i in range(self.m):
             out[i] = residuals[i]
         return out
+
+    def get_mi_residuals(self) -> np.ndarray:
+        """
+        Returns the mutual information residuals for each check node.
+
+        Returns:
+            np.ndarray: A numpy array containing the mutual information residuals for each check node.
+        """
+        cdef vector[double] residuals = self.bpd.get_mi_residuals()
+        out = np.zeros(self.m, dtype=np.float64)
+        for i in range(self.m):
+            out[i] = residuals[i]
+        return out
         
     @property
     def llr_vector(self) -> np.ndarray:

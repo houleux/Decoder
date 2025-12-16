@@ -313,7 +313,83 @@ namespace ldpc {
                 return residuals;
             }
 
+            double LLR_to_MI(const std::vector<double> &llr_values) {
+                double mu = 0.0;
+                for (double llr : llr_values) {
+                    mu += llr;
+                }
+                mu /= static_cast<double>(llr_values.size());
 
+                double sigma = std::sqrt(2.0 * mu);
+
+                double mi = 0.0;
+
+                if (sigma >= 10) {
+                    mi = 1.0;
+                }
+                else if (sigma > 1.6363) {
+                    mi = 1.0 - std::exp(0.001815 * sigma * sigma * sigma - 0.142675 * sigma * sigma - 0.082205 * sigma + 0.054960);
+                }
+                else {
+                    mi = -0.0421061 * sigma * sigma * sigma + 0.209252 * sigma * sigma - 0.00640081 * sigma;
+                }
+
+                return mi;
+            }
+
+            std::vector<double> get_mi_residuals() {
+                std::vector<double> residuals(this->check_count, 0.0);
+
+                if (this->bp_method == PRODUCT_SUM) {
+                    for (int row = 0; row < this->check_count; ++row) {
+                        double max_residual = 0.0;
+                        
+                        const double EPS_TANH = 1e-12;
+                        double Am = 0.0;
+                        int sm = 1;
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            double t = std::tanh(edge.bit_to_check_msg / 2.0);
+                            if (std::abs(t) < EPS_TANH) {
+                                t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+                            }
+                            Am += std::log(std::abs(t));
+                            if (edge.bit_to_check_msg < 0.0) sm = -sm;
+                        }
+
+                        for (auto &edge : pcm.iterate_row(row)) {
+                            double old_msg_mi = LLR_to_MI(std::vector<double>{edge.check_to_bit_msg});
+                            
+                            double t_self = std::tanh(edge.bit_to_check_msg / 2.0);
+                            if (std::abs(t_self) < EPS_TANH) {
+                                t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+                            }
+                            double log_abs_t_self = std::log(std::abs(t_self));
+                            
+                            double temp = Am - log_abs_t_self; // log(|prod_others|)
+                            
+                            int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+                            int sign_factor = sm * sign_Lmj;
+                            
+                            double prod_others = sign_factor * std::exp(temp);
+                            
+                            // Clamp prod_others to avoid singularity at +/- 1
+                            if (prod_others > 1.0 - 1e-15) prod_others = 1.0 - 1e-15;
+                            if (prod_others < -1.0 + 1e-15) prod_others = -1.0 + 1e-15;
+                            
+                            double new_msg = std::log((1.0 + prod_others) / (1.0 - prod_others));
+                            double new_msg_mi = LLR_to_MI(std::vector<double>{new_msg});
+                            
+                            double residual = std::abs(new_msg_mi - old_msg_mi);
+                            if (residual > max_residual) max_residual = residual;
+                        }
+                        residuals[row] = max_residual;
+                    }
+                } else if (this->bp_method == MINIMUM_SUM) {
+                     throw std::runtime_error("MI residuals for Minimum-Sum method are not yet implemented");
+                }
+
+                return residuals;
+            }
             // TODO: Check if function is correct/ and compare against matlab flood decoder
 
             std::vector<uint8_t> &bp_decode_parallel(const std::vector<double> &llr_vector) {

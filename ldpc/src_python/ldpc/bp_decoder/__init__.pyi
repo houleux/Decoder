@@ -330,6 +330,15 @@ class BpDecoder(BpDecoderBase):
         """
 
 
+    def get_mi_residuals(self) -> np.ndarray:
+        """
+        Returns the mutual information residuals for each check node.
+
+        Returns:
+            np.ndarray: A numpy array containing the mutual information residuals for each check node.
+        """
+
+
     @property
     def llr_vector(self) -> np.ndarray:
         """

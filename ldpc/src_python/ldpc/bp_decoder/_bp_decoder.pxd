@@ -67,6 +67,7 @@ cdef extern from "bp.hpp" namespace "ldpc::bp":
             bool converge
             vector[uint8_t] decode(vector[double]& llr_vector)
             vector[double] get_residuals()
+            vector[double] get_mi_residuals()
             void bp_decode_cluster(const vector[int]& cluster_checks)
             vector[uint8_t] soft_info_decode_serial(vector[double]& soft_syndrome, double cutoff, double sigma)
             # void nodewise_rbp(int max_updates, double residual_eps, bool use_approx_residual)
