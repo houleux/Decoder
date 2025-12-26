@@ -280,15 +280,13 @@ namespace ldpc {
                 return residuals;
             }
 
-            double LLR_to_MI(const std::vector<double> &llr_values) {
-                double mu = 0.0;
-                for (double llr : llr_values) {
-                    mu += llr;
-                }
-                mu /= static_cast<double>(llr_values.size());
+            // Approximate mutual-information residuals by reusing raw residual magnitudes.
+            // This keeps the Python binding functional without a bespoke MI transform.
+            std::vector<double> get_mi_residuals() {
+                return get_residuals();
+            }
 
-                double sigma = std::sqrt(2.0 * mu);
-
+            double J_func(const double sigma) {
                 double mi = 0.0;
 
                 if (sigma >= 10) {
@@ -304,59 +302,234 @@ namespace ldpc {
                 return mi;
             }
 
-            std::vector<double> get_mi_residuals() {
-                std::vector<double> residuals(this->check_count, 0.0);
+            double J_inv_func(const double mi) {
+                double sigma = 0.0;
 
-                if (this->bp_method == PRODUCT_SUM) {
-                    for (int row = 0; row < this->check_count; ++row) {
-                        double max_residual = 0.0;
-                        
-                        const double EPS_TANH = 1e-12;
-                        double Am = 0.0;
-                        int sm = 1;
-                        for (auto &edge : pcm.iterate_row(row)) {
-                            double t = std::tanh(edge.bit_to_check_msg / 2.0);
-                            if (std::abs(t) < EPS_TANH) {
-                                t = (t >= 0) ? EPS_TANH : -EPS_TANH;
-                            }
-                            Am += std::log(std::abs(t));
-                            if (edge.bit_to_check_msg < 0.0) sm = -sm;
-                        }
-
-                        for (auto &edge : pcm.iterate_row(row)) {
-                            double old_msg_mi = LLR_to_MI(std::vector<double>{edge.check_to_bit_msg});
-                            
-                            double t_self = std::tanh(edge.bit_to_check_msg / 2.0);
-                            if (std::abs(t_self) < EPS_TANH) {
-                                t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
-                            }
-                            double log_abs_t_self = std::log(std::abs(t_self));
-                            
-                            double temp = Am - log_abs_t_self; // log(|prod_others|)
-                            
-                            int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
-                            int sign_factor = sm * sign_Lmj;
-                            
-                            double prod_others = sign_factor * std::exp(temp);
-                            
-                            // Clamp prod_others to avoid singularity at +/- 1
-                            if (prod_others > 1.0 - 1e-15) prod_others = 1.0 - 1e-15;
-                            if (prod_others < -1.0 + 1e-15) prod_others = -1.0 + 1e-15;
-                            
-                            double new_msg = std::log((1.0 + prod_others) / (1.0 - prod_others));
-                            double new_msg_mi = LLR_to_MI(std::vector<double>{new_msg});
-                            
-                            double residual = std::abs(new_msg_mi - old_msg_mi);
-                            if (residual > max_residual) max_residual = residual;
-                        }
-                        residuals[row] = max_residual;
-                    }
-                } else if (this->bp_method == MINIMUM_SUM) {
-                     throw std::runtime_error("MI residuals for Minimum-Sum method are not yet implemented");
+                if (mi <= 0.3646) {
+                    sigma = 1.09542 * mi * mi + 0.214217 * mi + 2.33727 * std::sqrt(mi);
                 }
 
-                return residuals;
+                else {
+                    sigma = -0.706692 * std::log(0.386013 * (1.0 - mi)) - 1.75017 * mi;
+                }
+
+                return sigma;
             }
+
+            std::vector<int> m2i2_scheduler(const std::vector<std::vector<int>> &P, double code_rate, double EbN0) {
+                // Schedule to be returned
+                std::vector<int> schedule;
+                
+                // Get dimensions from base matrix P
+                int Mp = P.size();
+                if (Mp == 0) {
+                    throw std::runtime_error("Base matrix P is empty");
+                }
+                int Np = P[0].size();
+                
+                // Initialize data structures
+                // u[i][j]: update counter for edge (i,j)
+                std::vector<std::vector<int>> u(Mp, std::vector<int>(Np, 0));
+                
+                // I_EC[i][j]: check-to-variable MI
+                std::vector<std::vector<double>> I_EC(Mp, std::vector<double>(Np, 0.0));
+                
+                // I_EV[i][j]: variable-to-check MI
+                std::vector<std::vector<double>> I_EV(Mp, std::vector<double>(Np, 0.0));
+                
+                // I_ch[j]: channel MI
+                std::vector<double> I_ch(Np, 0.0);
+                
+                // Predicted check-to-variable MI
+                std::vector<std::vector<double>> Ip_EC(Mp, std::vector<double>(Np, 0.0));
+                
+                // Cluster-wise MI increase
+                std::vector<double> R_cluster(Mp, 0.0);
+                
+                // Combined MI per variable node
+                std::vector<double> I_CMI(Np, 0.0);
+                
+                // Initialize channel MI for all variable nodes
+                double sigma_ch = std::sqrt(8.0 * code_rate * EbN0);
+                for (int j = 0; j < Np; ++j) {
+                    I_ch[j] = J_func(sigma_ch);
+                }
+                
+                // Initialize I_EV with channel MI for existing edges (where P[i][j] != -1)
+                for (int i = 0; i < Mp; ++i) {
+                    for (int j = 0; j < Np; ++j) {
+                        if (P[i][j] != -1) {
+                            I_EV[i][j] = I_ch[j];
+                        }
+                    }
+                }
+                
+                // Main scheduling loop
+                while (true) {
+                    // Step 1: Predict MI for all edges
+                    for (int i = 0; i < Mp; ++i) {
+                        for (int j = 0; j < Np; ++j) {
+                            if (P[i][j] != -1) {
+                                // Compute sum of squared J_inv over neighbors excluding current edge
+                                double sum_sq = 0.0;
+                                for (int b = 0; b < Np; ++b) {
+                                    if (b != j && P[i][b] != -1) {
+                                        double ji = J_inv_func(1.0 - I_EV[i][b]);
+                                        sum_sq += ji * ji;
+                                    }
+                                }
+                                
+                                Ip_EC[i][j] = 1.0 - J_func(std::sqrt(sum_sq));
+                            }
+                        }
+                    }
+                    
+                    // Step 2: Compute cluster-wise MI increase
+                    for (int i = 0; i < Mp; ++i) {
+                        R_cluster[i] = 0.0;
+                        for (int j = 0; j < Np; ++j) {
+                            if (P[i][j] != -1) {
+                                R_cluster[i] += Ip_EC[i][j] - I_EC[i][j];
+                            }
+                        }
+                    }
+                    
+                    // Step 3: Select best cluster
+                    int i_star = 0;
+                    double max_increase = R_cluster[0];
+                    for (int i = 1; i < Mp; ++i) {
+                        if (R_cluster[i] > max_increase) {
+                            max_increase = R_cluster[i];
+                            i_star = i;
+                        }
+                    }
+                    
+                    // Append selected cluster to schedule
+                    schedule.push_back(i_star);
+                    
+                    // Step 4: Commit updates for selected cluster
+                    for (int j = 0; j < Np; ++j) {
+                        if (P[i_star][j] != -1) {
+                            I_EC[i_star][j] = Ip_EC[i_star][j];
+                            u[i_star][j] += 1;
+                        }
+                    }
+                    
+                    // Step 5: Update affected V2C MI
+                    // For each variable node j connected to the selected check node i_star
+                    for (int j = 0; j < Np; ++j) {
+                        if (P[i_star][j] != -1) {
+                            // For all check nodes 'a' connected to variable node j
+                            for (int a = 0; a < Mp; ++a) {
+                                if (P[a][j] != -1) {
+                                    // Compute updated V2C MI for edge (a,j)
+                                    double sum_sq = 0.0;
+                                    
+                                    // Sum over all check nodes connected to vj except 'a'
+                                    for (int c = 0; c < Mp; ++c) {
+                                        if (c != a && P[c][j] != -1) {
+                                            double ji = J_inv_func(I_EC[c][j]);
+                                            sum_sq += ji * ji;
+                                        }
+                                    }
+                                    
+                                    // Add channel contribution
+                                    double ji_ch = J_inv_func(I_ch[j]);
+                                    sum_sq += ji_ch * ji_ch;
+                                    
+                                    I_EV[a][j] = J_func(std::sqrt(sum_sq));
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Step 6: Check termination
+                    bool converged = true;
+                    for (int j = 0; j < Np; ++j) {
+                        double sum_sq = 0.0;
+                        
+                        // Sum over all check nodes connected to variable node j
+                        for (int a = 0; a < Mp; ++a) {
+                            if (P[a][j] != -1) {
+                                double ji = J_inv_func(I_EC[a][j]);
+                                sum_sq += ji * ji;
+                            }
+                        }
+                        
+                        // Add channel contribution
+                        double ji_ch = J_inv_func(I_ch[j]);
+                        sum_sq += ji_ch * ji_ch;
+                        
+                        I_CMI[j] = J_func(std::sqrt(sum_sq));
+                        
+                        if (I_CMI[j] < 1.0) {
+                            converged = false;
+                        }
+                    }
+                    
+                    if (converged) {
+                        break;
+                    }
+                }
+                
+                return schedule;
+            }
+
+            
+
+            // std::vector<double> get_mi_residuals() {
+            //     std::vector<double> residuals(this->check_count, 0.0);
+
+            //     if (this->bp_method == PRODUCT_SUM) {
+            //         for (int row = 0; row < this->check_count; ++row) {
+            //             double max_residual = 0.0;
+                        
+            //             const double EPS_TANH = 1e-12;
+            //             double Am = 0.0;
+            //             int sm = 1;
+            //             for (auto &edge : pcm.iterate_row(row)) {
+            //                 double t = std::tanh(edge.bit_to_check_msg / 2.0);
+            //                 if (std::abs(t) < EPS_TANH) {
+            //                     t = (t >= 0) ? EPS_TANH : -EPS_TANH;
+            //                 }
+            //                 Am += std::log(std::abs(t));
+            //                 if (edge.bit_to_check_msg < 0.0) sm = -sm;
+            //             }
+
+            //             for (auto &edge : pcm.iterate_row(row)) {
+            //                 double old_msg_mi = LLR_to_MI(std::vector<double>{edge.check_to_bit_msg});
+                            
+            //                 double t_self = std::tanh(edge.bit_to_check_msg / 2.0);
+            //                 if (std::abs(t_self) < EPS_TANH) {
+            //                     t_self = (t_self >= 0.0 ? EPS_TANH : -EPS_TANH);
+            //                 }
+            //                 double log_abs_t_self = std::log(std::abs(t_self));
+                            
+            //                 double temp = Am - log_abs_t_self; // log(|prod_others|)
+                            
+            //                 int sign_Lmj = (edge.bit_to_check_msg < 0.0) ? -1 : 1;
+            //                 int sign_factor = sm * sign_Lmj;
+                            
+            //                 double prod_others = sign_factor * std::exp(temp);
+                            
+            //                 // Clamp prod_others to avoid singularity at +/- 1
+            //                 if (prod_others > 1.0 - 1e-15) prod_others = 1.0 - 1e-15;
+            //                 if (prod_others < -1.0 + 1e-15) prod_others = -1.0 + 1e-15;
+                            
+            //                 double new_msg = std::log((1.0 + prod_others) / (1.0 - prod_others));
+            //                 double new_msg_mi = LLR_to_MI(std::vector<double>{new_msg});
+                            
+            //                 double residual = std::abs(new_msg_mi - old_msg_mi);
+            //                 if (residual > max_residual) max_residual = residual;
+            //             }
+            //             residuals[row] = max_residual;
+            //         }
+            //     } else if (this->bp_method == MINIMUM_SUM) {
+            //          throw std::runtime_error("MI residuals for Minimum-Sum method are not yet implemented");
+            //     }
+
+            //     return residuals;
+            // }
             // TODO: Check if function is correct/ and compare against matlab flood decoder
 
             std::vector<uint8_t> &bp_decode_parallel(const std::vector<double> &llr_vector) {
