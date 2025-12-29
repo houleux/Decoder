@@ -317,36 +317,25 @@ namespace ldpc {
             }
 
             std::vector<int> m2i2_scheduler(const std::vector<std::vector<int>> &P, double code_rate, double EbN0) {
-                // Schedule to be returned
                 std::vector<int> schedule;
                 
-                // Get dimensions from base matrix P
                 int Mp = P.size();
                 if (Mp == 0) {
                     throw std::runtime_error("Base matrix P is empty");
                 }
                 int Np = P[0].size();
                 
-                // Initialize data structures
-                // u[i][j]: update counter for edge (i,j)
+                
                 std::vector<std::vector<int>> u(Mp, std::vector<int>(Np, 0));
-                
-                // I_EC[i][j]: check-to-variable MI
                 std::vector<std::vector<double>> I_EC(Mp, std::vector<double>(Np, 0.0));
-                
-                // I_EV[i][j]: variable-to-check MI
                 std::vector<std::vector<double>> I_EV(Mp, std::vector<double>(Np, 0.0));
                 
-                // I_ch[j]: channel MI
                 std::vector<double> I_ch(Np, 0.0);
                 
-                // Predicted check-to-variable MI
                 std::vector<std::vector<double>> Ip_EC(Mp, std::vector<double>(Np, 0.0));
                 
-                // Cluster-wise MI increase
                 std::vector<double> R_cluster(Mp, 0.0);
-                
-                // Combined MI per variable node
+            
                 std::vector<double> I_CMI(Np, 0.0);
                 
                 // Initialize channel MI for all variable nodes
@@ -370,7 +359,6 @@ namespace ldpc {
                     for (int i = 0; i < Mp; ++i) {
                         for (int j = 0; j < Np; ++j) {
                             if (P[i][j] != -1) {
-                                // Compute sum of squared J_inv over neighbors excluding current edge
                                 double sum_sq = 0.0;
                                 for (int b = 0; b < Np; ++b) {
                                     if (b != j && P[i][b] != -1) {
