@@ -339,7 +339,7 @@ class BpDecoder(BpDecoderBase):
         """
 
 
-    def m2i2_scheduler(self, P, code_rate: float, EbN0: float) -> np.ndarray:
+    def m2i2_scheduler(self, P, code_rate: float, EbN0: float, max_iterations: int) -> np.ndarray:
         """
         Compute the M2I2 schedule for a base matrix.
 
@@ -351,6 +351,8 @@ class BpDecoder(BpDecoderBase):
             Code rate R.
         EbN0 : float
             Energy-per-bit to noise density ratio.
+        max_iterations : int
+            Maximum number of iterations for the schedule.
 
         Returns
         -------

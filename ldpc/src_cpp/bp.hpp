@@ -316,7 +316,7 @@ namespace ldpc {
                 return sigma;
             }
 
-            std::vector<int> m2i2_scheduler(const std::vector<std::vector<int>> &P, double code_rate, double EbN0) {
+            std::vector<int> m2i2_scheduler(const std::vector<std::vector<int>> &P, double code_rate, double EbN0, int max_iterations) {
                 std::vector<int> schedule;
                 
                 int Mp = P.size();
@@ -354,7 +354,7 @@ namespace ldpc {
                 }
                 
                 // Main scheduling loop
-                while (true) {
+                while (schedule.size() < max_iterations) {
                     // Step 1: Predict MI for all edges
                     for (int i = 0; i < Mp; ++i) {
                         for (int j = 0; j < Np; ++j) {

@@ -654,7 +654,7 @@ cdef class BpDecoder(BpDecoderBase):
             out[i] = residuals[i]
         return out
 
-    def m2i2_scheduler(self, P, code_rate: float, EbN0: float) -> np.ndarray:
+    def m2i2_scheduler(self, P, code_rate: float, EbN0: float, max_iterations: int) -> np.ndarray:
         """
         Compute the M2I2 schedule for a base matrix.
 
@@ -666,6 +666,8 @@ cdef class BpDecoder(BpDecoderBase):
             Code rate R.
         EbN0 : float
             Energy-per-bit to noise density ratio.
+        max_iterations : int
+            Maximum number of iterations for the schedule.
 
         Returns
         -------
@@ -687,7 +689,7 @@ cdef class BpDecoder(BpDecoderBase):
             for j in range(Np):
                 cP[i][j] = <int>P_arr[i, j]
 
-        cdef vector[int] schedule_vec = self.bpd.m2i2_scheduler(cP, code_rate, EbN0)
+        cdef vector[int] schedule_vec = self.bpd.m2i2_scheduler(cP, code_rate, EbN0, max_iterations)
         cdef Py_ssize_t schedule_len = schedule_vec.size()
 
         out = np.zeros(schedule_len, dtype=np.int32)
