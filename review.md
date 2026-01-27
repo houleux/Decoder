@@ -43,30 +43,22 @@ I did this instead of cluster wise rbp because:
 
 ![node-wise-rbp](rbp_algo.png)
 
-### Current Issues
 
-Although i implemented this scheduling algorithm, it is taking a very long time. 
+## Algo for mutual information based scheduling
 
-It is expected that this will take a lot longer than layered or flooding because of the complexity, but still the time taken is unreasonable and i have to optimise code still.
+Based on M2I2 scheduling
+
+> Scheduling happens independent to the BP decoder. The scheduler is SNR dependent and LLR independent.
 
 
-## Mutual Information based decoding
+Original algo:
 
-Some doubts regarding this. Needs to be clarified
+![m2i2-algo](m2i2_algo.png)
 
-## RL based decoding
 
-Will have to expose the messages from backend to frontend.
+I modified it slightly to accomadate clusters:
 
-After which, the decoder will be perfectly diliineated. Backend(cpp)-Bp algo, Frontend(python)-Scheduling
+![mi_algo](mi_algo_1.png)
+![mi_algo](mi_algo_2.png)
 
-We (might) try to recreate RELDEC to begin with, will come with a timeline regarding the same by next meet.
-
-## Timeline
-
-### By next meet:
-
-- Be done with exposing messages to frontend
-- Implement cluster-wise rbp and MI based decoding
-- Get a framework of RL and get its timeline decided
 
