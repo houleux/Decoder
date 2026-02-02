@@ -1,0 +1,31 @@
+# DQN Hyperparameters for LDPC Environments
+
+gymnasium_env_2/LDPC-LLRStats-v0:
+  n_timesteps: !!float 1e5
+  policy: 'MlpPolicy'
+  buffer_size: 50000
+  learning_rate: !!float 1e-4
+  batch_size: 128
+  learning_starts: 1000
+  gamma: 0.99
+  target_update_interval: 500
+  train_freq: 4
+  gradient_steps: 1
+  exploration_fraction: 0.2
+  exploration_final_eps: 0.05
+  policy_kwargs: "dict(net_arch=[128, 128])"
+
+gymnasium_env_2/LDPC-Residuals-v0:
+  n_timesteps: !!float 1e5
+  policy: 'MlpPolicy'
+  buffer_size: 50000
+  learning_rate: !!float 1e-4
+  batch_size: 128
+  learning_starts: 1000
+  gamma: 0.99
+  target_update_interval: 500
+  train_freq: 4
+  gradient_steps: 1
+  exploration_fraction: 0.2
+  exploration_final_eps: 0.05
+  policy_kwargs: "dict(net_arch=[128, 128])"
