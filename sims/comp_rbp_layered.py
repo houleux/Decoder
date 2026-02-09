@@ -5,9 +5,6 @@ import os
 import sys
 import matplotlib.pyplot as plt
 
-# Ensure project root (parent directory of this script) is on sys.path so
-# local packages like `utils` and `ldpc` can be imported when running
-# this file directly (python sims/comp_rbp_layered.py).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.LDPC_encode import LDPCEncode
@@ -36,12 +33,28 @@ class comparator:
 
         self.clusters = clusters
 
+    def _print_progress(self, prefix, current, total):
+        bar_len = 30
+        filled_len = int(bar_len * current / total) if total else 0
+        bar = "#" * filled_len + "-" * (bar_len - filled_len)
+        if total:
+            msg = f"\r{prefix} [{bar}] {current}/{total}"
+        else:
+            msg = f"\r{prefix} {current}"
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+        if total and current >= total:
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
     def run_iter_comp(self, snr_db= 3.0, iter_range= range(1, 31), to_plot= False):
         layered_bers = []
         rbp_bers = []
         rx_llrs = AWGNChannel(self.tx_codeword, snr_db=snr_db)
 
-        for max_iter in iter_range:
+        total_iters = len(iter_range) if hasattr(iter_range, "__len__") else None
+        for iter_idx, max_iter in enumerate(iter_range, start=1):
+            self._print_progress("Iterations", iter_idx, total_iters)
             rbp_decoded_codewords = []
             layered_decoded_codewords = []
 
@@ -88,7 +101,6 @@ class comparator:
 
 
 def main():
-    # Load the PCM
     pcm_path = os.path.join(os.path.dirname(__file__), 'H.mat')
     if not os.path.isfile(pcm_path):
         raise FileNotFoundError(f"PCM file not found: {pcm_path}")
@@ -109,7 +121,8 @@ def main():
     # Run comparison
     print("Running iteration comparison...")
     iter_range = range(1, 31)
-    layered_bers, rbp_bers = comp.run_iter_comp(snr_db=0.0, iter_range=iter_range)
+    snr_db = 6.0
+    layered_bers, rbp_bers = comp.run_iter_comp(snr_db=snr_db, iter_range=iter_range)
     
     # Plot results
     plt.figure(figsize=(10, 6))
@@ -117,14 +130,18 @@ def main():
     plt.semilogy(list(iter_range), rbp_bers, marker='s', label='Residual BP')
     plt.xlabel('Number of Iterations')
     plt.ylabel('Bit Error Rate (BER)')
-    plt.title('BER Comparison: Layered BP vs Residual BP')
+    plt.title(f'BER Comparison: Layered BP vs Residual BP (SNR={snr_db} dB)')
     plt.grid(True, which='both', alpha=0.3)
     plt.legend()
     plt.tight_layout()
-    plt.savefig('ber_comparison.png', dpi=300)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    output_dir = os.path.join(base_dir, "comps", "rbl_layered")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{snr_db}_{n_frames}.png")
+    plt.savefig(output_path, dpi=300)
     plt.show()
-    
-    print("Plot saved as 'ber_comparison.png'")
+
+    print(f"Plot saved as '{output_path}'")
 
 
 if __name__ == "__main__":
