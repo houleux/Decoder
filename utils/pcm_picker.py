@@ -1,5 +1,11 @@
 import numpy as np
 
+def getBaseMatrix(pcm_txt_path):
+    P = np.loadtxt(pcm_txt_path)
+    P = np.array(P, dtype=int)
+
+    return P
+
 def ldpcQuasiCyclicMatrix(blocksize, P):
     """
     Constructs a Quasi-Cyclic LDPC Parity Check Matrix H.

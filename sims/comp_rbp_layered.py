@@ -11,6 +11,7 @@ from utils.LDPC_encode import LDPCEncode
 from utils.awgn_channel import AWGNChannel
 from utils.find_ber import findBER
 from utils.res_cluster_picker import pick_max_avg_residual_cluster, pick_max_max_residual_cluster
+from utils.pcm_picker import pcmGenerator
 
 from ldpc.bp_decoder import BpDecoder
 
