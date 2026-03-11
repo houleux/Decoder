@@ -135,11 +135,11 @@ if __name__ == "__main__":
     parser.add_argument("--pcm", default="./pc_matrices/NR_1_0_32.txt",
                         help="path to base parity‑check matrix text file")
     parser.add_argument("--Z", type=int, default=32, help="protograph lifting factor")
-    parser.add_argument("--snrs", type=float, nargs="+", default=[0, 1, 2, 3, 4, 5, 6],
+    parser.add_argument("--snrs", type=float, nargs="+", default=[-3, -2, -1, 0, 1, 2, 3, 4],
                         help="SNR values in dB to sweep")
     parser.add_argument("--n_frames", type=int, default=1000,
                         help="number of random codewords per point")
-    parser.add_argument("--max_iter", type=int, default=20,
+    parser.add_argument("--max_iter", type=int, default=2,
                         help="maximum number of iterations/clusters")
     parser.add_argument("--alpha", type=float, default=0.5,
                         help="damping factor for RBL edge updates")
