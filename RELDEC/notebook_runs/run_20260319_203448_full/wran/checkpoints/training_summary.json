@@ -1,0 +1,40 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "train_snr_db": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      5.5
+    ],
+    "episodes_per_snr": 2500,
+    "code_rate": 0.6666666666666667,
+    "seed": 18,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 1
+  },
+  "h_shape": [
+    128,
+    384
+  ],
+  "h_nnz": 1296,
+  "progress": {
+    "episodes_completed": 15000,
+    "total_updates": 750000,
+    "mean_reward": 0.9769428848484907,
+    "elapsed_sec": 50.04561233520508
+  },
+  "artifacts": {
+    "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/checkpoint_latest.npz",
+    "checkpoint_final": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/checkpoint_final.npz",
+    "q_table_npy": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/q_table_final.npy"
+  }
+}
