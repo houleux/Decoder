@@ -1,0 +1,2 @@
+cluster_size,num_clusters,env_id,algo,train_steps,checkpoint_model_path,snr_db,ber,fer,avg_reward,avg_actions,n_frames,eval_frames
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,dqn,2000,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix/rl_continuous/frames_20/cluster_48/dqn/LDPC-DiscreteMI-v0/checkpoints/model_step_2000.zip,0.0,0.06636284722222222,1.0,69.95657077832735,60.0,20,20

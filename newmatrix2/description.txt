@@ -1,0 +1,89 @@
+# 5G NR LDPC Matrix Description
+
+## Original File
+
+File: NR_2_1_384.txt
+
+This file contains the shift coefficients used to construct the 5G NR LDPC
+parity-check matrix based on Base Graph 2 (BG2) with lifting size Z = 384.
+The file represents the expanded base graph where each entry corresponds
+to a cyclic shift applied to a Z × Z identity matrix.
+
+## Matrix Construction Rules
+
+Each element s in the file represents a Z × Z submatrix in the final
+parity-check matrix H:
+
+* s = -1  → Z × Z all-zero matrix
+* s ≥ 0   → Z × Z identity matrix cyclically shifted right by s positions
+
+Thus the full parity-check matrix is built by replacing every entry of the
+base graph with the corresponding Z × Z submatrix.
+
+## Generated Parity-Check Matrix
+
+From NR_2_1_384.txt the lifted QC-LDPC matrix has:
+
+Rows (check nodes)      : 16128
+Columns (variable nodes): 19968
+
+This corresponds to the lifted dimensions of BG2:
+
+Base graph rows (m) : 42
+Base graph cols (n) : 52
+Lifting size (Z)    : 384
+
+Rows = m × Z = 42 × 384 = 16128
+Cols = n × Z = 52 × 384 = 19968
+
+## Code Parameters Used in the Paper
+
+Information length (K) : 3840
+Code rate (R)          : 1/3
+
+The transmitted codeword length is:
+
+N = K / R = 11520
+
+Because the lifted matrix contains 19968 variable nodes, the remaining
+columns are punctured.
+
+Transmitted bits  : columns 1–11520
+Punctured bits    : columns 11521–19968
+
+During decoding, punctured bits are initialized with zero LLR.
+
+## Layered Decoding Structure
+
+For layered belief propagation decoding:
+
+Number of layers  : 42
+Rows per layer    : 384
+
+Each layer corresponds to one base graph row expanded by the lifting
+factor Z.
+
+Layer k processes rows:
+
+rows = k×384  to  (k+1)×384 − 1
+for k = 0 … 41
+
+## Generated Sparse Matrix File
+
+The generated matrix file (e.g., H_BG2_Z384.txt) stores the parity-check
+matrix in sparse coordinate format.
+
+Each line represents one non-zero entry:
+
+row_index column_index
+
+Indices are zero-based.
+
+Example:
+0 0
+0 384
+1 1
+...
+
+This sparse representation contains all edges of the Tanner graph and is
+suitable for implementing belief propagation decoders.

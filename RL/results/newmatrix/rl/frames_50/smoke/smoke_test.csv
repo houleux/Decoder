@@ -1,0 +1,2 @@
+cluster_size,env_id,algo,timesteps,snr_db,n_frames,ber,fer,avg_reward,avg_actions,train_seconds,status,error
+24,gymnasium_env_2/LDPC-DiscreteResidual-v0,ppo,300,0.0,5,0.07795138888888889,1.0,133.0668369193913,120.0,1.0321595668792725,pass,

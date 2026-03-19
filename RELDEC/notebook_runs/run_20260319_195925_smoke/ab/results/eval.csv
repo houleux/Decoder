@@ -1,0 +1,13 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,1.0,11,384,8,0.06981818181818182,0.7272727272727273,58636.36363636364,39.09090909090909,3,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+random,1.0,15,419,8,0.05586666666666667,0.5333333333333333,47300.0,31.533333333333335,7,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+round_robin,1.0,15,395,8,0.05266666666666667,0.5333333333333333,48600.0,32.4,7,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+reldec,1.0,13,453,8,0.06969230769230769,0.6153846153846154,54000.0,36.0,5,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+flooding,1.5,35,467,8,0.026685714285714285,0.22857142857142856,31028.571428571428,20.685714285714287,27,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+random,1.5,62,391,8,0.012612903225806452,0.12903225806451613,21338.709677419356,14.225806451612904,54,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+round_robin,1.5,44,371,8,0.016863636363636365,0.18181818181818182,21136.363636363636,14.090909090909092,36,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+reldec,1.5,55,413,8,0.015018181818181818,0.14545454545454545,20372.727272727272,13.581818181818182,47,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+flooding,2.0,115,418,8,0.007269565217391304,0.06956521739130435,19239.130434782608,12.826086956521738,107,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+random,2.0,120,189,5,0.00315,0.041666666666666664,12875.0,8.583333333333334,115,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+round_robin,2.0,120,246,4,0.0041,0.03333333333333333,10300.0,6.866666666666666,116,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True
+reldec,2.0,120,79,2,0.0013166666666666667,0.016666666666666666,8200.0,5.466666666666667,118,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,8,120,True

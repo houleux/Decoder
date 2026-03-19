@@ -1,0 +1,4 @@
+cluster_size,num_clusters,env_id,algo,snr_db,ber,fer,avg_reward,avg_actions,n_frames,transmitted_length,punctured_length
+384,42,gymnasium_env_2/LDPC-DiscreteResidual-v0,dqn,1.0,0.05259722222222222,1.0,267.23448228859075,210.0,50,11520,8448
+384,42,gymnasium_env_2/LDPC-DiscreteResidual-v0,dqn,1.5,0.04316493055555556,1.0,284.87862481295065,210.0,50,11520,8448
+384,42,gymnasium_env_2/LDPC-DiscreteResidual-v0,dqn,1.8,0.03736458333333333,1.0,297.8313012249709,210.0,50,11520,8448

@@ -1,0 +1,5 @@
+cluster_size,num_clusters,env_id,algo,train_timesteps,train_seconds,model_path,transmitted_length,punctured_length
+384,42,gymnasium_env_2/LDPC-DiscreteResidual-v0,ppo,10000,172.88856840133667,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix2_punctured/rl/frames_50/models/cluster_384/ppo/LDPC-DiscreteResidual-v0/model.zip,11520,8448
+384,42,gymnasium_env_2/LDPC-DiscreteResidual-v0,dqn,10000,136.5215027332306,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix2_punctured/rl/frames_50/models/cluster_384/dqn/LDPC-DiscreteResidual-v0/model.zip,11520,8448
+384,42,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,10000,113.89928603172302,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix2_punctured/rl/frames_50/models/cluster_384/ppo/LDPC-DiscreteMI-v0/model.zip,11520,8448
+384,42,gymnasium_env_2/LDPC-DiscreteMI-v0,dqn,10000,75.51779222488403,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix2_punctured/rl/frames_50/models/cluster_384/dqn/LDPC-DiscreteMI-v0/model.zip,11520,8448

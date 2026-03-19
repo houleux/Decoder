@@ -1,0 +1,64 @@
+{
+  "run_mode": "smoke",
+  "run_root": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke",
+  "codes": [
+    "ab",
+    "wran"
+  ],
+  "methods": [
+    "flooding",
+    "random",
+    "round_robin",
+    "reldec"
+  ],
+  "train_args": {
+    "episodes_per_snr": 6,
+    "checkpoint_every_episodes": 6,
+    "log_every": 3,
+    "max_episodes": 24,
+    "snr_override": {
+      "ab": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "wran": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    }
+  },
+  "eval_args": {
+    "target_frame_errors": 8,
+    "max_frames": 120,
+    "snr_override": {
+      "ab": [
+        1.0,
+        1.5,
+        2.0
+      ],
+      "wran": [
+        1.0,
+        2.0,
+        3.0
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "code": "ab",
+      "checkpoint_dir": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/ab/checkpoints",
+      "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/ab/checkpoints/checkpoint_latest.npz",
+      "eval_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/ab/results/eval.csv",
+      "eval_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/ab/results/eval.json"
+    },
+    {
+      "code": "wran",
+      "checkpoint_dir": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/wran/checkpoints",
+      "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/wran/checkpoints/checkpoint_latest.npz",
+      "eval_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/wran/results/eval.csv",
+      "eval_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_195925_smoke/wran/results/eval.json"
+    }
+  ]
+}

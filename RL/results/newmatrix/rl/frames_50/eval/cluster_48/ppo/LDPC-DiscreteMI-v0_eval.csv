@@ -1,0 +1,8 @@
+cluster_size,num_clusters,env_id,algo,snr_db,ber,fer,avg_reward,avg_actions,n_frames
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,-3,0.15425347222222222,1.0,48.80232668534332,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,-2,0.12727430555555555,1.0,53.7814254190977,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,-1,0.09878472222222222,1.0,60.40328147611707,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,0,0.07256944444444445,1.0,68.47927690487379,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,1,0.052447916666666664,1.0,77.00471667557267,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,2,0.033489583333333336,1.0,88.78251997828198,60.0,50
+48,12,gymnasium_env_2/LDPC-DiscreteMI-v0,ppo,3,0.020260416666666666,1.0,102.06950863963226,60.0,50

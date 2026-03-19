@@ -1,0 +1,4 @@
+cluster_size,num_clusters,env_id,algo,train_steps,checkpoint_model_path,snr_db,ber,fer,avg_reward,avg_actions,n_frames,eval_frames
+24,24,gymnasium_env_2/LDPC-DiscreteResidual-v0,ppo,2000,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix/rl_continuous/frames_50/cluster_24/ppo/LDPC-DiscreteResidual-v0/checkpoints/model_step_2000.zip,0.0,0.0755555555555555,1.0,134.0996123603659,120.0,50,50
+24,24,gymnasium_env_2/LDPC-DiscreteResidual-v0,ppo,4000,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix/rl_continuous/frames_50/cluster_24/ppo/LDPC-DiscreteResidual-v0/checkpoints/model_step_4000.zip,0.0,0.0754513888888888,1.0,134.50725862743937,120.0,50,50
+24,24,gymnasium_env_2/LDPC-DiscreteResidual-v0,ppo,6000,/root/Research/RithvikDecoder/Decoder/RL/results/newmatrix/rl_continuous/frames_50/cluster_24/ppo/LDPC-DiscreteResidual-v0/checkpoints/model_step_6000.zip,0.0,0.07345486111111112,1.0,135.43800857608318,120.0,50,50

@@ -22,8 +22,33 @@ register(
 )
 
 register(
+    id="gymnasium_env_2/LDPC-TanhResidual-v0",
+    entry_point="gymnasium_env_2.envs:LDPCEnv_TanhResidual",
+)
+
+register(
     id="gymnasium_env_2/LDPC-SyndromeHistory-v0",
     entry_point="gymnasium_env_2.envs:LDPCEnv_SyndromeHistory",
+)
+
+register(
+    id="gymnasium_env_2/LDPC-DiscreteLLR-v0",
+    entry_point="gymnasium_env_2.envs:LDPCEnv_DiscreteLLR",
+)
+
+register(
+    id="gymnasium_env_2/LDPC-DiscreteResidual-v0",
+    entry_point="gymnasium_env_2.envs:LDPCEnv_DiscreteResidual",
+)
+
+register(
+    id="gymnasium_env_2/LDPC-DiscreteTanhLLR-v0",
+    entry_point="gymnasium_env_2.envs:LDPCEnv_DiscreteTanhLLR",
+)
+
+register(
+    id="gymnasium_env_2/LDPC-DiscreteMI-v0",
+    entry_point="gymnasium_env_2.envs:LDPCEnv_DiscreteMI",
 )
 
 # Reward function variants
