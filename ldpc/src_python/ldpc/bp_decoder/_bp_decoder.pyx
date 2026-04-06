@@ -653,6 +653,49 @@ cdef class BpDecoder(BpDecoderBase):
         for i in range(self.m):
             out[i] = residuals[i]
         return out
+
+    def m2i2_scheduler(self, P, code_rate: float, EbN0: float, max_iterations: int) -> np.ndarray:
+        """
+        Compute the M2I2 schedule for a base matrix.
+
+        Parameters
+        ----------
+        P : array-like (Mp x Np)
+            Base matrix entries (values of -1 indicate no edge).
+        code_rate : float
+            Code rate R.
+        EbN0 : float
+            Energy-per-bit to noise density ratio.
+        max_iterations : int
+            Maximum number of iterations for the schedule.
+
+        Returns
+        -------
+        np.ndarray (int32)
+            The schedule as a 1D array of check indices.
+        """
+        P_arr = np.ascontiguousarray(P, dtype=np.int32)
+        if P_arr.ndim != 2:
+            raise ValueError("P must be a 2D array or list of lists of ints")
+
+        cdef Py_ssize_t Mp = P_arr.shape[0]
+        cdef Py_ssize_t Np = P_arr.shape[1]
+        cdef vector[vector[int]] cP
+        cP.resize(Mp)
+
+        cdef Py_ssize_t i, j
+        for i in range(Mp):
+            cP[i].resize(Np)
+            for j in range(Np):
+                cP[i][j] = <int>P_arr[i, j]
+
+        cdef vector[int] schedule_vec = self.bpd.m2i2_scheduler(cP, code_rate, EbN0, max_iterations)
+        cdef Py_ssize_t schedule_len = schedule_vec.size()
+
+        out = np.zeros(schedule_len, dtype=np.int32)
+        for i in range(schedule_len):
+            out[i] = schedule_vec[i]
+        return out
         
     @property
     def llr_vector(self) -> np.ndarray:

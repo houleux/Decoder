@@ -1,1 +1,2 @@
-1. Bg2 matrix maybe inacurate
+- Bg2 matrix maybe inacurate
+- for DQN part, rather than representing the state space using an integer (that represents the binary codeword), what if I use the vector as is for state rep?

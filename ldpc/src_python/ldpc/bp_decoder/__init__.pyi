@@ -339,6 +339,28 @@ class BpDecoder(BpDecoderBase):
         """
 
 
+    def m2i2_scheduler(self, P, code_rate: float, EbN0: float, max_iterations: int) -> np.ndarray:
+        """
+        Compute the M2I2 schedule for a base matrix.
+
+        Parameters
+        ----------
+        P : array-like (Mp x Np)
+            Base matrix entries (values of -1 indicate no edge).
+        code_rate : float
+            Code rate R.
+        EbN0 : float
+            Energy-per-bit to noise density ratio.
+        max_iterations : int
+            Maximum number of iterations for the schedule.
+
+        Returns
+        -------
+        np.ndarray (int32)
+            The schedule as a 1D array of check indices.
+        """
+
+
     @property
     def llr_vector(self) -> np.ndarray:
         """

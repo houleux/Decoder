@@ -116,6 +116,7 @@ default_cpp_modules = [
     "mod2",
     "union_find_decoder",
     "bplsd_decoder",
+    "rbl_bp_decoder",
 ]
 
 env_modules = os.environ.get("LDPC_BUILD_MODULES")
