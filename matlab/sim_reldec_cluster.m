@@ -78,7 +78,7 @@ for i =1 : length(SNR)
             end
             vals4 = zeros(1, height(P));
 
-            for k = 1:BlockSize
+            for k = 1:size(vals4)
                 start_idx = (k-1)*BlockSize + 1;
                 end_idx   = k*BlockSize;
                 vals4(k) = sum(vals1(start_idx:end_idx));
