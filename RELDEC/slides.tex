@@ -1,0 +1,157 @@
+\documentclass{beamer}
+%Information to be included in the title page:
+\title{RELDEC: Reinforcement Learning-Based Decoding of Moderate Length LDPC Codes}
+\author{}
+\institute{}
+\date{11th April 2026}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}
+\frametitle{Core Objectives of the paper}
+
+\begin{itemize}
+    \item Change MDRP formulation (state space, rewards etc.) to accommodate longer LDPC codes (relative to previous works)
+    \item Make algorithm adaptive to different channel SNRs online
+    \item First paper to use Deep Q learning for this problem (albeit briefly)
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Notation and Glossary}
+
+\begin{itemize}
+    \item Clusters: Mutually exhaustive subsets of check nodes
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{State Space [TO COMPLETE]}
+
+\begin{itemize}
+    
+    \item The state space is factored into num-cluster sub-state spaces. 
+    \item Each of these sub-state spaces represent the hard decoded bits of all variable nodes that are neighbors to a cluster
+    
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Rewards and Transitions}
+
+\begin{itemize}
+    \item Reward: Fraction of correctly decoded bits
+    \item Action: To schedule any cluster
+    \item Transitions: Simulated using a dynamic layered belief propagation decoder
+    
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Independence}
+
+\begin{itemize}
+    
+    \item Scheduling a cluster, can also change the state for another cluster (due to shared variable nodes). Thus these sub-MDPs are not truly independent. However, the authors assume independence.
+    \item For the sake of this paper, this assumption is not very relevant since most experiments are done with cluster size 1 or 2
+    \item In previous work by the same authors, they have discussed a strategy to minimize these dependencies between clusters
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Learning set up}
+
+\begin{itemize}
+    \item Tabular and Deep Q learning
+    \item Epsilon-greedy policy 
+    \item The agent is trained and tested on a mixture of 6 SNR values (each with equal samples)
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Parameters}
+
+%% INSERT TABLE OF PARAMETERS. KEEP 2 COLUMNS VALUE IN PAPER, OUR VALUE
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Results: BER and FER plots }
+
+\begin{itemize}
+    \item 
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Results: Average CN-> VN messages}
+
+\begin{itemize}
+    \item 
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Comment on DQN and state space}
+
+\begin{itemize}
+    \item The authors do not share the results for DQN claiming it is as good as random. \item However, in our simulations, it performs better than random and worse than RELDEC
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{Q learning analysis}
+
+\begin{itemize}
+    \item Comparing learning across time
+\end{itemize}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\end{document}
+
