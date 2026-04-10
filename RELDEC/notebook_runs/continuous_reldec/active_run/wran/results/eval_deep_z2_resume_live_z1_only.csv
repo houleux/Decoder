@@ -1,4 +1,7 @@
 method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
-deep_reldec_z1,2.0,162,1094,60,0.01758616255144033,0.37037037037037035,4896.0,3.7777777777777777,102,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
-deep_reldec_z1,2.5,651,885,60,0.003540226574500768,0.09216589861751152,3505.769585253456,2.705069124423963,591,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
-deep_reldec_z1,3.0,3000,467,34,0.00040538194444444443,0.011333333333333334,2599.344,2.0056666666666665,2966,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,2.0,162,1094,60,0.0175861625514403,0.3703703703703703,4896.0,3.7777777777777777,102,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,2.5,651,885,60,0.0035402265745007,0.0921658986175115,3505.769585253456,2.705069124423963,591,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,3.0,3000,467,34,0.0004053819444444,0.0113333333333333,2599.344,2.0056666666666665,2966,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,4.0,3000,0,0,0.0,0.0,1731.888,1.3363333333333334,3000,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,5.0,3000,0,0,0.0,0.0,1389.744,1.0723333333333334,3000,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
+deep_reldec_z1,5.5,3000,0,0,0.0,0.0,1329.696,1.026,3000,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,60,3000,True
