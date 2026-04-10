@@ -1,14 +1,15 @@
 % Configuration
-load("P_520.mat","P_520")
-% load("Q_1e5","Q")
-P = P_520;
+load("P_520_100.mat","P_520_100")
+load("Q_1e5","Q")
+P = P_520_100;
 BlockSize = 10;
 pcmatrix = ldpcQuasiCyclicMatrix(BlockSize,P);
 [m, ~] = size(pcmatrix);
 CN_neighbors = cell(m,1);
 for c = 1:m
-    CN_neighbors{c} = find(H(c,:));
+    CN_neighbors{c} = find(pcmatrix(c,:));
 end
+params.maxStateBits = 10;
 cfgLDPCEnc = ldpcEncoderConfig(pcmatrix);
 cfgLDPCDec_bp = ldpcDecoderConfig(pcmatrix);
 cfgLDPCDec = ldpcDecoderConfig(pcmatrix,'layered-bp');
@@ -37,7 +38,7 @@ for i = 1 : height(P)
     temp1(i) = temp;
 end
 
-SNR_db = [-3 -2 -1 0 1 2 3 4];
+SNR_db = [0 0.5 1 1.5 2];
 SNR = 10.^(SNR_db/10);
 maxnumiter = 2;
 for i =1 : length(SNR)
@@ -78,15 +79,15 @@ for i =1 : length(SNR)
             end
             vals4 = zeros(1, height(P));
 
-            for k = 1:size(vals4)
+            for k = 1:length(vals4)
                 start_idx = (k-1)*BlockSize + 1;
                 end_idx   = k*BlockSize;
                 vals4(k) = sum(vals1(start_idx:end_idx));
             end
             [~,a] = max(vals4);
-            [Y_out,res1,t] = ldpc_cluster(Y_temp,C,a,Res{a},row_weight,BlockSize);
+            [Y_out,res1] = ldpc_cluster(Y_temp,C,a,Res{a},row_weight,BlockSize);
             Y_temp = Y_out;
-            Res{t} = res1;
+            Res{a} = res1;
         end
         output_final_whole = Y_out < 0;
         output_final = output_final_whole(1:cfgLDPCEnc.NumInformationBits);
