@@ -1,0 +1,561 @@
+from __future__ import annotations
+
+import io
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Optional, Sequence
+
+import numpy as np
+import scipy.sparse as sp
+
+from ldpc.bp_decoder import BpDecoder
+
+from reldec_core import (
+    DecodeResult,
+    TrainProgress,
+    TrainingConfig,
+    _hard_decision,
+    bpsk_awgn_llr,
+    load_parity_check_from_sparse_csv,
+    syndrome_is_zero,
+)
+
+try:
+    import torch
+    import torch.nn as nn
+except Exception:  # pragma: no cover - allows importing this module without torch
+    torch = None
+    nn = None
+
+
+@dataclass(frozen=True)
+class DeepDqnConfig:
+    policy_label: str
+    cluster_size: int
+    hidden_dim: int = 128
+    learning_rate: float = 1e-3
+    replay_capacity: int = 20000
+    replay_warmup: int = 1000
+    batch_size: int = 128
+    target_sync_steps: int = 200
+    train_every_steps: int = 1
+    epsilon_start: float = 0.6
+    epsilon_end: float = 0.05
+    epsilon_decay_steps: int = 10000
+    gamma: float = 0.9
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(payload: dict) -> "DeepDqnConfig":
+        return DeepDqnConfig(
+            policy_label=str(payload["policy_label"]),
+            cluster_size=int(payload["cluster_size"]),
+            hidden_dim=int(payload.get("hidden_dim", 128)),
+            learning_rate=float(payload.get("learning_rate", 1e-3)),
+            replay_capacity=int(payload.get("replay_capacity", 20000)),
+            replay_warmup=int(payload.get("replay_warmup", 1000)),
+            batch_size=int(payload.get("batch_size", 128)),
+            target_sync_steps=int(payload.get("target_sync_steps", 200)),
+            train_every_steps=int(payload.get("train_every_steps", 1)),
+            epsilon_start=float(payload.get("epsilon_start", 0.6)),
+            epsilon_end=float(payload.get("epsilon_end", 0.05)),
+            epsilon_decay_steps=int(payload.get("epsilon_decay_steps", 10000)),
+            gamma=float(payload.get("gamma", 0.9)),
+        )
+
+
+@dataclass
+class DeepTrainingCheckpoint:
+    config: TrainingConfig
+    dqn_config: DeepDqnConfig
+    progress: TrainProgress
+    rng_state: dict
+    snr_schedule_db: np.ndarray
+    global_step: int
+    q_online_bytes: np.ndarray
+    q_target_bytes: np.ndarray
+    optimizer_bytes: np.ndarray
+
+
+@dataclass(frozen=True)
+class CnClusterMap:
+    cluster_size: int
+    clusters: tuple[np.ndarray, ...]
+    cluster_neighbors: tuple[np.ndarray, ...]
+
+
+class ReplayBuffer:
+    def __init__(self, capacity: int, state_dim: int):
+        self.capacity = int(capacity)
+        self.state_dim = int(state_dim)
+        self.states = np.zeros((self.capacity, self.state_dim), dtype=np.float32)
+        self.actions = np.zeros((self.capacity,), dtype=np.int64)
+        self.rewards = np.zeros((self.capacity,), dtype=np.float32)
+        self.next_states = np.zeros((self.capacity, self.state_dim), dtype=np.float32)
+        self.dones = np.zeros((self.capacity,), dtype=np.float32)
+        self.pos = 0
+        self.size = 0
+
+    def add(
+        self,
+        state: np.ndarray,
+        action: int,
+        reward: float,
+        next_state: np.ndarray,
+        done: bool,
+    ) -> None:
+        self.states[self.pos, :] = state
+        self.actions[self.pos] = int(action)
+        self.rewards[self.pos] = float(reward)
+        self.next_states[self.pos, :] = next_state
+        self.dones[self.pos] = 1.0 if done else 0.0
+        self.pos = (self.pos + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
+
+    def sample(self, rng: np.random.Generator, batch_size: int) -> tuple[np.ndarray, ...]:
+        idx = rng.integers(0, self.size, size=int(batch_size))
+        return (
+            self.states[idx],
+            self.actions[idx],
+            self.rewards[idx],
+            self.next_states[idx],
+            self.dones[idx],
+        )
+
+
+class QNetwork(nn.Module):
+    def __init__(self, state_dim: int, num_actions: int, hidden_dim: int):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, num_actions),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+def build_cn_clusters(h_csr: sp.csr_matrix, cluster_size: int) -> CnClusterMap:
+    if cluster_size <= 0:
+        raise ValueError("cluster_size must be >= 1")
+
+    h = h_csr.tocsr()
+    m, _ = h.shape
+    check_neighbors = [
+        h.indices[h.indptr[i] : h.indptr[i + 1]].astype(np.int32, copy=True) for i in range(m)
+    ]
+
+    clusters: list[np.ndarray] = []
+    for start in range(0, m, cluster_size):
+        cn_ids = np.arange(start, min(start + cluster_size, m), dtype=np.int32)
+        clusters.append(cn_ids)
+
+    cluster_neighbors: list[np.ndarray] = []
+    for cn_ids in clusters:
+        if cn_ids.size == 0:
+            cluster_neighbors.append(np.zeros((0,), dtype=np.int32))
+            continue
+        cn_neis = [check_neighbors[int(cn)] for cn in cn_ids if check_neighbors[int(cn)].size > 0]
+        if not cn_neis:
+            cluster_neighbors.append(np.zeros((0,), dtype=np.int32))
+            continue
+        merged = np.unique(np.concatenate(cn_neis).astype(np.int32, copy=False))
+        cluster_neighbors.append(merged)
+
+    return CnClusterMap(
+        cluster_size=int(cluster_size),
+        clusters=tuple(clusters),
+        cluster_neighbors=tuple(cluster_neighbors),
+    )
+
+
+def _state_vector(llr_post: np.ndarray, vn_indices: np.ndarray, state_dim: int) -> np.ndarray:
+    state = np.zeros((state_dim,), dtype=np.float32)
+    if vn_indices.size == 0:
+        return state
+    bits = (llr_post[vn_indices] < 0.0).astype(np.float32)
+    state[: bits.size] = bits
+    return state
+
+
+def _torch_bytes(payload: dict) -> np.ndarray:
+    if torch is None:
+        raise RuntimeError("PyTorch is required for Deep RELDEC")
+    buffer = io.BytesIO()
+    torch.save(payload, buffer)
+    return np.frombuffer(buffer.getvalue(), dtype=np.uint8)
+
+
+def _torch_from_bytes(array: np.ndarray, map_location: str = "cpu") -> dict:
+    if torch is None:
+        raise RuntimeError("PyTorch is required for Deep RELDEC")
+    buffer = io.BytesIO(array.tobytes())
+    return torch.load(buffer, map_location=map_location)
+
+
+def save_deep_training_checkpoint(checkpoint_path: str | Path, checkpoint: DeepTrainingCheckpoint) -> None:
+    checkpoint_path = Path(checkpoint_path)
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = checkpoint_path.parent / f"{checkpoint_path.name}.tmp"
+
+    with open(tmp_path, "wb") as fh:
+        np.savez_compressed(
+            fh,
+            config_json=np.array(json.dumps(checkpoint.config.to_dict())),
+            dqn_config_json=np.array(json.dumps(checkpoint.dqn_config.to_dict())),
+            snr_schedule_db=checkpoint.snr_schedule_db,
+            episodes_completed=np.array([checkpoint.progress.episodes_completed], dtype=np.int64),
+            total_updates=np.array([checkpoint.progress.total_updates], dtype=np.int64),
+            reward_sum=np.array([checkpoint.progress.reward_sum], dtype=np.float64),
+            reward_count=np.array([checkpoint.progress.reward_count], dtype=np.int64),
+            elapsed_sec=np.array([checkpoint.progress.elapsed_sec], dtype=np.float64),
+            rng_state_json=np.array(json.dumps(checkpoint.rng_state)),
+            global_step=np.array([checkpoint.global_step], dtype=np.int64),
+            policy_type=np.array("dqn"),
+            q_online_bytes=checkpoint.q_online_bytes,
+            q_target_bytes=checkpoint.q_target_bytes,
+            optimizer_bytes=checkpoint.optimizer_bytes,
+        )
+
+    tmp_path.replace(checkpoint_path)
+
+
+def load_deep_training_checkpoint(checkpoint_path: str | Path) -> DeepTrainingCheckpoint:
+    checkpoint_path = Path(checkpoint_path)
+    with np.load(checkpoint_path, allow_pickle=False) as npz:
+        policy_type = str(np.asarray(npz.get("policy_type", np.array("tabular"))).item())
+        if policy_type != "dqn":
+            raise ValueError(f"Checkpoint at {checkpoint_path} is not a Deep RELDEC DQN checkpoint")
+
+        config = TrainingConfig.from_dict(json.loads(str(np.asarray(npz["config_json"]).item())))
+        dqn_config = DeepDqnConfig.from_dict(
+            json.loads(str(np.asarray(npz["dqn_config_json"]).item()))
+        )
+        progress = TrainProgress(
+            episodes_completed=int(np.asarray(npz["episodes_completed"]).reshape(-1)[0]),
+            total_updates=int(np.asarray(npz["total_updates"]).reshape(-1)[0]),
+            reward_sum=float(np.asarray(npz["reward_sum"]).reshape(-1)[0]),
+            reward_count=int(np.asarray(npz["reward_count"]).reshape(-1)[0]),
+            elapsed_sec=float(np.asarray(npz["elapsed_sec"]).reshape(-1)[0]),
+        )
+        rng_state = json.loads(str(np.asarray(npz["rng_state_json"]).item()))
+        snr_schedule_db = np.asarray(npz["snr_schedule_db"], dtype=np.float64)
+        global_step = int(np.asarray(npz["global_step"]).reshape(-1)[0])
+        q_online_bytes = np.asarray(npz["q_online_bytes"], dtype=np.uint8)
+        q_target_bytes = np.asarray(npz["q_target_bytes"], dtype=np.uint8)
+        optimizer_bytes = np.asarray(npz["optimizer_bytes"], dtype=np.uint8)
+
+    return DeepTrainingCheckpoint(
+        config=config,
+        dqn_config=dqn_config,
+        progress=progress,
+        rng_state=rng_state,
+        snr_schedule_db=snr_schedule_db,
+        global_step=global_step,
+        q_online_bytes=q_online_bytes,
+        q_target_bytes=q_target_bytes,
+        optimizer_bytes=optimizer_bytes,
+    )
+
+
+class DeepReldecTrainer:
+    """Deep RELDEC trainer with DQN. Supports z=1 and z=2 cluster sizes."""
+
+    def __init__(
+        self,
+        h_csr: sp.csr_matrix,
+        dqn_config: DeepDqnConfig,
+        beta_discount: float,
+        l_max: int,
+        device: str = "cpu",
+    ):
+        if torch is None or nn is None:
+            raise RuntimeError("PyTorch is required for Deep RELDEC")
+
+        self.h = h_csr.tocsr().astype(np.uint8)
+        self.m, self.n = self.h.shape
+        self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
+        self.num_actions = len(self.map.clusters)
+        self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
+        self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+
+        self.gamma = float(beta_discount)
+        self.l_max = int(l_max)
+        self.dqn_config = dqn_config
+
+        self.device = torch.device(device)
+        self.online_net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
+        self.target_net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
+        self.target_net.load_state_dict(self.online_net.state_dict())
+        self.target_net.eval()
+
+        self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=dqn_config.learning_rate)
+        self.replay = ReplayBuffer(dqn_config.replay_capacity, self.state_dim)
+
+        self.decoder = BpDecoder(
+            self.h,
+            max_iter=1,
+            schedule="cluster",
+            input_vector_type="received_vector",
+        )
+
+        self.global_step = 0
+
+    def _epsilon(self) -> float:
+        cfg = self.dqn_config
+        if cfg.epsilon_decay_steps <= 0:
+            return float(cfg.epsilon_end)
+        frac = min(float(self.global_step) / float(cfg.epsilon_decay_steps), 1.0)
+        return float(cfg.epsilon_start + frac * (cfg.epsilon_end - cfg.epsilon_start))
+
+    def _choose_action(
+        self,
+        state_cache: np.ndarray,
+        rng: np.random.Generator,
+        training: bool,
+        valid_actions: Optional[np.ndarray] = None,
+    ) -> int:
+        if valid_actions is None:
+            valid_actions = np.arange(self.num_actions, dtype=np.int64)
+
+        eps = self._epsilon() if training else 0.0
+        if training and rng.random() < eps:
+            return int(valid_actions[rng.integers(0, valid_actions.size)])
+
+        with torch.no_grad():
+            states = torch.as_tensor(state_cache[valid_actions], dtype=torch.float32, device=self.device)
+            q_vals = self.online_net(states)
+            idx = torch.arange(valid_actions.size, device=self.device)
+            chosen_action_q = q_vals[idx, torch.as_tensor(valid_actions, device=self.device)]
+            best_val = torch.max(chosen_action_q)
+            ties = torch.where(chosen_action_q == best_val)[0].cpu().numpy()
+
+        tie_pick = int(ties[rng.integers(0, ties.size)])
+        return int(valid_actions[tie_pick])
+
+    def _train_step(self, rng: np.random.Generator) -> float:
+        cfg = self.dqn_config
+        if self.replay.size < cfg.replay_warmup:
+            return 0.0
+        if self.global_step % max(cfg.train_every_steps, 1) != 0:
+            return 0.0
+
+        states, actions, rewards, next_states, dones = self.replay.sample(rng, cfg.batch_size)
+
+        states_t = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+        actions_t = torch.as_tensor(actions, dtype=torch.int64, device=self.device).unsqueeze(1)
+        rewards_t = torch.as_tensor(rewards, dtype=torch.float32, device=self.device).unsqueeze(1)
+        next_states_t = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+        dones_t = torch.as_tensor(dones, dtype=torch.float32, device=self.device).unsqueeze(1)
+
+        q_pred = self.online_net(states_t).gather(1, actions_t)
+        with torch.no_grad():
+            q_next = self.target_net(next_states_t).max(dim=1, keepdim=True).values
+            q_target = rewards_t + (1.0 - dones_t) * self.gamma * q_next
+
+        loss = torch.mean((q_pred - q_target) ** 2)
+
+        self.optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        self.optimizer.step()
+
+        if self.global_step % max(cfg.target_sync_steps, 1) == 0:
+            self.target_net.load_state_dict(self.online_net.state_dict())
+
+        return float(loss.detach().cpu().item())
+
+    def _initial_state_cache(self, llr_post: np.ndarray) -> np.ndarray:
+        state_cache = np.zeros((self.num_actions, self.state_dim), dtype=np.float32)
+        for action in range(self.num_actions):
+            state_cache[action] = _state_vector(
+                llr_post,
+                self.map.cluster_neighbors[action],
+                self.state_dim,
+            )
+        return state_cache
+
+    def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+
+        state_cache = self._initial_state_cache(llr_post)
+        episode_reward = 0.0
+        episode_loss = 0.0
+
+        for _ in range(self.l_max):
+            action = self._choose_action(state_cache, rng=rng, training=True)
+            prev_state = state_cache[action].copy()
+
+            llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+            neighbors = self.map.cluster_neighbors[action]
+
+            if neighbors.size == 0:
+                reward = 1.0
+            else:
+                reward = float(np.mean(llr_post[neighbors] >= 0.0))
+
+            next_state = _state_vector(llr_post, neighbors, self.state_dim)
+            self.replay.add(prev_state, action, reward, next_state, False)
+
+            state_cache[action] = next_state
+            episode_reward += reward
+            self.global_step += 1
+            episode_loss += self._train_step(rng)
+
+        return episode_reward, episode_loss
+
+    def export_checkpoint_payload(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        q_online = _torch_bytes(self.online_net.state_dict())
+        q_target = _torch_bytes(self.target_net.state_dict())
+        optim = _torch_bytes(self.optimizer.state_dict())
+        return q_online, q_target, optim
+
+    def import_checkpoint_payload(
+        self,
+        q_online_bytes: np.ndarray,
+        q_target_bytes: np.ndarray,
+        optimizer_bytes: np.ndarray,
+        global_step: int,
+    ) -> None:
+        self.online_net.load_state_dict(_torch_from_bytes(q_online_bytes, map_location=str(self.device)))
+        self.target_net.load_state_dict(_torch_from_bytes(q_target_bytes, map_location=str(self.device)))
+        self.optimizer.load_state_dict(_torch_from_bytes(optimizer_bytes, map_location=str(self.device)))
+        self.global_step = int(global_step)
+
+
+class DeepReldecDecoder:
+    def __init__(
+        self,
+        h_csr: sp.csr_matrix,
+        dqn_config: DeepDqnConfig,
+        q_online_bytes: np.ndarray,
+        device: str = "cpu",
+    ):
+        if torch is None or nn is None:
+            raise RuntimeError("PyTorch is required for Deep RELDEC")
+
+        self.h = h_csr.tocsr().astype(np.uint8)
+        self.m, self.n = self.h.shape
+        self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
+        self.num_actions = len(self.map.clusters)
+        self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
+        self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+        self.device = torch.device(device)
+
+        self.net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
+        self.net.load_state_dict(_torch_from_bytes(q_online_bytes, map_location=str(self.device)))
+        self.net.eval()
+
+        self.decoder = BpDecoder(
+            self.h,
+            max_iter=1,
+            schedule="cluster",
+            input_vector_type="received_vector",
+        )
+
+        self.cluster_messages = np.array(
+            [int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+            dtype=np.int32,
+        )
+
+    def _state_for_action(self, llr_post: np.ndarray, action: int) -> np.ndarray:
+        return _state_vector(llr_post, self.map.cluster_neighbors[action], self.state_dim)
+
+    def _choose_greedy(self, llr_post: np.ndarray, valid_actions: np.ndarray, rng: np.random.Generator) -> int:
+        state_stack = np.zeros((valid_actions.size, self.state_dim), dtype=np.float32)
+        for i, action in enumerate(valid_actions):
+            state_stack[i] = self._state_for_action(llr_post, int(action))
+
+        with torch.no_grad():
+            states = torch.as_tensor(state_stack, dtype=torch.float32, device=self.device)
+            q_vals = self.net(states)
+            idx = torch.arange(valid_actions.size, device=self.device)
+            selected_q = q_vals[idx, torch.as_tensor(valid_actions, device=self.device)]
+            best_val = torch.max(selected_q)
+            ties = torch.where(selected_q == best_val)[0].cpu().numpy()
+
+        pick = int(ties[rng.integers(0, ties.size)])
+        return int(valid_actions[pick])
+
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = _hard_decision(llr_post)
+
+        messages = 0
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+            for _ in range(self.num_actions):
+                valid = np.flatnonzero(~scheduled).astype(np.int64)
+                action = self._choose_greedy(llr_post, valid, rng)
+
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                scheduled[action] = True
+                messages += int(self.cluster_messages[action])
+
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+
+def evaluate_deep_method(
+    decoder: DeepReldecDecoder,
+    snr_db: float,
+    code_rate: float,
+    i_max: int,
+    target_frame_errors: int,
+    max_frames: int,
+    rng: np.random.Generator,
+    all_zero_only: bool = True,
+    method_name: str = "deep_reldec_z2",
+):
+    from reldec_core import MethodStats
+
+    stats = MethodStats(method=method_name, n=decoder.n)
+
+    while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+        if all_zero_only:
+            tx_bits = np.zeros(decoder.n, dtype=np.uint8)
+        else:
+            tx_bits = rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+
+        llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+        decoded = decoder.decode(llr, i_max=i_max, rng=rng)
+        stats.update(tx_bits, decoded)
+
+    return stats
+
+
+def load_deep_decoder_from_checkpoint(
+    checkpoint_path: str | Path,
+    matrix_csv: str | Path,
+    expected_policy_label: str,
+    device: str = "cpu",
+) -> DeepReldecDecoder:
+    checkpoint = load_deep_training_checkpoint(checkpoint_path)
+    if checkpoint.dqn_config.policy_label != expected_policy_label:
+        raise ValueError(
+            f"Checkpoint policy label '{checkpoint.dqn_config.policy_label}' does not match "
+            f"expected '{expected_policy_label}'"
+        )
+
+    h = load_parity_check_from_sparse_csv(matrix_csv)
+    return DeepReldecDecoder(
+        h_csr=h,
+        dqn_config=checkpoint.dqn_config,
+        q_online_bytes=checkpoint.q_online_bytes,
+        device=device,
+    )

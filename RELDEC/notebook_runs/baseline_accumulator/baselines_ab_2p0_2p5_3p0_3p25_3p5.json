@@ -1,0 +1,146 @@
+{
+  "config": {
+    "code": "ab",
+    "methods": [
+      "flooding",
+      "random",
+      "round_robin"
+    ],
+    "snr_db": [
+      2.0,
+      2.5,
+      3.0,
+      3.25,
+      3.5
+    ],
+    "i_max": 50,
+    "code_rate": 0.4,
+    "random_codewords": false,
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv"
+  },
+  "records": {
+    "flooding|2.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "flooding|2.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "flooding|3.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "flooding|3.25": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "flooding|3.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "random|2.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "random|2.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "random|3.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "random|3.25": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "random|3.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "round_robin|2.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "round_robin|2.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "round_robin|3.00": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "round_robin|3.25": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    },
+    "round_robin|3.50": {
+      "frames": 0,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "messages": 0,
+      "iterations": 0,
+      "converged_frames": 0
+    }
+  },
+  "run_history": [],
+  "created_at": "2026-03-24 20:52:27",
+  "updated_at": "2026-04-08 00:00:00"
+}

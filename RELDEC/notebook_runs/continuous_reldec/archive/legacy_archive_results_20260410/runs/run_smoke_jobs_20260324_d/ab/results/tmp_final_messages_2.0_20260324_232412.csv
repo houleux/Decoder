@@ -1,0 +1,5 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,2.0,400,371,8,0.001855,0.02,14565.0,9.71,392,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,20,400,True
+random,2.0,400,669,14,0.003345,0.035,11610.0,7.74,386,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,20,400,True
+round_robin,2.0,400,588,11,0.00294,0.0275,10226.25,6.8175,389,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,20,400,True
+reldec,2.0,400,559,10,0.002795,0.025,10470.0,6.98,390,ab,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv,0.4,50,20,400,True

@@ -1,0 +1,99 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv",
+    "code_rate": 0.4,
+    "methods": [
+      "flooding",
+      "random",
+      "round_robin",
+      "reldec"
+    ],
+    "snr_db": [
+      2.0
+    ],
+    "i_max": 50,
+    "target_frame_errors": 10,
+    "max_frames": 200,
+    "all_zero_only": true,
+    "seed": 1017
+  },
+  "results": [
+    {
+      "method": "flooding",
+      "snr_db": 2.0,
+      "frames": 177,
+      "bit_errors": 465,
+      "frame_errors": 10,
+      "ber": 0.005254237288135594,
+      "fer": 0.05649717514124294,
+      "avg_messages": 18440.677966101695,
+      "avg_iterations": 12.293785310734464,
+      "converged_frames": 167,
+      "code": "ab",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv",
+      "code_rate": 0.4,
+      "i_max": 50,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "random",
+      "snr_db": 2.0,
+      "frames": 131,
+      "bit_errors": 457,
+      "frame_errors": 10,
+      "ber": 0.006977099236641221,
+      "fer": 0.07633587786259542,
+      "avg_messages": 13625.954198473282,
+      "avg_iterations": 9.083969465648854,
+      "converged_frames": 121,
+      "code": "ab",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv",
+      "code_rate": 0.4,
+      "i_max": 50,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "round_robin",
+      "snr_db": 2.0,
+      "frames": 200,
+      "bit_errors": 126,
+      "frame_errors": 3,
+      "ber": 0.00126,
+      "fer": 0.015,
+      "avg_messages": 8415.0,
+      "avg_iterations": 5.61,
+      "converged_frames": 197,
+      "code": "ab",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv",
+      "code_rate": 0.4,
+      "i_max": 50,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "reldec",
+      "snr_db": 2.0,
+      "frames": 193,
+      "bit_errors": 488,
+      "frame_errors": 10,
+      "ber": 0.00505699481865285,
+      "fer": 0.05181347150259067,
+      "avg_messages": 12691.709844559586,
+      "avg_iterations": 8.461139896373057,
+      "converged_frames": 183,
+      "code": "ab",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_AB_LDPC_500.csv",
+      "code_rate": 0.4,
+      "i_max": 50,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "run_mode": "full",
+  "run_root": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full",
+  "codes": [
+    "ab",
+    "wran"
+  ],
+  "methods": [
+    "flooding",
+    "random",
+    "round_robin",
+    "reldec"
+  ],
+  "train_args": {
+    "episodes_per_snr": 2500,
+    "checkpoint_every_episodes": 250,
+    "log_every": 100,
+    "max_episodes": null,
+    "snr_override": null
+  },
+  "eval_args": {
+    "target_frame_errors": 300,
+    "max_frames": 200000,
+    "snr_override": null
+  },
+  "recovered_without_rerun": true,
+  "artifacts": [
+    {
+      "code": "ab",
+      "checkpoint_dir": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/checkpoints",
+      "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/checkpoints/checkpoint_latest.npz",
+      "checkpoint_final": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/checkpoints/checkpoint_final.npz",
+      "q_table_npy": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/checkpoints/q_table_final.npy",
+      "training_summary_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/checkpoints/training_summary.json",
+      "eval_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/results/eval.csv",
+      "eval_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/ab/results/eval.json",
+      "training_saved": true,
+      "evaluation_saved": false
+    },
+    {
+      "code": "wran",
+      "checkpoint_dir": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints",
+      "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/checkpoint_latest.npz",
+      "checkpoint_final": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/checkpoint_final.npz",
+      "q_table_npy": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/q_table_final.npy",
+      "training_summary_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/checkpoints/training_summary.json",
+      "eval_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/results/eval.csv",
+      "eval_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/run_20260319_203448_full/wran/results/eval.json",
+      "training_saved": true,
+      "evaluation_saved": false
+    }
+  ]
+}

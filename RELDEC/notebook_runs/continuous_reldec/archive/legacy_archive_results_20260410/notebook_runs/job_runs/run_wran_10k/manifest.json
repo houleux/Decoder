@@ -1,0 +1,50 @@
+{
+  "created_at": "2026-03-25T00:20:03Z",
+  "run_root": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/job_runs/run_wran_10k",
+  "codes": [
+    "wran"
+  ],
+  "code_index": {
+    "wran": 0
+  },
+  "methods": [
+    "flooding",
+    "random",
+    "round_robin",
+    "reldec"
+  ],
+  "train": {
+    "episodes_per_snr": 2500,
+    "checkpoint_every_episodes": 250,
+    "log_every": 100,
+    "max_episodes": null,
+    "seeds": {
+      "wran": 18
+    },
+    "train_snr_count": 6
+  },
+  "eval": {
+    "target_frame_errors": 300,
+    "max_frames": 10000,
+    "seed_base": 1017,
+    "interval_sec": 900,
+    "snr_berfer": [
+      2.0,
+      2.5,
+      3.0,
+      3.25,
+      3.5
+    ],
+    "snr_messages": [
+      2.0,
+      2.5,
+      3.0,
+      4.0,
+      5.0
+    ]
+  },
+  "system": {
+    "cpu_count": 2,
+    "worker_cap": 2
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "flooding",
+      "random",
+      "round_robin",
+      "reldec"
+    ],
+    "snr_db": [
+      3.0
+    ],
+    "i_max": 5,
+    "target_frame_errors": 10,
+    "max_frames": 200,
+    "all_zero_only": true,
+    "seed": 1020
+  },
+  "results": [
+    {
+      "method": "flooding",
+      "snr_db": 3.0,
+      "frames": 38,
+      "bit_errors": 94,
+      "frame_errors": 10,
+      "ber": 0.006441885964912281,
+      "fer": 0.2631578947368421,
+      "avg_messages": 5184.0,
+      "avg_iterations": 4.0,
+      "converged_frames": 28,
+      "code": "wran",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "random",
+      "snr_db": 3.0,
+      "frames": 200,
+      "bit_errors": 82,
+      "frame_errors": 9,
+      "ber": 0.0010677083333333333,
+      "fer": 0.045,
+      "avg_messages": 3609.36,
+      "avg_iterations": 2.785,
+      "converged_frames": 191,
+      "code": "wran",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "round_robin",
+      "snr_db": 3.0,
+      "frames": 200,
+      "bit_errors": 108,
+      "frame_errors": 8,
+      "ber": 0.00140625,
+      "fer": 0.04,
+      "avg_messages": 3447.36,
+      "avg_iterations": 2.66,
+      "converged_frames": 192,
+      "code": "wran",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    },
+    {
+      "method": "reldec",
+      "snr_db": 3.0,
+      "frames": 129,
+      "bit_errors": 55,
+      "frame_errors": 10,
+      "ber": 0.0011103036175710594,
+      "fer": 0.07751937984496124,
+      "avg_messages": 3445.953488372093,
+      "avg_iterations": 2.6589147286821704,
+      "converged_frames": 119,
+      "code": "wran",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 10,
+      "max_frames": 200,
+      "all_zero_only": true
+    }
+  ]
+}

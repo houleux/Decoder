@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from reldec_deep import evaluate_deep_method, load_deep_decoder_from_checkpoint
 from reldec_core import (
     THIS_DIR,
     ReldecDecoderSuite,
@@ -26,11 +27,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--code", choices=["ab", "wran"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
     parser.add_argument("--q-table", type=str, default=None)
+    parser.add_argument("--deep-checkpoint", type=str, default=None)
     parser.add_argument(
         "--methods",
         nargs="+",
         default=None,
-        help="Subset of: flooding random round_robin reldec",
+        help="Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2",
     )
     parser.add_argument("--snr-db", nargs="+", type=float, default=None)
     parser.add_argument("--i-max", type=int, default=None)
@@ -49,10 +51,12 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
         methods = ["flooding", "random", "round_robin"]
         if args.q_table:
             methods.append("reldec")
+        if args.deep_checkpoint:
+            methods.append("deep_reldec_z2")
         return methods
 
     methods = [m.lower() for m in args.methods]
-    valid = {"flooding", "random", "round_robin", "reldec"}
+    valid = {"flooding", "random", "round_robin", "reldec", "deep_reldec_z1", "deep_reldec_z2"}
     for method in methods:
         if method not in valid:
             supported = ", ".join(sorted(valid))
@@ -83,6 +87,8 @@ def _main() -> None:
     methods = _normalize_methods(args)
     if "reldec" in methods and not args.q_table:
         raise ValueError("--q-table is required when evaluating method 'reldec'")
+    if any(m.startswith("deep_reldec_") for m in methods) and not args.deep_checkpoint:
+        raise ValueError("--deep-checkpoint is required when evaluating deep RELDEC methods")
 
     h = load_parity_check_from_sparse_csv(matrix_csv)
     code_rate = args.code_rate if args.code_rate is not None else nominal_code_rate(h)
@@ -90,6 +96,20 @@ def _main() -> None:
     suite = ReldecDecoderSuite(h)
     if "reldec" in methods:
         suite.set_q_table(load_q_table(args.q_table))
+
+    deep_decoders = {}
+    if "deep_reldec_z1" in methods:
+        deep_decoders["deep_reldec_z1"] = load_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="deep_z1",
+        )
+    if "deep_reldec_z2" in methods:
+        deep_decoders["deep_reldec_z2"] = load_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="deep_z2",
+        )
 
     rng = np.random.default_rng(args.seed)
     all_zero_only = not args.random_codewords
@@ -129,6 +149,16 @@ def _main() -> None:
                 max_frames=int(args.max_frames),
                 rng=rng,
                 all_zero_only=all_zero_only,
+            ) if method in {"flooding", "random", "round_robin", "reldec"} else evaluate_deep_method(
+                decoder=deep_decoders[method],
+                snr_db=float(snr_db),
+                code_rate=float(code_rate),
+                i_max=i_max,
+                target_frame_errors=int(args.target_frame_errors),
+                max_frames=int(args.max_frames),
+                rng=rng,
+                all_zero_only=all_zero_only,
+                method_name=method,
             )
 
             row = stats.summary(snr_db=float(snr_db))

@@ -1,0 +1,5 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,2.0,342,4528,300,0.034478557504873296,0.8771929824561403,6411.789473684211,4.947368421052632,42,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
+random,2.0,478,4756,300,0.025910913528591352,0.6276150627615062,5932.3179916317995,4.577405857740586,178,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
+round_robin,2.0,527,5366,300,0.026516049968374446,0.5692599620493358,5759.453510436432,4.444022770398482,227,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
+reldec,2.0,910,5740,300,0.016426282051282052,0.32967032967032966,4625.723076923077,3.5692307692307694,610,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
