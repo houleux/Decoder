@@ -1,10 +1,17 @@
 % Configuration
-load("P_520_100.mat","P_520_100")
-load("Q_1e5","Q")
-P = P_520_100;
-BlockSize = 10;
-pcmatrix = ldpcQuasiCyclicMatrix(BlockSize,P);
+% load("P_520_100.mat","P_520_100")
+% load("Q_15000_P_520.mat","Q")
+% Q = Q ./ max(abs(Q(:)));
+% P = P_520_100;
+BlockSize = 16;
+epsilon_test = 0.05;
+% pcmatrix = ldpcQuasiCyclicMatrix(BlockSize,P);
+Q = readmatrix('qtable_ep015000.csv');
+Q = Q(2:end, :);
+pcmatrix = sparse(logical(readmatrix('WRAN_irreg_384_256 (1).csv')));
+%% 
 [m, ~] = size(pcmatrix);
+P = zeros(m/BlockSize);
 CN_neighbors = cell(m,1);
 for c = 1:m
     CN_neighbors{c} = find(pcmatrix(c,:));
@@ -27,24 +34,13 @@ rowOffset = oWeight(1:parityLen,1);
 rowWeight = oWeight(parityLen + (1:parityLen),1);
 columnIndex = cIndexMap(1:numEdges) + 1;
 row_weight = sum((P+1) ~= 0, 2);
-temp = 0;
-for i = 1 : height(P)
-    for j = 1 : BlockSize
-        for k = 1 : row_weight(i)
-            C{i}(j,k) = columnIndex(temp + (row_weight(i)*(j-1)) + k);
-        end
-    end
-    temp = temp + (row_weight(i)*(j-1))+k;
-    temp1(i) = temp;
-end
-
-SNR_db = [0 0.5 1 1.5 2];
+SNR_db = [0 1 2 3 4 5];
 SNR = 10.^(SNR_db/10);
-maxnumiter = 2;
-for i =1 : length(SNR)
+maxnumiter = 5;
+for i =1 : 1
     current_state = zeros(m,10);
-    for j = 1 : 1000
-        bits = randi([0 1], cfgLDPCEnc.NumInformationBits,1);
+    for j = 1 : 100
+        bits = zeros(cfgLDPCEnc.NumInformationBits,1);
         codeword = ldpcEncode(bits,cfgLDPCEnc);
         codeword_1 = (codeword == 0);
         codeword_2 = (codeword == 1);
@@ -56,14 +52,17 @@ for i =1 : length(SNR)
         [Y,actualnumiter,finalparitychecks] = ldpcDecode(soft_demodulated_output,cfgLDPCDec,maxnumiter);
         Res = repmat({zeros(cfgLDPCEnc.BlockLength,1)}, 1, height(P));
         Y_temp = soft_demodulated_output;
+        for k = 1 : m
+            res{k} = zeros(1,numel(CN_neighbors{k}));
+        end
         for x = 1 : maxnumiter*height(P)
+            current_state = zeros(m, params.maxStateBits);
             for v = 1:m 
                 idx1 = CN_neighbors{v}; % neighbor indices
                 vals = Y_temp(idx1);
                 % extract values % ensure row vector
                 vals = vals(:)';
-                vals_full = zeros(1, 10);
-                k = min(length(vals), 10);
+                k = min(length(vals), params.maxStateBits);
                 current_state(v,1:k) = vals(1:k);
                 % remaining elements already zero (no need to fill)
             end
@@ -77,18 +76,31 @@ for i =1 : length(SNR)
                 s_new(f) = 1 + sum(vec .* (2.^(length(vec)-1:-1:0)));
                 vals1(f) = Q(s_new(f),f);
             end
+            % [~,a(x)] = max(vals1);
+            % idx2 = CN_neighbors{a(x)};
+            % vals2 = Y_temp(idx2)'- res{a(x)};
+            % temp = tanh(vals2./2);
+            % prodLq = prod(temp);
+            % res{a(x)} = 2*atanh(prodLq ./ temp);
+            % Y_temp(idx2) = vals2 + res{a(x)};
             vals4 = zeros(1, height(P));
-
+            
             for k = 1:length(vals4)
                 start_idx = (k-1)*BlockSize + 1;
                 end_idx   = k*BlockSize;
                 vals4(k) = sum(vals1(start_idx:end_idx));
             end
-            [~,a] = max(vals4);
-            [Y_out,res1] = ldpc_cluster(Y_temp,C,a,Res{a},row_weight,BlockSize);
+            if rand < epsilon_test
+                a(x) = randi(height(P));
+            else
+                [~, a(x)] = max(vals4);
+            end
+            % [~,a(x)] = max(vals4);
+            [Y_out,res1] = ldpc_cluster(Y_temp,CN_neighbors,a(x),Res{a(x)},row_weight,BlockSize);
             Y_temp = Y_out;
-            Res{a} = res1;
+            Res{a(x)} = res1;
         end
+        % Y_out = Y_temp;
         output_final_whole = Y_out < 0;
         output_final = output_final_whole(1:cfgLDPCEnc.NumInformationBits);
         ber(j) = biterr(output_final,bits);
