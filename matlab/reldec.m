@@ -15,7 +15,7 @@ params.epsilon = 0.1;
 params.lmax = 50;
 params.maxStateBits = 10;   % IMPORTANT
 
-numSamples = 100000;
+numSamples = 15000;
 n = 520;
 %% ---------------- PRECOMPUTE GRAPH ----------------
 CN_neighbors = cell(m,1);
@@ -36,7 +36,7 @@ clusters = num2cell(1:m);
 L_set = cell(numSamples,1);
 
 snr = 0;
-sigma = 1;
+sigma = 2;
 
 for i = 1:numSamples
     rx = 1 + sigma * randn(1,n);
@@ -45,7 +45,7 @@ end
 
 %% ---------------- TRAIN ----------------
 Q = RELDEC_CPU_MAIN(L_set, H, CN_neighbors, VN_neighbors, clusters, params);
-save("Q_1e5.mat",'Q')
+save("Q_1e5_P_520","Q")
 disp('Training completed');
 
 
@@ -147,10 +147,11 @@ for idx = 1:N
         end
 
         %% -------- REWARD --------
-        prev_correct_bits = sum(state_hard(a,:));
-        new_correct_bits = sum(state_hard_updated(a,:));
-
-        reward = prev_correct_bits - new_correct_bits;
+        % prev_correct_bits = sum(state_hard(a,:));
+        % new_correct_bits = sum(state_hard_updated(a,:));
+        % 
+        % reward = prev_correct_bits - new_correct_bits;
+        reward = sum(state_hard_updated(a,:))/(length(CN_neighbors{a}));
         % bin2dec for Q indexing fr updated state
         for i = 1 : m
             vec = state_hard_updated(i,:);
