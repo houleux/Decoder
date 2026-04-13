@@ -13,9 +13,9 @@
 \frametitle{Core Objectives of the paper}
 
 \begin{itemize}
-    \item Change MDRP formulation (state space, rewards etc.) to accommodate longer LDPC codes (relative to previous works)
-    \item Make algorithm adaptive to different channel SNRs online
-    \item First paper to use Deep Q learning for this problem (albeit briefly)
+    \item Extend MDRP-style RL decoding to moderate-length LDPC settings
+    \item Learn scheduling policies robust across multiple online SNRs
+    \item Benchmark tabular Q-learning; briefly report Deep Q-learning behavior
 \end{itemize}
 
 \end{frame}
@@ -26,7 +26,11 @@
 \frametitle{Notation and Glossary}
 
 \begin{itemize}
-    \item Clusters: Mutually exhaustive subsets of check nodes
+    \item Cluster: subset of check nodes (CNs) scheduled together in one action
+    \item Action: choose one cluster for layered BP update
+    \item State (per cluster): hard-decision pattern on neighboring variable nodes (VNs)
+    \item Reward: correctness fraction over VN neighborhood after update
+    \item Transition: induced by one-step layered BP decoder dynamics
 \end{itemize}
 
 \end{frame}
@@ -34,13 +38,13 @@
 %% ---------------------------------------------------------------------
 
 \begin{frame}
-\frametitle{State Space [TO COMPLETE]}
+\frametitle{State Space}
 
 \begin{itemize}
-    
-    \item The state space is factored into num-cluster sub-state spaces. 
-    \item Each of these sub-state spaces represent the hard decoded bits of all variable nodes that are neighbors to a cluster
-    
+    \item State is factorized across clusters (one local state per cluster)
+    \item For cluster $c$, state $s_c$ is the hard-decision bit pattern on VNs connected to $c$
+    \item Effective state dimension scales with cluster neighborhood size, not full code length
+    \item Practical implication: tractable for tabular learning at small cluster sizes ($z=1,2$)
 \end{itemize}
 
 \end{frame}
@@ -54,7 +58,7 @@
     \item Reward: Fraction of correctly decoded bits
     \item Action: To schedule any cluster
     \item Transitions: Simulated using a dynamic layered belief propagation decoder
-    
+    \item Credit assignment is local, but transition impact is globally coupled through shared VNs
 \end{itemize}
 
 \end{frame}
@@ -65,10 +69,10 @@
 \frametitle{Independence}
 
 \begin{itemize}
-    
-    \item Scheduling a cluster, can also change the state for another cluster (due to shared variable nodes). Thus these sub-MDPs are not truly independent. However, the authors assume independence.
-    \item For the sake of this paper, this assumption is not very relevant since most experiments are done with cluster size 1 or 2
-    \item In previous work by the same authors, they have discussed a strategy to minimize these dependencies between clusters
+    \item Scheduling one cluster can modify neighboring-cluster states via shared VNs
+    \item So sub-MDPs are only approximately independent
+    \item Approximation is less harmful for small clusters ($z=1,2$), where overlap is limited
+    \item Prior work by the same authors discusses methods to reduce this coupling
 \end{itemize}
 
 \end{frame}
@@ -84,6 +88,7 @@
     \item Tabular and Deep Q learning
     \item Epsilon-greedy policy 
     \item The agent is trained and tested on a mixture of 6 SNR values (each with equal samples)
+    \item Baselines: Flooding, Random, Round-robin, RELDEC (tabular), Deep RELDEC ($z=2$, optional $z=1$)
 \end{itemize}
 
 \end{frame}
@@ -95,7 +100,62 @@
 \begin{frame}
 \frametitle{Parameters}
 
-%% INSERT TABLE OF PARAMETERS. KEEP 2 COLUMNS VALUE IN PAPER, OUR VALUE
+\scriptsize
+\begin{tabular}{|p{2.8cm}|p{3.4cm}|p{4.2cm}|}
+\hline
+\textbf{Parameter} & \textbf{Paper} & \textbf{Our setup} \\
+\hline
+Code & Moderate-length LDPC (AB, WRAN style) & WRAN irregular $(384,256)$ parity-check matrix \\
+\hline
+Training SNRs & Mixed SNR training (6 points) & $[1.0,2.0,3.0,4.0,5.0,5.5]$ \\
+\hline
+Eval SNRs (main run) & Multi-SNR curves & $[2.0,2.5,3.0]$ in current resumed run \\
+\hline
+Policy variants & Tabular + brief DQN mention & Tabular RELDEC, Deep RELDEC $z=2$ (+ optional $z=1$) \\
+\hline
+Cluster size $z$ & Mainly small clusters & $z=2$ primary, $z=1$ optional comparison \\
+\hline
+Action policy & $\epsilon$-greedy & $\epsilon$-greedy (tabular + deep) \\
+\hline
+Training budget & Not fixed in one canonical recipe & 120 episodes total, 20 episodes/SNR \\
+\hline
+Max BP steps $L_{\max}$ & Task dependent & 20 \\
+\hline
+\end{tabular}
+
+\end{frame}
+
+%% ---------------------------------------------------------------------
+
+\begin{frame}
+\frametitle{DQN and Evaluation Config (Paper vs Ours)}
+
+\scriptsize
+\begin{tabular}{|p{2.8cm}|p{3.4cm}|p{4.2cm}|}
+\hline
+\textbf{Parameter} & \textbf{Paper} & \textbf{Our setup} \\
+\hline
+DQN hidden dim & Not fully specified & 128 \\
+\hline
+Learning rate & Not fully specified & $1\times10^{-3}$ \\
+\hline
+Replay capacity & Not fully specified & 20000 \\
+\hline
+Replay warmup & Not fully specified & 1000 \\
+\hline
+Batch size & Not fully specified & 128 \\
+\hline
+Target sync steps & Not fully specified & 200 \\
+\hline
+Train-every-steps & Not fully specified & 1 \\
+\hline
+$\epsilon$ schedule & $\epsilon$-greedy & start 0.6, end 0.05, decay 10000 \\
+\hline
+Eval stop criteria & BER/FER curves & target frame errors: 60, max frames: 3000 \\
+\hline
+Seeding & Not emphasized & seed 7 (deep-$z2$), seed 18 (deep-$z1$ train), eval seeds offset \\
+\hline
+\end{tabular}
 
 \end{frame}
 
@@ -107,7 +167,10 @@
 \frametitle{Results: BER and FER plots }
 
 \begin{itemize}
-    \item 
+    \item RELDEC (tabular) remains strongest among learned schedulers in current runs
+    \item Deep RELDEC ($z=2$) improves over Random and is usually below tabular RELDEC
+    \item Deep RELDEC ($z=1$) is competitive with deep-$z2$ but still trails tabular RELDEC
+    \item Plots shown for low-to-mid SNR region where BER/FER separation is most informative
 \end{itemize}
 
 \end{frame}
@@ -120,7 +183,10 @@
 \frametitle{Results: Average CN-> VN messages}
 
 \begin{itemize}
-    \item 
+    \item Message count captures decoding effort (latency proxy)
+    \item Learned policies target better BER/FER-effort trade-offs than naive schedules
+    \item Random/round-robin baselines are typically less efficient at matched error rates
+    \item Compare jointly with BER/FER to avoid selecting low-effort but inaccurate policies
 \end{itemize}
 
 \end{frame}
@@ -133,7 +199,10 @@
 \frametitle{Comment on DQN and state space}
 
 \begin{itemize}
-    \item The authors do not share the results for DQN claiming it is as good as random. \item However, in our simulations, it performs better than random and worse than RELDEC
+    \item Paper notes limited DQN gains and does not provide full deep results
+    \item In our runs, DQN is consistently better than Random, but still below tabular RELDEC
+    \item Likely reason: larger effective state/action complexity and data-efficiency limits at this budget
+    \item This motivates sparse checkpoint-level diagnostics instead of only final BER/FER plots
 \end{itemize}
 
 \end{frame}
@@ -146,7 +215,11 @@
 \frametitle{Q learning analysis}
 
 \begin{itemize}
-    \item Comparing learning across time
+    \item Compare mean reward trajectory across checkpoint milestones
+    \item Track selected probe $Q(s,a)$ values over training to measure stability/drift
+    \item Visualize Q-heatmaps (tabular full table; DQN probe-state action values)
+    \item Sparse milestone performance checks at 3 dB only, with lower frame budget
+    \item No retraining required: analysis runs directly from saved checkpoints
 \end{itemize}
 
 \end{frame}

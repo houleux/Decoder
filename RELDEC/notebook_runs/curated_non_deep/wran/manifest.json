@@ -1,25 +1,25 @@
 {
-  "created_at": "20260410_200452",
+  "created_at": "20260410_234610",
   "policy": "archive_non_deep_raw_keep_highest_frames",
   "curated_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/results/non_deep_highest_frames.csv",
   "curated_json": "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/results/non_deep_highest_frames.json",
   "curated_rows": 32,
   "archived_csv_files": [
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_final_berfer_20260325_021320.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/latest_messages.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_reldec_2_3_4_5_5p5.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_final_messages_20260325_021320.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/latest_berfer.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_periodic_berfer_20260325_002118.csv",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_periodic_messages_20260325_002118.csv"
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_final_berfer_20260325_021320.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/latest_messages.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_reldec_2_3_4_5_5p5.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_final_messages_20260325_021320.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/latest_berfer.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_periodic_berfer_20260325_002118.csv",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_periodic_messages_20260325_002118.csv"
   ],
   "archived_json_files": [
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_final_berfer_20260325_021320.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/latest_messages.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_reldec_2_3_4_5_5p5.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_final_messages_20260325_021320.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/latest_berfer.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_periodic_berfer_20260325_002118.json",
-    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_200452/eval_periodic_messages_20260325_002118.json"
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_final_berfer_20260325_021320.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/latest_messages.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_reldec_2_3_4_5_5p5.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_final_messages_20260325_021320.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/latest_berfer.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_periodic_berfer_20260325_002118.json",
+    "/root/Research/RithvikDecoder/Decoder/RELDEC/notebook_runs/curated_non_deep/wran/archive/non_deep_raw_20260410_234610/eval_periodic_messages_20260325_002118.json"
   ]
 }
