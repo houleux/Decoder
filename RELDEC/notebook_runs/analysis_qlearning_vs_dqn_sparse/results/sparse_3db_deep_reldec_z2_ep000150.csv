@@ -1,0 +1,2 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+deep_reldec_z2,3.0,800,113,9,0.00036783854166666665,0.01125,2711.88,2.0925,791,wran,/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,20,800,True
