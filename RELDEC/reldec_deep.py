@@ -184,6 +184,59 @@ def _state_vector(llr_post: np.ndarray, vn_indices: np.ndarray, state_dim: int) 
     return state
 
 
+def _j_sigma(sigma: float) -> float:
+    sigma = float(max(sigma, 0.0))
+    if sigma <= 1.6363:
+        return float(-0.0421061 * sigma**3 + 0.209252 * sigma**2 - 0.00640081 * sigma)
+    if sigma < 10.0:
+        exponent = (
+            0.00181491 * sigma**3
+            - 0.142675 * sigma**2
+            - 0.0822054 * sigma
+            + 0.0549608
+        )
+        return float(1.0 - np.exp(exponent))
+    return 1.0
+
+
+def _j_inverse(i_value: float) -> float:
+    i_value = float(np.clip(i_value, 0.0, 1.0 - 1e-12))
+    if i_value <= 0.3646:
+        return float(1.09542 * i_value**2 + 0.214217 * i_value + 2.33727 * np.sqrt(i_value))
+
+    arg = max(0.386013 * (1.0 - i_value), 1e-12)
+    return float(-0.706692 * np.log(arg) + 1.75017 * i_value)
+
+
+def _sigma_from_llrs(llrs: np.ndarray) -> float:
+    llrs = np.asarray(llrs, dtype=np.float64)
+    if llrs.size == 0:
+        return 0.0
+
+    mean_llr = float(np.mean(llrs))
+    sigma2 = max(2.0 * mean_llr, 0.0)
+    return float(np.sqrt(max(sigma2, 0.0)))
+
+
+def _mutual_information_from_llrs(llrs: np.ndarray) -> float:
+    sigma = _sigma_from_llrs(llrs)
+    return float(np.clip(_j_sigma(sigma), 0.0, 1.0))
+
+
+def _invert_mutual_information(i_value: float) -> float:
+    return float(_j_inverse(i_value))
+
+
+def _cluster_mutual_information_vector(
+    llr_post: np.ndarray,
+    cluster_neighbors: tuple[np.ndarray, ...],
+) -> np.ndarray:
+    mi = np.zeros((len(cluster_neighbors),), dtype=np.float32)
+    for idx, neighbors in enumerate(cluster_neighbors):
+        mi[idx] = _mutual_information_from_llrs(llr_post[neighbors]) if neighbors.size else 0.0
+    return mi
+
+
 def _torch_bytes(payload: dict) -> np.ndarray:
     if torch is None:
         raise RuntimeError("PyTorch is required for Deep RELDEC")
@@ -283,7 +336,8 @@ class DeepReldecTrainer:
         self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
         self.num_actions = len(self.map.clusters)
         self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
-        self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+        self.use_mi_state = str(dqn_config.policy_label).startswith("mi_")
+        self.state_dim = self.num_actions if self.use_mi_state else int(max(self.cluster_degrees.max(initial=1), 1))
 
         self.gamma = float(beta_discount)
         self.l_max = int(l_max)
@@ -329,7 +383,11 @@ class DeepReldecTrainer:
             return int(valid_actions[rng.integers(0, valid_actions.size)])
 
         with torch.no_grad():
-            states = torch.as_tensor(state_cache[valid_actions], dtype=torch.float32, device=self.device)
+            if state_cache.ndim == 1:
+                states_np = np.repeat(state_cache[None, :], valid_actions.size, axis=0)
+            else:
+                states_np = state_cache[valid_actions]
+            states = torch.as_tensor(states_np, dtype=torch.float32, device=self.device)
             q_vals = self.online_net(states)
             idx = torch.arange(valid_actions.size, device=self.device)
             chosen_action_q = q_vals[idx, torch.as_tensor(valid_actions, device=self.device)]
@@ -338,6 +396,9 @@ class DeepReldecTrainer:
 
         tie_pick = int(ties[rng.integers(0, ties.size)])
         return int(valid_actions[tie_pick])
+
+    def _cluster_mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+        return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
 
     def _train_step(self, rng: np.random.Generator) -> float:
         cfg = self.dqn_config
@@ -371,6 +432,9 @@ class DeepReldecTrainer:
         return float(loss.detach().cpu().item())
 
     def _initial_state_cache(self, llr_post: np.ndarray) -> np.ndarray:
+        if self.use_mi_state:
+            return self._cluster_mi_state(llr_post)
+
         state_cache = np.zeros((self.num_actions, self.state_dim), dtype=np.float32)
         for action in range(self.num_actions):
             state_cache[action] = _state_vector(
@@ -388,6 +452,30 @@ class DeepReldecTrainer:
         state_cache = self._initial_state_cache(llr_post)
         episode_reward = 0.0
         episode_loss = 0.0
+
+        if self.use_mi_state:
+            for _ in range(self.l_max):
+                scheduled = np.zeros(self.num_actions, dtype=bool)
+
+                for _ in range(self.num_actions):
+                    valid_actions = np.flatnonzero(~scheduled).astype(np.int64)
+                    action = self._choose_action(state_cache, rng=rng, training=True, valid_actions=valid_actions)
+                    prev_state = state_cache.copy()
+
+                    llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                    state_cache = self._cluster_mi_state(llr_post)
+                    reward = float(state_cache[action] - prev_state[action])
+
+                    self.replay.add(prev_state, action, reward, state_cache.copy(), False)
+                    scheduled[action] = True
+                    episode_reward += reward
+                    self.global_step += 1
+                    episode_loss += self._train_step(rng)
+
+                if syndrome_is_zero(self.h, _hard_decision(llr_post)):
+                    break
+
+            return episode_reward, episode_loss
 
         for _ in range(self.l_max):
             action = self._choose_action(state_cache, rng=rng, training=True)
@@ -446,7 +534,8 @@ class DeepReldecDecoder:
         self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
         self.num_actions = len(self.map.clusters)
         self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
-        self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+        self.use_mi_state = str(dqn_config.policy_label).startswith("mi_")
+        self.state_dim = self.num_actions if self.use_mi_state else int(max(self.cluster_degrees.max(initial=1), 1))
         self.device = torch.device(device)
 
         self.net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
@@ -465,13 +554,21 @@ class DeepReldecDecoder:
             dtype=np.int32,
         )
 
+    def _cluster_mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+        return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+
     def _state_for_action(self, llr_post: np.ndarray, action: int) -> np.ndarray:
+        if self.use_mi_state:
+            return self._cluster_mi_state(llr_post)
         return _state_vector(llr_post, self.map.cluster_neighbors[action], self.state_dim)
 
     def _choose_greedy(self, llr_post: np.ndarray, valid_actions: np.ndarray, rng: np.random.Generator) -> int:
-        state_stack = np.zeros((valid_actions.size, self.state_dim), dtype=np.float32)
-        for i, action in enumerate(valid_actions):
-            state_stack[i] = self._state_for_action(llr_post, int(action))
+        if self.use_mi_state:
+            state_stack = np.repeat(self._cluster_mi_state(llr_post)[None, :], valid_actions.size, axis=0)
+        else:
+            state_stack = np.zeros((valid_actions.size, self.state_dim), dtype=np.float32)
+            for i, action in enumerate(valid_actions):
+                state_stack[i] = self._state_for_action(llr_post, int(action))
 
         with torch.no_grad():
             states = torch.as_tensor(state_stack, dtype=torch.float32, device=self.device)
@@ -509,6 +606,108 @@ class DeepReldecDecoder:
                 return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
 
         return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+
+class MiReldecBaselineDecoder:
+    """Naive MI-based cluster scheduler using the J(sigma) approximation."""
+
+    def __init__(self, h_csr: sp.csr_matrix, cluster_size: int = 2, device: str = "cpu"):
+        self.h = h_csr.tocsr().astype(np.uint8)
+        self.m, self.n = self.h.shape
+        self.map = build_cn_clusters(self.h, cluster_size)
+        self.num_actions = len(self.map.clusters)
+        self.cluster_messages = np.array(
+            [int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+            dtype=np.int32,
+        )
+        self.device = device
+        self.decoder = BpDecoder(
+            self.h,
+            max_iter=1,
+            schedule="cluster",
+            input_vector_type="received_vector",
+        )
+
+    def _cluster_mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+        return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+
+    def _choose_action(
+        self,
+        current_state: np.ndarray,
+        previous_state: np.ndarray,
+        scheduled: np.ndarray,
+        rng: np.random.Generator,
+    ) -> int:
+        valid = np.flatnonzero(~scheduled).astype(np.int64)
+        if valid.size == 0:
+            raise ValueError("No valid actions left to schedule")
+
+        delta = np.abs(current_state - previous_state)
+        valid_delta = delta[valid]
+        if np.all(valid_delta == 0.0):
+            best = float(np.max(current_state[valid]))
+            candidates = valid[current_state[valid] == best]
+        else:
+            best = float(np.max(valid_delta))
+            candidates = valid[valid_delta == best]
+
+        return int(candidates[rng.integers(0, candidates.size)])
+
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = _hard_decision(llr_post)
+        previous_state = self._cluster_mi_state(llr_post)
+        messages = 0
+
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+
+            for _ in range(self.num_actions):
+                current_state = self._cluster_mi_state(llr_post)
+                action = self._choose_action(current_state, previous_state, scheduled, rng)
+
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                messages += int(self.cluster_messages[action])
+                scheduled[action] = True
+                previous_state = current_state
+
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+    def evaluate(
+        self,
+        snr_db: float,
+        code_rate: float,
+        i_max: int,
+        target_frame_errors: int,
+        max_frames: int,
+        rng: np.random.Generator,
+        all_zero_only: bool = True,
+        method_name: str = "mi_naive_z2",
+    ):
+        from reldec_core import MethodStats, bpsk_awgn_llr
+
+        stats = MethodStats(method=method_name, n=self.n)
+
+        while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+            if all_zero_only:
+                tx_bits = np.zeros(self.n, dtype=np.uint8)
+            else:
+                tx_bits = rng.integers(0, 2, size=self.n, dtype=np.uint8)
+
+            llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+            decoded = self.decode(llr, i_max=i_max, rng=rng)
+            stats.update(tx_bits, decoded)
+
+        return stats
 
 
 def evaluate_deep_method(

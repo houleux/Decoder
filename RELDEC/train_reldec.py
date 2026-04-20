@@ -32,7 +32,7 @@ from reldec_core import (
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train RELDEC (tabular z=1 or Deep RELDEC DQN for z=1/z=2)."
+        description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, or MI-DQN z=2)."
     )
     parser.add_argument("--code", choices=["ab", "wran"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
@@ -52,7 +52,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-history", action="store_true")
     parser.add_argument(
         "--policy-type",
-        choices=["tabular", "deep_z1", "deep_z2"],
+        choices=["tabular", "deep_z1", "deep_z2", "mi_dqn_z2"],
         default="tabular",
     )
     parser.add_argument("--device", type=str, default="cpu")
@@ -102,6 +102,8 @@ def _cluster_size_for_policy(policy_type: str) -> int:
     if policy_type == "deep_z1":
         return 1
     if policy_type == "deep_z2":
+        return 2
+    if policy_type == "mi_dqn_z2":
         return 2
     raise ValueError(f"Unsupported policy type: {policy_type}")
 

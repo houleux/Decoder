@@ -1,0 +1,39 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "mi_naive_z2"
+    ],
+    "snr_db": [
+      3.0
+    ],
+    "i_max": 5,
+    "target_frame_errors": 1,
+    "max_frames": 5,
+    "all_zero_only": true,
+    "seed": 7
+  },
+  "results": [
+    {
+      "method": "mi_naive_z2",
+      "snr_db": 3.0,
+      "frames": 5,
+      "bit_errors": 1,
+      "frame_errors": 1,
+      "ber": 0.0005208333333333333,
+      "fer": 0.2,
+      "avg_messages": 4406.4,
+      "avg_iterations": 3.4,
+      "converged_frames": 4,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 1,
+      "max_frames": 5,
+      "all_zero_only": true
+    }
+  ]
+}
