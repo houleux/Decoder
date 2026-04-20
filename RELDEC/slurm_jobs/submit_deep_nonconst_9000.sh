@@ -6,7 +6,7 @@ cd "$(dirname "$0")/../.."
 
 mkdir -p RELDEC/slurm_logs
 
-python RELDEC/slurm_jobs/extend_deep_checkpoints_to_10k.py --target-total-episodes 10000
+python3 RELDEC/slurm_jobs/extend_deep_checkpoints_to_10k.py --target-total-episodes 10000
 
 echo "Submitting Deep RELDEC non-constant jobs..."
 sbatch RELDEC/slurm_jobs/train_deep_z1_to_10k.sbatch

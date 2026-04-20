@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source .venv/bin/activate
 
-python RELDEC/train_reldec.py \
+python3 RELDEC/train_reldec.py \
   --code wran \
   --policy-type deep_z2 \
   --device cuda \
