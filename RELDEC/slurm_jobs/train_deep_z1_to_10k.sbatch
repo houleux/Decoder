@@ -2,6 +2,7 @@
 #SBATCH -A research
 #SBATCH --qos=medium
 #SBATCH --partition=long
+#SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH -J reldec_dz1_10k
 #SBATCH -n 10
 #SBATCH --gres=gpu:1
