@@ -1,0 +1,39 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "deep_reldec_z1"
+    ],
+    "snr_db": [
+      2.5
+    ],
+    "i_max": 5,
+    "target_frame_errors": 20,
+    "max_frames": 800,
+    "all_zero_only": true,
+    "seed": 707
+  },
+  "results": [
+    {
+      "method": "deep_reldec_z1",
+      "snr_db": 2.5,
+      "frames": 63,
+      "bit_errors": 242,
+      "frame_errors": 20,
+      "ber": 0.010003306878306879,
+      "fer": 0.31746031746031744,
+      "avg_messages": 4710.857142857143,
+      "avg_iterations": 3.634920634920635,
+      "converged_frames": 43,
+      "code": "wran",
+      "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 20,
+      "max_frames": 800,
+      "all_zero_only": true
+    }
+  ]
+}

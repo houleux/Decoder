@@ -1,0 +1,2 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+reldec,2.5,281,303,20,0.0028080516014234876,0.0711743772241993,3352.9964412811387,2.587188612099644,261,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,20,800,True

@@ -28,9 +28,9 @@
   "h_nnz": 1296,
   "policy_type": "deep_z2",
   "progress": {
-    "episodes_completed": 1000,
-    "total_updates": 20000,
-    "mean_reward": 0.9715811363636365,
+    "episodes_completed": 10000,
+    "total_updates": 200000,
+    "mean_reward": 0.9083584772727498,
     "elapsed_sec": 0.0
   },
   "artifacts": {

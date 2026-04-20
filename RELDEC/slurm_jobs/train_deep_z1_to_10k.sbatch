@@ -16,6 +16,19 @@ set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 source .venv/bin/activate
 
+python3 - <<'PY'
+import sys
+if sys.version_info < (3, 10):
+  raise SystemExit(
+    f"ERROR: active .venv Python is {sys.version.split()[0]} (< 3.10). "
+    "Recreate .venv using Ada module u22/python/3.12.4."
+  )
+PY
+
+python3 - <<'PY'
+import numpy  # noqa: F401
+PY
+
 python3 RELDEC/train_reldec.py \
   --code wran \
   --policy-type deep_z1 \

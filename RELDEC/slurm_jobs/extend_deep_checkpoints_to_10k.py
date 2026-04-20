@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+RELDEC_DIR = SCRIPT_DIR.parent
+if str(RELDEC_DIR) not in sys.path:
+    sys.path.insert(0, str(RELDEC_DIR))
 
 from reldec_core import build_training_snr_schedule
 from reldec_deep import (
