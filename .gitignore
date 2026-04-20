@@ -1,3 +1,10 @@
 .build
 .vscode
 build/
+pycache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
