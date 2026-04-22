@@ -1,31 +1,59 @@
 import numpy as np
 
 class QCLDPCEncoder:
-    def __init__(self, base_matrix, Z):
+    def __init__(self, base_matrix=None, Z=None, H=None):
         """
-        Initializes the Encoder by lifting the base matrix and pre-computing
-        the generator matrix for the parity bits.
+        Initializes the Encoder by either lifting the base matrix or using a
+        directly provided parity-check matrix, then pre-computing the generator
+        matrix for the parity bits.
         
         Args:
             base_matrix (list or np.array): The QC Base Matrix. 
                                             Use -1 for Zero blocks.
                                             Use 0, 1, etc., for shift values.
             Z (int): The lifting factor (size of sub-matrices).
+            H (list or np.array, optional): Full parity-check matrix. When
+                                           provided, base_matrix and Z are not
+                                           required.
         """
-        self.Z = Z
-        self.base_matrix = np.array(base_matrix)
-        self.Hb = self.base_matrix
-        self.mb, self.nb = self.Hb.shape
-        
-        # Dimensions of the full matrix
-        self.M = self.mb * self.Z
-        self.N = self.nb * self.Z
-        self.K = self.N - self.M
-        
-        print(f"Initializing Encoder: Full Matrix Size {self.M}x{self.N}, Message Bits: {self.K}")
+        if H is not None:
+            self.Z = None
+            self.base_matrix = None
+            self.Hb = None
+            self.mb = None
+            self.nb = None
+            self.H = np.array(H, dtype=int)
 
-        # 1. Lift the Base Matrix to get H
-        self.H = self._lift_matrix()
+            if self.H.ndim != 2:
+                raise ValueError("H must be a 2D matrix")
+
+            self.M, self.N = self.H.shape
+            self.K = self.N - self.M
+
+            if self.K <= 0:
+                raise ValueError(
+                    f"Full matrix H must have more columns than rows for systematic encoding, got {self.M}x{self.N}"
+                )
+
+            print(f"Initializing Encoder from H: Full Matrix Size {self.M}x{self.N}, Message Bits: {self.K}")
+        else:
+            if base_matrix is None or Z is None:
+                raise ValueError("Either H or both base_matrix and Z must be provided")
+
+            self.Z = Z
+            self.base_matrix = np.array(base_matrix)
+            self.Hb = self.base_matrix
+            self.mb, self.nb = self.Hb.shape
+            
+            # Dimensions of the full matrix
+            self.M = self.mb * self.Z
+            self.N = self.nb * self.Z
+            self.K = self.N - self.M
+            
+            print(f"Initializing Encoder: Full Matrix Size {self.M}x{self.N}, Message Bits: {self.K}")
+
+            # 1. Lift the Base Matrix to get H
+            self.H = self._lift_matrix()
 
         # 2. Split H into Information (Hu) and Parity (Hp) parts
         # We assume the code is systematic: [Message | Parity]
@@ -127,17 +155,3 @@ class QCLDPCEncoder:
         """Performs Matrix Multiplication over GF(2)."""
         # Standard matmul then modulo 2
         return (A @ B) % 2
-
-
-# import os
-# import numpy as np
-# from scipy.sparse import csr_matrix
-# import scipy.io
-
-# def LDPCEncode(message):
-#     utils_dir = os.path.dirname(__file__)
-#     gmat_path = os.path.join(utils_dir, 'G.mat')
-#     G_mat_data = scipy.io.loadmat(gmat_path)
-#     G_matrix = G_mat_data['G_systematic']
-#     encoded_data = message @ G_matrix % 2
-#     return encoded_data
