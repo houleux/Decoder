@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -A research
 #SBATCH --qos=medium
-#SBATCH --partition=long
+#SBATCH --partition=u22
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH -J reldec_mi_quick
 #SBATCH -n 10
