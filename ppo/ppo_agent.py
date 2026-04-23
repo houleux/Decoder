@@ -30,7 +30,7 @@ class RunningMeanStd:
     def __init__(self, shape: tuple):
         self.mean = np.zeros(shape, dtype=np.float64)
         self.var = np.ones(shape, dtype=np.float64)
-        self.count = 1e-4  # avoid division by zero
+        self.count = 1e-4
 
     def update(self, x: np.ndarray):
         """Update with a single observation or a batch."""
@@ -53,7 +53,6 @@ class RunningMeanStd:
         self.count = total_count
 
     def normalize(self, x: np.ndarray) -> np.ndarray:
-        """Normalize observation to zero mean, unit variance."""
         return (x - self.mean) / (np.sqrt(self.var) + 1e-8)
 
 
@@ -73,8 +72,6 @@ class ActorMLP(nn.Module):
             nn.Tanh(),
             nn.Linear(128, act_dim),
         )
-        # Smaller initial weights on the output layer for more uniform
-        # initial policy, helping exploration
         nn.init.orthogonal_(self.net[0].weight, gain=np.sqrt(2))
         nn.init.zeros_(self.net[0].bias)
         nn.init.orthogonal_(self.net[2].weight, gain=np.sqrt(2))
@@ -115,7 +112,11 @@ class CriticMLP(nn.Module):
 # ---------------------------------------------------------------------------
 
 class RolloutBuffer:
-    """Stores transitions collected during rollouts."""
+    """Stores transitions collected during rollouts.
+
+    IMPORTANT: stores *normalized* observations so that old_log_probs
+    are consistent with the states used during PPO updates.
+    """
 
     def __init__(self):
         self.states: List[np.ndarray] = []
@@ -125,15 +126,7 @@ class RolloutBuffer:
         self.values: List[float] = []
         self.dones: List[bool] = []
 
-    def store(
-        self,
-        state: np.ndarray,
-        action: int,
-        log_prob: float,
-        reward: float,
-        value: float,
-        done: bool,
-    ):
+    def store(self, state, action, log_prob, reward, value, done):
         self.states.append(state)
         self.actions.append(action)
         self.log_probs.append(log_prob)
@@ -239,13 +232,11 @@ class PpoAgent:
     # Observation processing
     # ------------------------------------------------------------------
 
-    def _process_obs(self, obs: np.ndarray, update_stats: bool = False) -> np.ndarray:
+    def _normalize_obs(self, obs: np.ndarray) -> np.ndarray:
         """Normalize observation using running statistics."""
         if not self.normalize_obs:
-            return obs
-        if update_stats:
-            self.obs_rms.update(obs)
-        return self.obs_rms.normalize(obs)
+            return obs.astype(np.float32)
+        return self.obs_rms.normalize(obs).astype(np.float32)
 
     # ------------------------------------------------------------------
     # Action selection
@@ -258,24 +249,15 @@ class PpoAgent:
     ) -> Tuple[int, float, float]:
         """Select an action given the current LLR state.
 
-        Parameters
-        ----------
-        state : np.ndarray, shape (n,)
-            Current posterior LLR vector.
-        training : bool
-            If True, sample from the policy; if False, take argmax.
-
-        Returns
-        -------
-        action : int
-            Chosen cluster index.
-        log_prob : float
-            Log-probability of the chosen action.
-        value : float
-            Estimated state value V(s).
+        Returns (action, log_prob, value).
         """
-        # Normalize the observation
-        norm_state = self._process_obs(state, update_stats=training)
+        # Update normalization stats BEFORE normalizing so the
+        # normalized observation used here and stored in the buffer
+        # are identical.
+        if training and self.normalize_obs:
+            self.obs_rms.update(state)
+
+        norm_state = self._normalize_obs(state)
 
         with torch.no_grad():
             s = torch.as_tensor(norm_state, dtype=torch.float32, device=self.device)
@@ -293,6 +275,19 @@ class PpoAgent:
 
         return action, log_prob, value
 
+    def get_cluster_ranking(self, state: np.ndarray) -> np.ndarray:
+        """Return cluster indices sorted by descending policy probability.
+
+        Used by the inference decoder to schedule all clusters in
+        the policy-preferred order.
+        """
+        norm_state = self._normalize_obs(state)
+        with torch.no_grad():
+            s = torch.as_tensor(norm_state, dtype=torch.float32, device=self.device)
+            logits = self.actor(s)
+        # Sort descending by logit value
+        return torch.argsort(logits, descending=True).cpu().numpy()
+
     # ------------------------------------------------------------------
     # GAE computation
     # ------------------------------------------------------------------
@@ -300,13 +295,7 @@ class PpoAgent:
     def _compute_gae(
         self, rewards: np.ndarray, values: np.ndarray, dones: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute Generalized Advantage Estimation.
-
-        Returns
-        -------
-        advantages : np.ndarray
-        returns : np.ndarray
-        """
+        """Compute Generalized Advantage Estimation."""
         T = len(rewards)
         advantages = np.zeros(T, dtype=np.float64)
         last_gae = 0.0
@@ -319,9 +308,6 @@ class PpoAgent:
                 next_non_terminal = 1.0 - dones[t]
                 next_value = values[t + 1]
 
-            # When dones[t] is True, this is the last step of an episode.
-            # The next step belongs to a new episode, so we cut the
-            # bootstrap and GAE carry-over.
             delta = rewards[t] + self.gamma * next_value * next_non_terminal - values[t]
             last_gae = delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae
             advantages[t] = last_gae
@@ -334,22 +320,12 @@ class PpoAgent:
     # ------------------------------------------------------------------
 
     def update(self) -> dict:
-        """Perform PPO update on the collected buffer.
-
-        Returns
-        -------
-        dict with 'policy_loss', 'value_loss', 'entropy' averages.
-        """
+        """Perform PPO update on the collected buffer."""
         if len(self.buffer) == 0:
             return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
 
-        # Normalize stored observations
-        raw_states = np.array(self.buffer.states, dtype=np.float64)
-        if self.normalize_obs:
-            norm_states = self.obs_rms.normalize(raw_states).astype(np.float32)
-        else:
-            norm_states = raw_states.astype(np.float32)
-
+        # Buffer already contains NORMALIZED observations — use directly
+        states = np.array(self.buffer.states, dtype=np.float32)
         actions = np.array(self.buffer.actions, dtype=np.int64)
         old_log_probs = np.array(self.buffer.log_probs, dtype=np.float32)
         rewards = np.array(self.buffer.rewards, dtype=np.float64)
@@ -365,20 +341,19 @@ class PpoAgent:
         advantages = (advantages - adv_mean) / adv_std
 
         # To tensors
-        states_t = torch.as_tensor(norm_states, device=self.device)
+        states_t = torch.as_tensor(states, device=self.device)
         actions_t = torch.as_tensor(actions, device=self.device)
         old_log_probs_t = torch.as_tensor(old_log_probs, device=self.device)
         advantages_t = torch.as_tensor(advantages, dtype=torch.float32, device=self.device)
         returns_t = torch.as_tensor(returns, dtype=torch.float32, device=self.device)
 
-        T = len(norm_states)
+        T = len(states)
         total_policy_loss = 0.0
         total_value_loss = 0.0
         total_entropy = 0.0
         n_updates = 0
 
         for _ in range(self.ppo_epochs):
-            # Shuffle indices
             indices = np.random.permutation(T)
 
             for start in range(0, T, self.minibatch_size):
@@ -392,7 +367,7 @@ class PpoAgent:
                 mb_advantages = advantages_t[mb_idx_t]
                 mb_returns = returns_t[mb_idx_t]
 
-                # Actor forward — returns raw logits
+                # Actor forward
                 logits = self.actor(mb_states)
                 dist = Categorical(logits=logits)
                 new_log_probs = dist.log_prob(mb_actions)
@@ -444,25 +419,7 @@ class PpoAgent:
         update_every: int = 10,
         verbose: bool = True,
     ) -> List[float]:
-        """Train PPO on a set of (LLR, codeword) pairs.
-
-        Parameters
-        ----------
-        env : PpoEnv
-            The Gymnasium environment.
-        llr_list : list of np.ndarray
-            Training LLR vectors.
-        codeword_list : list of np.ndarray
-            Corresponding transmitted codewords.
-        update_every : int
-            Number of episodes between PPO updates.
-        verbose : bool
-            Print progress periodically.
-
-        Returns
-        -------
-        list of float — per-episode total rewards.
-        """
+        """Train PPO on a set of (LLR, codeword) pairs."""
         self.actor.train()
         self.critic.train()
         print(f"[PpoAgent] Training on device: {self.device}")
@@ -482,9 +439,11 @@ class PpoAgent:
                 new_obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
 
-                # Store the raw (un-normalized) observation; normalization
-                # is applied during the update using the current stats.
-                self.buffer.store(obs, action, log_prob, reward, value, done)
+                # Store the NORMALIZED observation (same one used for
+                # computing log_prob above) so that old_log_probs and
+                # states are consistent during the PPO update.
+                norm_obs = self._normalize_obs(obs)
+                self.buffer.store(norm_obs, action, log_prob, reward, value, done)
 
                 obs = new_obs
                 ep_reward += reward
