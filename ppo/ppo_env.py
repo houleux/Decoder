@@ -155,6 +155,11 @@ class PpoEnv(gym.Env):
     ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """Schedule cluster ``action``, return (obs, reward, term, trunc, info)."""
         a = int(action)
+        if a < 0 or a >= self.num_clusters:
+            raise IndexError(
+                f"Action index {a} out of range for {self.num_clusters} clusters. "
+                "Check that the PPO agent action dimension matches env.num_clusters."
+            )
 
         # Schedule cluster a via the BP decoder
         self._current_llrs = self.bp_decoder.decode_cluster(

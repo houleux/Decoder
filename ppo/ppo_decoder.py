@@ -22,7 +22,11 @@ class PpoDecoder:
         self.agent = agent
 
     def decode(self, llr_vector: np.ndarray, I_max: int = 30) -> np.ndarray:
-        """Decode using the learned scheduling policy."""
+        """Decode using the learned scheduling policy.
+
+        Each iteration schedules all clusters once via the actor's greedy
+        policy, then checks the syndrome.  Stops early on convergence.
+        """
         llr = np.asarray(llr_vector, dtype=np.float64)
         self.bp_decoder.reset()
         self.bp_decoder.initialise_log_domain_bp(llr)
@@ -30,12 +34,16 @@ class PpoDecoder:
 
         for _ in range(I_max):
             for _ in range(self.num_clusters):
-                action, _, _ = self.agent.select_action(current_llrs, training=False)
+                action, _, _ = self.agent.select_action(
+                    current_llrs, training=False
+                )
                 current_llrs = self.bp_decoder.decode_cluster(
                     self.clusters[action].tolist()
                 )
+
             decoded = (current_llrs < 0).astype(np.uint8)
             syndrome = (self.H @ decoded.astype(np.int32)) % 2
             if np.all(syndrome == 0):
                 break
+
         return decoded

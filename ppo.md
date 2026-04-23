@@ -25,7 +25,7 @@ posterior log-likelihood ratios (LLRs) of variable nodes.
 
 | Aspect | RELDEC (tabular) | PPO (this module) |
 |--------|-----------------|-------------------|
-| State representation | Per-cluster hard-decided integer | Raw posterior LLRs (continuous) |
+| State representation | Per-cluster hard-decided integer | Raw posterior LLRs (continuous, normalized) |
 | Policy | Tabular Q(s_a, a) per cluster | MLP actor `π(a\|s)` |
 | Value estimation | Implicit in Q-table | MLP critic `V(s)` |
 | Update rule | Q-learning (Eq. 6) | PPO clipped surrogate + GAE |
@@ -34,18 +34,27 @@ posterior log-likelihood ratios (LLRs) of variable nodes.
 
 ### Actor Network (`ActorMLP`)
 ```
-Input (n) → Linear(512) → Tanh → Linear(128) → Tanh → Linear(num_clusters) → LogSoftmax
+Input (n) → Linear(512) → Tanh → Linear(128) → Tanh → Linear(num_clusters) → [raw logits]
 ```
+Output: raw logits passed to `Categorical(logits=...)` for sampling.
 
 ### Critic Network (`CriticMLP`)
 ```
 Input (n) → Linear(512) → Tanh → Linear(128) → Tanh → Linear(1)
 ```
 
+Both networks use **orthogonal initialization** (gain=√2 for hidden layers, gain=0.01 for actor output to start near-uniform).
+
+### Observation Normalization
+
+Raw LLR values can range widely (e.g. ±20+). A `RunningMeanStd` normalizer
+tracks the online mean and variance of observations, normalizing inputs to
+approximately zero mean and unit variance before feeding to the networks.
+
 ### PPO Hyperparameters (defaults)
 - Learning rate: `3e-4`
-- Discount factor (γ): `0.99`
-- GAE lambda: `0.95`
+- Discount factor (γ): `0.95` (lower than typical — scheduling rewards are local)
+- GAE lambda: `0.9`
 - Clip epsilon: `0.2`
 - PPO epochs: `4`
 - Minibatch size: `64`
@@ -74,10 +83,10 @@ ppo/
 
 ### `ppo_agent.py` — PPO Agent
 
-- **`select_action(state, training)`**: Samples from policy (training) or takes argmax (inference)
+- **`select_action(state, training)`**: Normalizes obs → samples from policy (training) or takes argmax (inference)
 - **`train(env, llr_list, codeword_list, ...)`**: Collects rollouts and performs PPO updates
 - **`update()`**: Computes GAE advantages, runs clipped surrogate + value loss optimisation
-- **`save(path)` / `load(path)`**: Checkpoint actor, critic, and optimiser state
+- **`save(path)` / `load(path)`**: Checkpoint actor, critic, optimizer, and normalization stats
 
 ### `ppo_decoder.py` — Inference Decoder
 
@@ -104,7 +113,7 @@ from ppo import PpoEnv, PpoAgent, PpoDecoder
 # Setup
 bp_dec = BpDecoder(H, max_iter=0, bp_method="product_sum", schedule="parallel")
 env = PpoEnv(H, clusters, bp_dec, l_max=m)
-agent = PpoAgent(obs_dim=n, num_clusters=m)
+agent = PpoAgent(obs_dim=n, num_clusters=m, gamma=0.95)
 
 # Train
 rewards = agent.train(env, llr_list, codeword_list, update_every=10)
@@ -117,24 +126,6 @@ agent.load("ppo_model.pt")
 decoder = PpoDecoder(H, clusters, bp_dec, agent)
 decoded_bits = decoder.decode(llr_vector, I_max=30)
 ```
-
-## Test Results
-
-Test on `small_16.txt` (Z=11, n=198, rate=0.667), 500 training frames at 4.0 dB:
-
-| SNR (dB) | Flooding BER | PPO BER |
-|-----------|-------------|---------|
-| 3.0 | 0.031465 | 0.080303 |
-| 4.0 | 0.003939 | 0.054495 |
-| 5.0 | 0.000707 | 0.038687 |
-
-> **Note**: PPO BER is higher than flooding BP in this initial test.
-> This is expected — the small training budget (500 frames, single SNR) and
-> compact network are a starting point. Performance can be improved by:
-> - Training across multiple SNR points
-> - Using more training frames
-> - Tuning hyperparameters (learning rate, entropy coefficient)
-> - Training for more epochs / using curriculum learning
 
 ## Dependencies
 

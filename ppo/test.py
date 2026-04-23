@@ -1,7 +1,7 @@
 """
 PPO End-to-End Test
 ====================
-Trains PPO on a small QC-LDPC code and compares BER against flooding BP.
+Trains PPO on a small QC-LDPC code and compares BER against layered BP.
 
 Usage:
     conda activate hnrs
@@ -98,13 +98,14 @@ def main():
         obs_dim=n,
         num_clusters=m,
         lr=3e-4,
-        gamma=0.99,
-        gae_lambda=0.95,
+        gamma=0.95,          # lower gamma — scheduling rewards are mostly local
+        gae_lambda=0.9,
         clip_eps=0.2,
         ppo_epochs=4,
         minibatch_size=64,
         entropy_coeff=0.01,
         value_coeff=0.5,
+        normalize_obs=True,
     )
 
     # --- 6. Train PPO ---
@@ -129,7 +130,7 @@ def main():
     N_TEST = 100
     I_MAX = 30
 
-    print(f"\n{'SNR (dB)':>10} | {'Flooding BER':>14} | {'PPO BER':>14}")
+    print(f"\n{'SNR (dB)':>10} | {'Layered BER':>14} | {'PPO BER':>14}")
     print("-" * 45)
 
     for snr_db in TEST_SNRS:
@@ -137,15 +138,21 @@ def main():
             encoder, N_TEST, snr_db, seed=int(snr_db * 1000)
         )
 
-        # Flooding BP
-        flood_dec = BpDecoder(
-            H, max_iter=I_MAX, bp_method="product_sum", schedule="parallel"
+        # Layered BP (sequential cluster scheduling as baseline)
+        layered_dec = BpDecoder(
+            H, max_iter=0, bp_method="product_sum", schedule="parallel"
         )
-        flood_errors = 0
+        layered_errors = 0
         for i in range(N_TEST):
-            decoded = flood_dec.decode(test_llr[i])
-            flood_errors += np.sum(decoded != test_cw[i])
-        flood_ber = flood_errors / (N_TEST * n)
+            llr = test_llr[i].copy()
+            layered_dec.reset()
+            layered_dec.initialise_log_domain_bp(llr)
+            for _ in range(I_MAX):
+                for c in clusters:
+                    llr = layered_dec.decode_cluster(c)
+            decoded = (llr < 0).astype(np.uint8)
+            layered_errors += np.sum(decoded != test_cw[i])
+        layered_ber = layered_errors / (N_TEST * n)
 
         # PPO
         ppo_errors = 0
@@ -154,7 +161,7 @@ def main():
             ppo_errors += np.sum(decoded != test_cw[i])
         ppo_ber = ppo_errors / (N_TEST * n)
 
-        print(f"{snr_db:10.1f} | {flood_ber:14.6f} | {ppo_ber:14.6f}")
+        print(f"{snr_db:10.1f} | {layered_ber:14.6f} | {ppo_ber:14.6f}")
 
     print("\nDone.")
 

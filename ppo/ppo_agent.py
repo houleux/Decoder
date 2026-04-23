@@ -21,11 +21,48 @@ from torch.distributions import Categorical
 
 
 # ---------------------------------------------------------------------------
+# Running statistics for observation normalization
+# ---------------------------------------------------------------------------
+
+class RunningMeanStd:
+    """Welford's online algorithm for running mean/variance."""
+
+    def __init__(self, shape: tuple):
+        self.mean = np.zeros(shape, dtype=np.float64)
+        self.var = np.ones(shape, dtype=np.float64)
+        self.count = 1e-4  # avoid division by zero
+
+    def update(self, x: np.ndarray):
+        """Update with a single observation or a batch."""
+        if x.ndim == 1:
+            x = x[np.newaxis, :]
+        batch_mean = x.mean(axis=0)
+        batch_var = x.var(axis=0)
+        batch_count = x.shape[0]
+        self._update_from_moments(batch_mean, batch_var, batch_count)
+
+    def _update_from_moments(self, batch_mean, batch_var, batch_count):
+        delta = batch_mean - self.mean
+        total_count = self.count + batch_count
+        new_mean = self.mean + delta * batch_count / total_count
+        m_a = self.var * self.count
+        m_b = batch_var * batch_count
+        m2 = m_a + m_b + delta**2 * self.count * batch_count / total_count
+        self.mean = new_mean
+        self.var = m2 / total_count
+        self.count = total_count
+
+    def normalize(self, x: np.ndarray) -> np.ndarray:
+        """Normalize observation to zero mean, unit variance."""
+        return (x - self.mean) / (np.sqrt(self.var) + 1e-8)
+
+
+# ---------------------------------------------------------------------------
 # MLP networks
 # ---------------------------------------------------------------------------
 
 class ActorMLP(nn.Module):
-    """Policy network: maps LLR vector → log-probabilities over clusters."""
+    """Policy network: maps normalized LLR vector → raw logits over clusters."""
 
     def __init__(self, obs_dim: int, act_dim: int):
         super().__init__()
@@ -36,14 +73,22 @@ class ActorMLP(nn.Module):
             nn.Tanh(),
             nn.Linear(128, act_dim),
         )
+        # Smaller initial weights on the output layer for more uniform
+        # initial policy, helping exploration
+        nn.init.orthogonal_(self.net[0].weight, gain=np.sqrt(2))
+        nn.init.zeros_(self.net[0].bias)
+        nn.init.orthogonal_(self.net[2].weight, gain=np.sqrt(2))
+        nn.init.zeros_(self.net[2].bias)
+        nn.init.orthogonal_(self.net[4].weight, gain=0.01)
+        nn.init.zeros_(self.net[4].bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Return log-softmax logits."""
-        return torch.log_softmax(self.net(x), dim=-1)
+        """Return raw logits (NOT log-softmax)."""
+        return self.net(x)
 
 
 class CriticMLP(nn.Module):
-    """Value network: maps LLR vector → scalar state value V(s)."""
+    """Value network: maps normalized LLR vector → scalar state value V(s)."""
 
     def __init__(self, obs_dim: int):
         super().__init__()
@@ -54,6 +99,12 @@ class CriticMLP(nn.Module):
             nn.Tanh(),
             nn.Linear(128, 1),
         )
+        nn.init.orthogonal_(self.net[0].weight, gain=np.sqrt(2))
+        nn.init.zeros_(self.net[0].bias)
+        nn.init.orthogonal_(self.net[2].weight, gain=np.sqrt(2))
+        nn.init.zeros_(self.net[2].bias)
+        nn.init.orthogonal_(self.net[4].weight, gain=1.0)
+        nn.init.zeros_(self.net[4].bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x).squeeze(-1)
@@ -131,6 +182,10 @@ class PpoAgent:
         Entropy bonus coefficient.
     value_coeff : float
         Value loss coefficient.
+    max_grad_norm : float
+        Maximum gradient norm for clipping.
+    normalize_obs : bool
+        Whether to apply running observation normalization.
     device : str
         Torch device ('cpu', 'cuda', 'mps').
     """
@@ -147,6 +202,8 @@ class PpoAgent:
         minibatch_size: int = 64,
         entropy_coeff: float = 0.01,
         value_coeff: float = 0.5,
+        max_grad_norm: float = 0.5,
+        normalize_obs: bool = True,
         device: str = "cpu",
     ):
         self.obs_dim = obs_dim
@@ -158,6 +215,8 @@ class PpoAgent:
         self.minibatch_size = minibatch_size
         self.entropy_coeff = entropy_coeff
         self.value_coeff = value_coeff
+        self.max_grad_norm = max_grad_norm
+        self.normalize_obs = normalize_obs
         self.device = torch.device(device)
 
         # Networks
@@ -170,8 +229,23 @@ class PpoAgent:
             lr=lr,
         )
 
+        # Observation normalization
+        self.obs_rms = RunningMeanStd(shape=(obs_dim,))
+
         # Rollout buffer
         self.buffer = RolloutBuffer()
+
+    # ------------------------------------------------------------------
+    # Observation processing
+    # ------------------------------------------------------------------
+
+    def _process_obs(self, obs: np.ndarray, update_stats: bool = False) -> np.ndarray:
+        """Normalize observation using running statistics."""
+        if not self.normalize_obs:
+            return obs
+        if update_stats:
+            self.obs_rms.update(obs)
+        return self.obs_rms.normalize(obs)
 
     # ------------------------------------------------------------------
     # Action selection
@@ -200,16 +274,19 @@ class PpoAgent:
         value : float
             Estimated state value V(s).
         """
+        # Normalize the observation
+        norm_state = self._process_obs(state, update_stats=training)
+
         with torch.no_grad():
-            s = torch.as_tensor(state, dtype=torch.float32, device=self.device)
-            log_probs = self.actor(s)
+            s = torch.as_tensor(norm_state, dtype=torch.float32, device=self.device)
+            logits = self.actor(s)
             value = self.critic(s).item()
 
-            dist = Categorical(logits=log_probs)
+            dist = Categorical(logits=logits)
             if training:
                 action = dist.sample()
             else:
-                action = log_probs.argmax()
+                action = logits.argmax()
 
             log_prob = dist.log_prob(action).item()
             action = action.item()
@@ -236,16 +313,17 @@ class PpoAgent:
 
         for t in reversed(range(T)):
             if t == T - 1:
+                next_non_terminal = 0.0
                 next_value = 0.0
             else:
+                next_non_terminal = 1.0 - dones[t]
                 next_value = values[t + 1]
 
-            if dones[t]:
-                next_value = 0.0
-                last_gae = 0.0
-
-            delta = rewards[t] + self.gamma * next_value - values[t]
-            last_gae = delta + self.gamma * self.gae_lambda * last_gae
+            # When dones[t] is True, this is the last step of an episode.
+            # The next step belongs to a new episode, so we cut the
+            # bootstrap and GAE carry-over.
+            delta = rewards[t] + self.gamma * next_value * next_non_terminal - values[t]
+            last_gae = delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae
             advantages[t] = last_gae
 
         returns = advantages + values
@@ -265,8 +343,13 @@ class PpoAgent:
         if len(self.buffer) == 0:
             return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
 
-        # Convert buffer to arrays
-        states = np.array(self.buffer.states, dtype=np.float32)
+        # Normalize stored observations
+        raw_states = np.array(self.buffer.states, dtype=np.float64)
+        if self.normalize_obs:
+            norm_states = self.obs_rms.normalize(raw_states).astype(np.float32)
+        else:
+            norm_states = raw_states.astype(np.float32)
+
         actions = np.array(self.buffer.actions, dtype=np.int64)
         old_log_probs = np.array(self.buffer.log_probs, dtype=np.float32)
         rewards = np.array(self.buffer.rewards, dtype=np.float64)
@@ -282,13 +365,13 @@ class PpoAgent:
         advantages = (advantages - adv_mean) / adv_std
 
         # To tensors
-        states_t = torch.as_tensor(states, device=self.device)
+        states_t = torch.as_tensor(norm_states, device=self.device)
         actions_t = torch.as_tensor(actions, device=self.device)
         old_log_probs_t = torch.as_tensor(old_log_probs, device=self.device)
         advantages_t = torch.as_tensor(advantages, dtype=torch.float32, device=self.device)
         returns_t = torch.as_tensor(returns, dtype=torch.float32, device=self.device)
 
-        T = len(states)
+        T = len(norm_states)
         total_policy_loss = 0.0
         total_value_loss = 0.0
         total_entropy = 0.0
@@ -309,9 +392,9 @@ class PpoAgent:
                 mb_advantages = advantages_t[mb_idx_t]
                 mb_returns = returns_t[mb_idx_t]
 
-                # Actor forward
-                log_probs = self.actor(mb_states)
-                dist = Categorical(logits=log_probs)
+                # Actor forward — returns raw logits
+                logits = self.actor(mb_states)
+                dist = Categorical(logits=logits)
                 new_log_probs = dist.log_prob(mb_actions)
                 entropy = dist.entropy().mean()
 
@@ -332,7 +415,7 @@ class PpoAgent:
                 loss.backward()
                 nn.utils.clip_grad_norm_(
                     list(self.actor.parameters()) + list(self.critic.parameters()),
-                    max_norm=0.5,
+                    max_norm=self.max_grad_norm,
                 )
                 self.optimizer.step()
 
@@ -382,6 +465,7 @@ class PpoAgent:
         """
         self.actor.train()
         self.critic.train()
+        print(f"[PpoAgent] Training on device: {self.device}")
 
         episode_rewards: List[float] = []
         total = len(llr_list)
@@ -398,6 +482,8 @@ class PpoAgent:
                 new_obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
 
+                # Store the raw (un-normalized) observation; normalization
+                # is applied during the update using the current stats.
                 self.buffer.store(obs, action, log_prob, reward, value, done)
 
                 obs = new_obs
@@ -435,20 +521,27 @@ class PpoAgent:
     # ------------------------------------------------------------------
 
     def save(self, path: str):
-        """Save actor and critic state dicts."""
+        """Save actor, critic, optimizer, and normalization stats."""
         torch.save(
             {
                 "actor": self.actor.state_dict(),
                 "critic": self.critic.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
+                "obs_rms_mean": self.obs_rms.mean,
+                "obs_rms_var": self.obs_rms.var,
+                "obs_rms_count": self.obs_rms.count,
             },
             path,
         )
 
     def load(self, path: str):
-        """Load actor and critic state dicts."""
+        """Load actor, critic, optimizer, and normalization stats."""
         checkpoint = torch.load(path, map_location=self.device)
         self.actor.load_state_dict(checkpoint["actor"])
         self.critic.load_state_dict(checkpoint["critic"])
         if "optimizer" in checkpoint:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
+        if "obs_rms_mean" in checkpoint:
+            self.obs_rms.mean = checkpoint["obs_rms_mean"]
+            self.obs_rms.var = checkpoint["obs_rms_var"]
+            self.obs_rms.count = checkpoint["obs_rms_count"]
