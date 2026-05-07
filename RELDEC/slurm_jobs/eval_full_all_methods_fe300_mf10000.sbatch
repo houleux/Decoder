@@ -38,11 +38,12 @@ mkdir -p "$RESULT_DIR"
 TS="$(date +%Y%m%d_%H%M%S)"
 
 Q_TABLE="${BASE_DIR}/checkpoints/q_table_final.npy"
+MI_TAB_Q_TABLE="${BASE_DIR}/checkpoints_mi_tabular_z2_10k/q_table_final.npy"
 CKPT_Z1="${BASE_DIR}/checkpoints_deep_z1_1k/checkpoint_latest.npz"
 CKPT_Z2="${BASE_DIR}/checkpoints_deep_z2_1k/checkpoint_latest.npz"
 CKPT_MI="${BASE_DIR}/checkpoints_mi_dqn_z2_1k/checkpoint_latest.npz"
 
-for p in "$Q_TABLE" "$CKPT_Z1" "$CKPT_Z2" "$CKPT_MI"; do
+for p in "$Q_TABLE" "$MI_TAB_Q_TABLE" "$CKPT_Z1" "$CKPT_Z2" "$CKPT_MI"; do
   if [[ ! -f "$p" ]]; then
     echo "ERROR: missing required artifact: $p" >&2
     exit 1
@@ -63,7 +64,8 @@ COMMON_ARGS=(
 python3 RELDEC/evaluate_reldec.py \
   "${COMMON_ARGS[@]}" \
   --q-table "$Q_TABLE" \
-  --methods flooding random round_robin reldec mi_naive_z2 \
+  --mi-tabular-q-table "$MI_TAB_Q_TABLE" \
+  --methods flooding random round_robin reldec mi_naive_z2 mi_tabular_z2 \
   --output-csv "${RESULT_DIR}/wran_full_baseline_tabular_mi_naive_${TS}.csv"
 
 # 2) Deep z1

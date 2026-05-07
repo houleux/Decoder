@@ -10,6 +10,7 @@ from reldec_deep import (
     DeepDqnConfig,
     DeepReldecTrainer,
     DeepTrainingCheckpoint,
+    MiTabularQTrainer,
     load_deep_training_checkpoint,
     save_deep_training_checkpoint,
 )
@@ -32,7 +33,7 @@ from reldec_core import (
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, or MI-DQN z=2)."
+        description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, MI-DQN z=2, or MI-tabular z=2)."
     )
     parser.add_argument("--code", choices=["ab", "wran"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
@@ -52,9 +53,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-history", action="store_true")
     parser.add_argument(
         "--policy-type",
-        choices=["tabular", "deep_z1", "deep_z2", "mi_dqn_z2"],
+        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2"],
         default="tabular",
     )
+    parser.add_argument("--mi-bins", type=int, default=21)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--dqn-hidden-dim", type=int, default=128)
     parser.add_argument("--dqn-learning-rate", type=float, default=1e-3)
@@ -99,6 +101,8 @@ def _build_config_from_args(args: argparse.Namespace) -> TrainingConfig:
 def _cluster_size_for_policy(policy_type: str) -> int:
     if policy_type == "tabular":
         return 1
+    if policy_type == "mi_tabular_z2":
+        return 2
     if policy_type == "deep_z1":
         return 1
     if policy_type == "deep_z2":
@@ -150,7 +154,7 @@ def _main() -> None:
     dqn_final_path = checkpoint_dir / "dqn_final.npz"
     summary_path = checkpoint_dir / "training_summary.json"
 
-    if args.resume and args.policy_type == "tabular":
+    if args.resume and args.policy_type in {"tabular", "mi_tabular_z2"}:
         resume_path = Path(args.resume)
         checkpoint = load_training_checkpoint(resume_path)
         _validate_checkpoint_config(checkpoint.config, args)
@@ -160,17 +164,50 @@ def _main() -> None:
         snr_schedule_db = checkpoint.snr_schedule_db
 
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
-        trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
+        if args.policy_type == "tabular":
+            trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
+        else:
+            trainer = MiTabularQTrainer(
+                h_csr=h,
+                alpha=config.hyperparams.alpha,
+                beta=config.hyperparams.beta,
+                epsilon=config.hyperparams.epsilon,
+                l_max=config.hyperparams.l_max,
+                cluster_size=2,
+                mi_bins=int(args.mi_bins),
+                q_table=checkpoint.q_table,
+            )
 
         rng = np.random.default_rng()
         rng.bit_generator.state = checkpoint.rng_state
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif args.policy_type == "tabular":
+    elif args.policy_type in {"tabular", "mi_tabular_z2"}:
         config = _build_config_from_args(args)
+        config = TrainingConfig(
+            code=config.code,
+            matrix_csv=config.matrix_csv,
+            train_snr_db=config.train_snr_db,
+            episodes_per_snr=config.episodes_per_snr,
+            code_rate=config.code_rate,
+            seed=config.seed,
+            hyperparams=config.hyperparams,
+            cluster_size=cluster_size,
+        )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
-        trainer = ReldecTrainer(h, config.hyperparams)
+        if args.policy_type == "tabular":
+            trainer = ReldecTrainer(h, config.hyperparams)
+        else:
+            trainer = MiTabularQTrainer(
+                h_csr=h,
+                alpha=config.hyperparams.alpha,
+                beta=config.hyperparams.beta,
+                epsilon=config.hyperparams.epsilon,
+                l_max=config.hyperparams.l_max,
+                cluster_size=2,
+                mi_bins=int(args.mi_bins),
+            )
         progress = TrainProgress()
 
         rng = np.random.default_rng(config.seed)
@@ -313,7 +350,7 @@ def _main() -> None:
             save_deep_training_checkpoint(hist_path, payload)
         print(f"[checkpoint] saved deep checkpoint at episode {ep_done}")
 
-    if args.policy_type == "tabular":
+    if args.policy_type in {"tabular", "mi_tabular_z2"}:
         progress = train_reldec(
             trainer=trainer,
             snr_schedule_db=snr_schedule_db,
@@ -348,7 +385,7 @@ def _main() -> None:
                     f"mean_reward={progress.mean_reward():.6f} updates={progress.total_updates}"
                 )
 
-    if args.policy_type == "tabular":
+    if args.policy_type in {"tabular", "mi_tabular_z2"}:
         final_checkpoint = TrainingCheckpoint(
             q_table=trainer.q_table,
             config=config,
@@ -392,7 +429,7 @@ def _main() -> None:
             "checkpoint_final": str(final_path),
         },
     }
-    if args.policy_type == "tabular":
+    if args.policy_type in {"tabular", "mi_tabular_z2"}:
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)

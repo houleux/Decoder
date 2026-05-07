@@ -10,6 +10,7 @@ import numpy as np
 
 from reldec_deep import evaluate_deep_method, load_deep_decoder_from_checkpoint
 from reldec_deep import MiReldecBaselineDecoder
+from reldec_deep import MiTabularQDecoder, evaluate_mi_tabular_method
 from reldec_core import (
     THIS_DIR,
     ReldecDecoderSuite,
@@ -28,12 +29,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--code", choices=["ab", "wran"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
     parser.add_argument("--q-table", type=str, default=None)
+    parser.add_argument("--mi-tabular-q-table", type=str, default=None)
     parser.add_argument("--deep-checkpoint", type=str, default=None)
     parser.add_argument(
         "--methods",
         nargs="+",
         default=None,
-        help="Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2 mi_naive_z2 mi_dqn_z2",
+        help=(
+            "Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2 "
+            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2"
+        ),
     )
     parser.add_argument("--snr-db", nargs="+", type=float, default=None)
     parser.add_argument("--i-max", type=int, default=None)
@@ -54,6 +59,8 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
             methods.append("reldec")
         if args.deep_checkpoint:
             methods.append("deep_reldec_z2")
+        if args.mi_tabular_q_table:
+            methods.append("mi_tabular_z2")
         return methods
 
     methods = [m.lower() for m in args.methods]
@@ -66,6 +73,7 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
         "deep_reldec_z2",
         "mi_naive_z2",
         "mi_dqn_z2",
+        "mi_tabular_z2",
     }
     for method in methods:
         if method not in valid:
@@ -97,6 +105,8 @@ def _main() -> None:
     methods = _normalize_methods(args)
     if "reldec" in methods and not args.q_table:
         raise ValueError("--q-table is required when evaluating method 'reldec'")
+    if "mi_tabular_z2" in methods and not args.mi_tabular_q_table:
+        raise ValueError("--mi-tabular-q-table is required when evaluating method 'mi_tabular_z2'")
     if any(m.startswith("deep_reldec_") for m in methods) and not args.deep_checkpoint:
         raise ValueError("--deep-checkpoint is required when evaluating deep RELDEC methods")
 
@@ -128,6 +138,13 @@ def _main() -> None:
         )
 
     mi_naive_decoder = MiReldecBaselineDecoder(load_parity_check_from_sparse_csv(matrix_csv), cluster_size=2)
+    mi_tabular_decoder = None
+    if "mi_tabular_z2" in methods:
+        mi_tabular_decoder = MiTabularQDecoder(
+            h_csr=load_parity_check_from_sparse_csv(matrix_csv),
+            q_table=load_q_table(args.mi_tabular_q_table),
+            cluster_size=2,
+        )
 
     rng = np.random.default_rng(args.seed)
     all_zero_only = not args.random_codewords
@@ -157,36 +174,55 @@ def _main() -> None:
     for snr_db in snr_db_values:
         print(f"[eval] snr={snr_db:.2f} dB")
         for method in methods:
-            stats = evaluate_single_method(
-                suite=suite,
-                method=method,
-                snr_db=float(snr_db),
-                code_rate=float(code_rate),
-                i_max=i_max,
-                target_frame_errors=int(args.target_frame_errors),
-                max_frames=int(args.max_frames),
-                rng=rng,
-                all_zero_only=all_zero_only,
-            ) if method in {"flooding", "random", "round_robin", "reldec"} else evaluate_deep_method(
-                decoder=deep_decoders[method],
-                snr_db=float(snr_db),
-                code_rate=float(code_rate),
-                i_max=i_max,
-                target_frame_errors=int(args.target_frame_errors),
-                max_frames=int(args.max_frames),
-                rng=rng,
-                all_zero_only=all_zero_only,
-                method_name=method,
-            ) if method == "mi_dqn_z2" else mi_naive_decoder.evaluate(
-                snr_db=float(snr_db),
-                code_rate=float(code_rate),
-                i_max=i_max,
-                target_frame_errors=int(args.target_frame_errors),
-                max_frames=int(args.max_frames),
-                rng=rng,
-                all_zero_only=all_zero_only,
-                method_name=method,
-            )
+            if method in {"flooding", "random", "round_robin", "reldec"}:
+                stats = evaluate_single_method(
+                    suite=suite,
+                    method=method,
+                    snr_db=float(snr_db),
+                    code_rate=float(code_rate),
+                    i_max=i_max,
+                    target_frame_errors=int(args.target_frame_errors),
+                    max_frames=int(args.max_frames),
+                    rng=rng,
+                    all_zero_only=all_zero_only,
+                )
+            elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2"}:
+                stats = evaluate_deep_method(
+                    decoder=deep_decoders[method],
+                    snr_db=float(snr_db),
+                    code_rate=float(code_rate),
+                    i_max=i_max,
+                    target_frame_errors=int(args.target_frame_errors),
+                    max_frames=int(args.max_frames),
+                    rng=rng,
+                    all_zero_only=all_zero_only,
+                    method_name=method,
+                )
+            elif method == "mi_tabular_z2":
+                if mi_tabular_decoder is None:
+                    raise ValueError("mi_tabular_z2 requested but decoder was not initialized")
+                stats = evaluate_mi_tabular_method(
+                    decoder=mi_tabular_decoder,
+                    snr_db=float(snr_db),
+                    code_rate=float(code_rate),
+                    i_max=i_max,
+                    target_frame_errors=int(args.target_frame_errors),
+                    max_frames=int(args.max_frames),
+                    rng=rng,
+                    all_zero_only=all_zero_only,
+                    method_name=method,
+                )
+            else:
+                stats = mi_naive_decoder.evaluate(
+                    snr_db=float(snr_db),
+                    code_rate=float(code_rate),
+                    i_max=i_max,
+                    target_frame_errors=int(args.target_frame_errors),
+                    max_frames=int(args.max_frames),
+                    rng=rng,
+                    all_zero_only=all_zero_only,
+                    method_name=method,
+                )
 
             row = stats.summary(snr_db=float(snr_db))
             row["code"] = args.code

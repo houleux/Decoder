@@ -13,6 +13,7 @@ from ldpc.bp_decoder import BpDecoder
 
 from reldec_core import (
     DecodeResult,
+    ReldecHyperParams,
     TrainProgress,
     TrainingConfig,
     _hard_decision,
@@ -708,6 +709,229 @@ class MiReldecBaselineDecoder:
             stats.update(tx_bits, decoded)
 
         return stats
+
+
+class MiTabularQTrainer:
+    """Tabular Q-learning over MI state bins for z=2 CN clusters."""
+
+    def __init__(
+        self,
+        h_csr: sp.csr_matrix,
+        alpha: float,
+        beta: float,
+        epsilon: float,
+        l_max: int,
+        cluster_size: int = 2,
+        mi_bins: int = 21,
+        q_table: Optional[np.ndarray] = None,
+    ):
+        self.h = h_csr.tocsr().astype(np.uint8)
+        self.m, self.n = self.h.shape
+        self.map = build_cn_clusters(self.h, cluster_size)
+        self.num_actions = len(self.map.clusters)
+        self.cluster_messages = np.array(
+            [int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+            dtype=np.int32,
+        )
+
+        self.alpha = float(alpha)
+        self.beta = float(beta)
+        self.epsilon = float(epsilon)
+        self.l_max = int(l_max)
+        self.hyperparams = ReldecHyperParams(
+            alpha=self.alpha,
+            beta=self.beta,
+            epsilon=self.epsilon,
+            l_max=self.l_max,
+        )
+        self.mi_bins = int(max(2, mi_bins))
+
+        if q_table is None:
+            self.q_table = np.zeros((self.mi_bins, self.num_actions), dtype=np.float64)
+        else:
+            q_arr = np.asarray(q_table, dtype=np.float64)
+            expected = (self.mi_bins, self.num_actions)
+            if q_arr.shape != expected:
+                raise ValueError(f"Q-table shape {q_arr.shape} does not match expected {expected}")
+            self.q_table = q_arr
+
+        self.decoder = BpDecoder(
+            self.h,
+            max_iter=1,
+            schedule="cluster",
+            input_vector_type="received_vector",
+        )
+
+    def _mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+        mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+        bins = np.floor(mi * float(self.mi_bins - 1)).astype(np.int64)
+        return np.clip(bins, 0, self.mi_bins - 1)
+
+    def _select_action_train(
+        self,
+        state_bins: np.ndarray,
+        scheduled: np.ndarray,
+        rng: np.random.Generator,
+    ) -> int:
+        valid = np.flatnonzero(~scheduled).astype(np.int64)
+        if valid.size == 0:
+            raise ValueError("No valid actions left to schedule")
+
+        if rng.random() < self.epsilon:
+            return int(valid[rng.integers(0, valid.size)])
+
+        q_vals = np.array([self.q_table[int(state_bins[a]), int(a)] for a in valid], dtype=np.float64)
+        best = float(np.max(q_vals))
+        ties = valid[np.flatnonzero(q_vals == best)]
+        return int(ties[rng.integers(0, ties.size)])
+
+    def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> float:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+        state_bins = self._mi_state(llr_post)
+
+        episode_reward = 0.0
+
+        for _ in range(self.l_max):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+
+            for _ in range(self.num_actions):
+                action = self._select_action_train(state_bins, scheduled, rng)
+                prev_bin = int(state_bins[action])
+                prev_mi = float(mi[action])
+
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+                state_bins = self._mi_state(llr_post)
+
+                reward = float(mi[action] - prev_mi)
+                next_bin = int(state_bins[action])
+
+                old_q = float(self.q_table[prev_bin, action])
+                next_best_q = float(np.max(self.q_table[next_bin, :]))
+                self.q_table[prev_bin, action] = (1.0 - self.alpha) * old_q + self.alpha * (
+                    reward + self.beta * next_best_q
+                )
+
+                scheduled[action] = True
+                episode_reward += reward
+
+            if syndrome_is_zero(self.h, _hard_decision(llr_post)):
+                break
+
+        return episode_reward
+
+
+class MiTabularQDecoder:
+    """Greedy inference decoder using a trained MI-tabular Q-table for z=2 clusters."""
+
+    def __init__(
+        self,
+        h_csr: sp.csr_matrix,
+        q_table: np.ndarray,
+        cluster_size: int = 2,
+        mi_bins: int = 21,
+    ):
+        self.h = h_csr.tocsr().astype(np.uint8)
+        self.m, self.n = self.h.shape
+        self.map = build_cn_clusters(self.h, cluster_size)
+        self.num_actions = len(self.map.clusters)
+        self.mi_bins = int(max(2, mi_bins))
+        self.q_table = np.asarray(q_table, dtype=np.float64)
+
+        expected = (self.mi_bins, self.num_actions)
+        if self.q_table.shape != expected:
+            raise ValueError(f"Q-table shape {self.q_table.shape} does not match expected {expected}")
+
+        self.cluster_messages = np.array(
+            [int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+            dtype=np.int32,
+        )
+        self.decoder = BpDecoder(
+            self.h,
+            max_iter=1,
+            schedule="cluster",
+            input_vector_type="received_vector",
+        )
+
+    def _mi_state(self, llr_post: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+        bins = np.floor(mi * float(self.mi_bins - 1)).astype(np.int64)
+        bins = np.clip(bins, 0, self.mi_bins - 1)
+        return mi, bins
+
+    def _choose_greedy(
+        self,
+        state_bins: np.ndarray,
+        scheduled: np.ndarray,
+        rng: np.random.Generator,
+    ) -> int:
+        valid = np.flatnonzero(~scheduled).astype(np.int64)
+        if valid.size == 0:
+            raise ValueError("No valid actions left to schedule")
+
+        q_vals = np.array([self.q_table[int(state_bins[a]), int(a)] for a in valid], dtype=np.float64)
+        best = float(np.max(q_vals))
+        ties = valid[np.flatnonzero(q_vals == best)]
+        return int(ties[rng.integers(0, ties.size)])
+
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = _hard_decision(llr_post)
+        messages = 0
+
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+
+            for _ in range(self.num_actions):
+                _, state_bins = self._mi_state(llr_post)
+                action = self._choose_greedy(state_bins, scheduled, rng)
+
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                scheduled[action] = True
+                messages += int(self.cluster_messages[action])
+
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+
+def evaluate_mi_tabular_method(
+    decoder: MiTabularQDecoder,
+    snr_db: float,
+    code_rate: float,
+    i_max: int,
+    target_frame_errors: int,
+    max_frames: int,
+    rng: np.random.Generator,
+    all_zero_only: bool = True,
+    method_name: str = "mi_tabular_z2",
+):
+    from reldec_core import MethodStats
+
+    stats = MethodStats(method=method_name, n=decoder.n)
+
+    while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+        if all_zero_only:
+            tx_bits = np.zeros(decoder.n, dtype=np.uint8)
+        else:
+            tx_bits = rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+
+        llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+        decoded = decoder.decode(llr, i_max=i_max, rng=rng)
+        stats.update(tx_bits, decoded)
+
+    return stats
 
 
 def evaluate_deep_method(

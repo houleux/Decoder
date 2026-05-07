@@ -8,6 +8,10 @@ if [[ ! -f RELDEC/slurm_jobs/train_mi_dqn_z2_to_10k.sbatch ]]; then
   echo "ERROR: missing RELDEC/slurm_jobs/train_mi_dqn_z2_to_10k.sbatch" >&2
   exit 1
 fi
+if [[ ! -f RELDEC/slurm_jobs/train_mi_tabular_z2_to_10k.sbatch ]]; then
+  echo "ERROR: missing RELDEC/slurm_jobs/train_mi_tabular_z2_to_10k.sbatch" >&2
+  exit 1
+fi
 if [[ ! -f RELDEC/slurm_jobs/eval_mi_existing_fe60_mf3000.sbatch ]]; then
   echo "ERROR: missing RELDEC/slurm_jobs/eval_mi_existing_fe60_mf3000.sbatch" >&2
   exit 1
@@ -37,14 +41,25 @@ if [[ -z "$train_job_id" ]]; then
   exit 1
 fi
 
-# 3) Finally: full all-method evaluation (FE=300, max_frames=10000).
-eval_submit_out="$(sbatch --dependency=afterok:${train_job_id} RELDEC/slurm_jobs/eval_full_all_methods_fe300_mf10000.sbatch)"
+# 3) Then: MI-tabular z2 training to 10k episodes.
+tab_submit_out="$(sbatch --dependency=afterok:${train_job_id} RELDEC/slurm_jobs/train_mi_tabular_z2_to_10k.sbatch)"
+echo "$tab_submit_out"
+tab_job_id="$(awk '{print $4}' <<< "$tab_submit_out")"
+
+if [[ -z "$tab_job_id" ]]; then
+  echo "ERROR: could not parse MI-tabular training job id" >&2
+  exit 1
+fi
+
+# 4) Finally: full all-method evaluation (FE=300, max_frames=10000).
+eval_submit_out="$(sbatch --dependency=afterok:${tab_job_id} RELDEC/slurm_jobs/eval_full_all_methods_fe300_mf10000.sbatch)"
 echo "$eval_submit_out"
 eval_job_id="$(awk '{print $4}' <<< "$eval_submit_out")"
 
 echo "Submitted quick eval job: ${quick_job_id}"
 echo "Submitted training job:   ${train_job_id} (afterok:${quick_job_id})"
-echo "Submitted eval job:       ${eval_job_id} (afterok:${train_job_id})"
+echo "Submitted MI-tabular job: ${tab_job_id} (afterok:${train_job_id})"
+echo "Submitted eval job:       ${eval_job_id} (afterok:${tab_job_id})"
 echo ""
 echo "Queue snapshot:"
 squeue -u "$USER" -o "%.18i %.9P %.20j %.8u %.2t %.10M %.6D %R"

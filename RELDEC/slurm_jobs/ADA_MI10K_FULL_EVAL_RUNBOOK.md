@@ -17,16 +17,20 @@ This runbook is for running on Ada with SLURM using the research account.
 
 - `RELDEC/slurm_jobs/train_mi_dqn_z2_to_10k.sbatch`
   - Resumes `mi_dqn_z2` from current WRAN checkpoint and extends schedule to 10,000 total episodes.
+- `RELDEC/slurm_jobs/train_mi_tabular_z2_to_10k.sbatch`
+  - Trains a new MI-state/tabular-Q method (`mi_tabular_z2`) for 10,000 episodes.
+  - Uses MI-derived state bins and MI-gain reward at z=2 clustering.
 - `RELDEC/slurm_jobs/eval_full_all_methods_fe300_mf10000.sbatch`
   - Runs full BER/FER evaluation with `target_frame_errors=300` and `max_frames=10000`.
   - Evaluates methods:
-    - flooding, random, round_robin, reldec, mi_naive_z2, deep_reldec_z1, deep_reldec_z2, mi_dqn_z2
+    - flooding, random, round_robin, reldec, mi_naive_z2, mi_tabular_z2, deep_reldec_z1, deep_reldec_z2, mi_dqn_z2
   - Merges outputs into an accumulated CSV.
 - `RELDEC/slurm_jobs/submit_mi10k_and_full_eval.sh`
-  - Submits a 3-stage chain with `afterok` dependencies:
+  - Submits a 4-stage chain with `afterok` dependencies:
     1) quick MI eval (FE=60/MF=3000)
     2) MI training to 10k
-    3) full all-method eval (FE=300/MF=10000)
+    3) MI-tabular z2 training to 10k
+    4) full all-method eval (FE=300/MF=10000)
 
 ## Paths Used
 
@@ -66,7 +70,8 @@ This submits:
 
 1. `reldec_mi_quick` quick MI-only eval job
 2. `reldec_mi10k` training job dependent on quick eval success
-3. `reldec_eval_full` full evaluation job dependent on training success
+3. `reldec_mi_tab10k` MI-tabular training job dependent on MI-DQN training success
+4. `reldec_eval_full` full evaluation job dependent on MI-tabular training success
 
 ## Monitor
 
@@ -108,6 +113,7 @@ Once `reldec_mi_quick` completes, inspect quick outputs immediately while traini
 ## Notes
 
 - The MI training script extends checkpoint schedule to 10,000 episodes before resume.
+- The MI-tabular method uses MI state bins and MI-gain reward (tabular Q-learning, z=2).
 - Evaluation is split across multiple CLI calls because deep method checkpoints are method-specific.
 - Accumulated merge de-duplicates rows by:
   - method, snr_db, code, matrix_csv, target_frame_errors, max_frames, all_zero_only
