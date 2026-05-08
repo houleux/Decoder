@@ -1,0 +1,40 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "matrices/H_Mackay_96_48.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "episodes_per_snr": 2500,
+    "code_rate": 0.5,
+    "seed": 7,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 25
+    },
+    "cluster_size": 6
+  },
+  "h_shape": [
+    48,
+    96
+  ],
+  "h_nnz": 288,
+  "policy_type": "deep_zx",
+  "progress": {
+    "episodes_completed": 12500,
+    "total_updates": 312500,
+    "mean_reward": 0.908291722222222,
+    "elapsed_sec": 0.0
+  },
+  "artifacts": {
+    "checkpoint_latest": "../RELDEC/notebook_runs/continuous_reldec/active_run/mackay_96_48/checkpoints_deep_zx/checkpoint_latest.npz",
+    "checkpoint_final": "../RELDEC/notebook_runs/continuous_reldec/active_run/mackay_96_48/checkpoints_deep_zx/checkpoint_final.npz",
+    "dqn_checkpoint": "../RELDEC/notebook_runs/continuous_reldec/active_run/mackay_96_48/checkpoints_deep_zx/dqn_final.npz"
+  }
+}

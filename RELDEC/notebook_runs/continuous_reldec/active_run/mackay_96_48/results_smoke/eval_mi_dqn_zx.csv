@@ -1,0 +1,4 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+mi_dqn_zx,0.5,5,52,5,0.10833333333333334,1.0,7200.0,25.0,0,ab,matrices/H_Mackay_96_48.csv,0.5,25,5,100,True
+mi_dqn_zx,1.5,16,48,5,0.03125,0.3125,3042.0,10.5625,11,ab,matrices/H_Mackay_96_48.csv,0.5,25,5,100,True
+mi_dqn_zx,2.5,47,40,5,0.008865248226950355,0.10638297872340426,1562.5531914893618,5.425531914893617,42,ab,matrices/H_Mackay_96_48.csv,0.5,25,5,100,True

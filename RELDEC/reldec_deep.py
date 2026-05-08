@@ -127,19 +127,22 @@ class ReplayBuffer:
         )
 
 
-class QNetwork(nn.Module):
-    def __init__(self, state_dim: int, num_actions: int, hidden_dim: int):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, num_actions),
-        )
+if torch is not None and nn is not None:
+    class QNetwork(nn.Module):
+        def __init__(self, state_dim: int, num_actions: int, hidden_dim: int):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(state_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, num_actions),
+            )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.net(x)
+else:
+    QNetwork = None  # type: ignore
 
 
 def build_cn_clusters(h_csr: sp.csr_matrix, cluster_size: int) -> CnClusterMap:

@@ -53,9 +53,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-history", action="store_true")
     parser.add_argument(
         "--policy-type",
-        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2"],
+        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2", "mi_tabular_zx", "deep_zx", "mi_dqn_zx"],
         default="tabular",
     )
+    parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx policies")
     parser.add_argument("--mi-bins", type=int, default=21)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--dqn-hidden-dim", type=int, default=128)
@@ -98,7 +99,7 @@ def _build_config_from_args(args: argparse.Namespace) -> TrainingConfig:
     )
 
 
-def _cluster_size_for_policy(policy_type: str) -> int:
+def _cluster_size_for_policy(policy_type: str, args_z: int | None = None) -> int:
     if policy_type == "tabular":
         return 1
     if policy_type == "mi_tabular_z2":
@@ -109,6 +110,10 @@ def _cluster_size_for_policy(policy_type: str) -> int:
         return 2
     if policy_type == "mi_dqn_z2":
         return 2
+    if policy_type in ("mi_tabular_zx", "deep_zx", "mi_dqn_zx"):
+        if args_z is None:
+            raise ValueError(f"--z must be provided for policy {policy_type}")
+        return args_z
     raise ValueError(f"Unsupported policy type: {policy_type}")
 
 
@@ -139,7 +144,7 @@ def _validate_checkpoint_config(config: TrainingConfig, args: argparse.Namespace
 
 def _main() -> None:
     args = _parse_args()
-    cluster_size = _cluster_size_for_policy(args.policy_type)
+    cluster_size = _cluster_size_for_policy(args.policy_type, args.z)
 
     checkpoint_dir = (
         Path(args.checkpoint_dir)
@@ -154,7 +159,7 @@ def _main() -> None:
     dqn_final_path = checkpoint_dir / "dqn_final.npz"
     summary_path = checkpoint_dir / "training_summary.json"
 
-    if args.resume and args.policy_type in {"tabular", "mi_tabular_z2"}:
+    if args.resume and args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         resume_path = Path(args.resume)
         checkpoint = load_training_checkpoint(resume_path)
         _validate_checkpoint_config(checkpoint.config, args)
@@ -173,7 +178,7 @@ def _main() -> None:
                 beta=config.hyperparams.beta,
                 epsilon=config.hyperparams.epsilon,
                 l_max=config.hyperparams.l_max,
-                cluster_size=2,
+                cluster_size=cluster_size,
                 mi_bins=int(args.mi_bins),
                 q_table=checkpoint.q_table,
             )
@@ -183,7 +188,7 @@ def _main() -> None:
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif args.policy_type in {"tabular", "mi_tabular_z2"}:
+    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         config = _build_config_from_args(args)
         config = TrainingConfig(
             code=config.code,
@@ -205,7 +210,7 @@ def _main() -> None:
                 beta=config.hyperparams.beta,
                 epsilon=config.hyperparams.epsilon,
                 l_max=config.hyperparams.l_max,
-                cluster_size=2,
+                cluster_size=cluster_size,
                 mi_bins=int(args.mi_bins),
             )
         progress = TrainProgress()
@@ -350,7 +355,7 @@ def _main() -> None:
             save_deep_training_checkpoint(hist_path, payload)
         print(f"[checkpoint] saved deep checkpoint at episode {ep_done}")
 
-    if args.policy_type in {"tabular", "mi_tabular_z2"}:
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         progress = train_reldec(
             trainer=trainer,
             snr_schedule_db=snr_schedule_db,
@@ -385,7 +390,7 @@ def _main() -> None:
                     f"mean_reward={progress.mean_reward():.6f} updates={progress.total_updates}"
                 )
 
-    if args.policy_type in {"tabular", "mi_tabular_z2"}:
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         final_checkpoint = TrainingCheckpoint(
             q_table=trainer.q_table,
             config=config,
@@ -429,7 +434,7 @@ def _main() -> None:
             "checkpoint_final": str(final_path),
         },
     }
-    if args.policy_type in {"tabular", "mi_tabular_z2"}:
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)

@@ -37,9 +37,11 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2 "
-            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2"
+            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2 deep_reldec_zx mi_naive_zx mi_dqn_zx mi_tabular_zx"
         ),
     )
+    parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx methods")
+    parser.add_argument("--mi-bins", type=int, default=21, help="Quantization level for MI state bins")
     parser.add_argument("--snr-db", nargs="+", type=float, default=None)
     parser.add_argument("--i-max", type=int, default=None)
     parser.add_argument("--code-rate", type=float, default=None)
@@ -74,6 +76,10 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
         "mi_naive_z2",
         "mi_dqn_z2",
         "mi_tabular_z2",
+        "deep_reldec_zx",
+        "mi_naive_zx",
+        "mi_dqn_zx",
+        "mi_tabular_zx",
     }
     for method in methods:
         if method not in valid:
@@ -109,6 +115,16 @@ def _main() -> None:
         raise ValueError("--mi-tabular-q-table is required when evaluating method 'mi_tabular_z2'")
     if any(m.startswith("deep_reldec_") for m in methods) and not args.deep_checkpoint:
         raise ValueError("--deep-checkpoint is required when evaluating deep RELDEC methods")
+    if "mi_dqn_z2" in methods and not args.deep_checkpoint:
+        raise ValueError("--deep-checkpoint is required when evaluating mi_dqn_z2")
+    if "mi_dqn_zx" in methods and not args.deep_checkpoint:
+        raise ValueError("--deep-checkpoint is required when evaluating mi_dqn_zx")
+    if "mi_tabular_zx" in methods and not args.mi_tabular_q_table:
+        raise ValueError("--mi-tabular-q-table is required when evaluating method 'mi_tabular_zx'")
+    
+    zx_methods = [m for m in methods if m.endswith("_zx")]
+    if zx_methods and args.z is None:
+        raise ValueError(f"--z is required when evaluating _zx methods: {zx_methods}")
 
     h = load_parity_check_from_sparse_csv(matrix_csv)
     code_rate = args.code_rate if args.code_rate is not None else nominal_code_rate(h)
@@ -136,14 +152,39 @@ def _main() -> None:
             matrix_csv=matrix_csv,
             expected_policy_label="mi_dqn_z2",
         )
+    if "deep_reldec_zx" in methods:
+        deep_decoders["deep_reldec_zx"] = load_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="deep_zx",
+        )
+    if "mi_dqn_zx" in methods:
+        deep_decoders["mi_dqn_zx"] = load_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="mi_dqn_zx",
+        )
 
-    mi_naive_decoder = MiReldecBaselineDecoder(load_parity_check_from_sparse_csv(matrix_csv), cluster_size=2)
+    mi_naive_decoder = None
+    if "mi_naive_z2" in methods:
+        mi_naive_decoder = MiReldecBaselineDecoder(load_parity_check_from_sparse_csv(matrix_csv), cluster_size=2)
+    elif "mi_naive_zx" in methods:
+        mi_naive_decoder = MiReldecBaselineDecoder(load_parity_check_from_sparse_csv(matrix_csv), cluster_size=args.z)
+        
     mi_tabular_decoder = None
     if "mi_tabular_z2" in methods:
         mi_tabular_decoder = MiTabularQDecoder(
             h_csr=load_parity_check_from_sparse_csv(matrix_csv),
             q_table=load_q_table(args.mi_tabular_q_table),
             cluster_size=2,
+            mi_bins=args.mi_bins,
+        )
+    elif "mi_tabular_zx" in methods:
+        mi_tabular_decoder = MiTabularQDecoder(
+            h_csr=load_parity_check_from_sparse_csv(matrix_csv),
+            q_table=load_q_table(args.mi_tabular_q_table),
+            cluster_size=args.z,
+            mi_bins=args.mi_bins,
         )
 
     rng = np.random.default_rng(args.seed)
@@ -186,7 +227,7 @@ def _main() -> None:
                     rng=rng,
                     all_zero_only=all_zero_only,
                 )
-            elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2"}:
+            elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2", "deep_reldec_zx", "mi_dqn_zx"}:
                 stats = evaluate_deep_method(
                     decoder=deep_decoders[method],
                     snr_db=float(snr_db),
@@ -198,9 +239,9 @@ def _main() -> None:
                     all_zero_only=all_zero_only,
                     method_name=method,
                 )
-            elif method == "mi_tabular_z2":
+            elif method in {"mi_tabular_z2", "mi_tabular_zx"}:
                 if mi_tabular_decoder is None:
-                    raise ValueError("mi_tabular_z2 requested but decoder was not initialized")
+                    raise ValueError(f"{method} requested but decoder was not initialized")
                 stats = evaluate_mi_tabular_method(
                     decoder=mi_tabular_decoder,
                     snr_db=float(snr_db),
@@ -212,7 +253,9 @@ def _main() -> None:
                     all_zero_only=all_zero_only,
                     method_name=method,
                 )
-            else:
+            elif method in {"mi_naive_z2", "mi_naive_zx"}:
+                if mi_naive_decoder is None:
+                    raise ValueError(f"{method} requested but decoder was not initialized")
                 stats = mi_naive_decoder.evaluate(
                     snr_db=float(snr_db),
                     code_rate=float(code_rate),

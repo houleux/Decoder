@@ -1,0 +1,79 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "matrices/H_Mackay_96_48.csv",
+    "code_rate": 0.5,
+    "methods": [
+      "deep_reldec_zx"
+    ],
+    "snr_db": [
+      0.5,
+      1.5,
+      2.5
+    ],
+    "i_max": 25,
+    "target_frame_errors": 300,
+    "max_frames": 100000,
+    "all_zero_only": true,
+    "seed": 17
+  },
+  "results": [
+    {
+      "method": "deep_reldec_zx",
+      "snr_db": 0.5,
+      "frames": 398,
+      "bit_errors": 3794,
+      "frame_errors": 300,
+      "ber": 0.09929857621440535,
+      "fer": 0.7537688442211056,
+      "avg_messages": 5783.879396984925,
+      "avg_iterations": 20.082914572864322,
+      "converged_frames": 98,
+      "code": "ab",
+      "matrix_csv": "matrices/H_Mackay_96_48.csv",
+      "code_rate": 0.5,
+      "i_max": 25,
+      "target_frame_errors": 300,
+      "max_frames": 100000,
+      "all_zero_only": true
+    },
+    {
+      "method": "deep_reldec_zx",
+      "snr_db": 1.5,
+      "frames": 763,
+      "bit_errors": 3261,
+      "frame_errors": 300,
+      "ber": 0.044519986893840104,
+      "fer": 0.3931847968545216,
+      "avg_messages": 3448.8283093053738,
+      "avg_iterations": 11.975098296199214,
+      "converged_frames": 473,
+      "code": "ab",
+      "matrix_csv": "matrices/H_Mackay_96_48.csv",
+      "code_rate": 0.5,
+      "i_max": 25,
+      "target_frame_errors": 300,
+      "max_frames": 100000,
+      "all_zero_only": true
+    },
+    {
+      "method": "deep_reldec_zx",
+      "snr_db": 2.5,
+      "frames": 2958,
+      "bit_errors": 2975,
+      "frame_errors": 300,
+      "ber": 0.010476532567049808,
+      "fer": 0.10141987829614604,
+      "avg_messages": 1451.683569979716,
+      "avg_iterations": 5.040567951318458,
+      "converged_frames": 2672,
+      "code": "ab",
+      "matrix_csv": "matrices/H_Mackay_96_48.csv",
+      "code_rate": 0.5,
+      "i_max": 25,
+      "target_frame_errors": 300,
+      "max_frames": 100000,
+      "all_zero_only": true
+    }
+  ]
+}
