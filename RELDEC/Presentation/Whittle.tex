@@ -1,0 +1,220 @@
+\documentclass[aspectratio=169,professionalfonts]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usefonttheme{professionalfonts}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage{hyperref}
+
+\title{LDPC Scheduling, Weak Coupling, and State Augmentation}
+\subtitle{A step-by-step academic framing}
+\author{}
+\date{}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Roadmap}
+\begin{enumerate}
+  \item Define weakly coupled MDPs, restless bandits, and factored MDPs.
+  \item Map clustered LDPC scheduling to these concepts.
+  \item Explain why the mapping is not exact.
+  \item Introduce the state-augmentation idea and its interpretation.
+  \item State the most accurate classification and nearest literature connections.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Step 1: Weakly coupled MDPs (WC-MDP)}
+A weakly coupled MDP is built from multiple sub-MDPs whose \emph{local dynamics are independent}, while the system is coupled through shared action/resource constraints.
+
+\vspace{0.4em}
+Typical structure:
+\[
+S = S_1 \times \cdots \times S_K,
+\qquad
+A(s) = \Bigl\{a=(a_1,\dots,a_K): \sum_{u=1}^K c_u(a_u) \le B\Bigr\},
+\]
+with transition kernel
+\[
+P(s'\mid s,a)=\prod_{u=1}^K P_u(s_u'\mid s_u,a_u).
+\]
+\textbf{Note: }Standard WC-MDPs are coupled by shared resource constraints (e.g. common budget) but transitions are independent. Many theoretical results break for other formulations (e.g. state based transition coupling used here)
+\end{frame}
+
+\begin{frame}{Step 2: Restless bandits}
+A restless bandit is a special case of a weakly coupled MDP in which each subsystem is an arm, each arm has a small action set (usually active/passive), and only a limited number of arms can be activated at each time.
+
+\vspace{0.4em}
+For arm $u$:
+\[
+a_u \in \{0,1\},
+\qquad
+\sum_{u=1}^K a_u \le B,
+\]
+and even passive arms keep evolving:
+\[
+P_u(s_u'\mid s_u,a_u=0) \neq \delta_{s_u}.
+\]
+Whittle-index methods rely on this per-arm local Markov structure plus the activation constraint.
+\end{frame}
+
+\begin{frame}{Step 3: Factored and dynamically coupled MDPs}
+A factored MDP represents the global state by components $s=(s_1,\dots,s_K)$ (here states of clusters) and exploits sparse conditional dependence (the fact that clusters are almost independent).
+
+\vspace{0.4em}
+In a \emph{dynamically coupled} factored MDP, the next state of subsystem $u$ may depend on neighboring subsystem states/actions:
+\[
+P(s_u' \mid s,a) = P_u\bigl(s_u'\mid s_{\mathcal N(u)}, a_{\mathcal N(u)}\bigr),
+\]
+for a sparse interaction graph $\mathcal N(u)$. This is strictly more general than a classical weakly coupled MDP.
+\end{frame}
+
+\begin{frame}{Step 4: Clustered LDPC scheduling model}
+In clustered LDPC decoding, the Tanner graph is partitioned into clusters of check nodes. At each decision step, the scheduler picks one cluster to update.
+
+\vspace{0.4em}
+Natural abstraction:
+\begin{itemize}
+  \item subsystem $u$ $\leftrightarrow$ cluster $C_u$,
+  \item local state $s_u$ $\leftrightarrow$ cluster summary, e.g. hard decisions / residual-like statistics / local syndrome features,
+  \item action $a_u$ $\leftrightarrow$ whether cluster $u$ is scheduled now,
+  \item budget constraint $\sum_u a_u \le B$ $\leftrightarrow$ serial or parallel hardware scheduling constraint.
+\end{itemize}
+This is why the problem initially looks like a weakly coupled MDP or restless bandit.
+\end{frame}
+
+\begin{frame}{Step 5: Where the direct WC-MDP mapping fails}
+The issue is not the action budget; the issue is the transition law.
+
+\vspace{0.4em}
+If cluster $u$ is updated, messages are changed on VNs adjacent to $C_u$. Those VNs may also be adjacent to other clusters $v$, so the next state of cluster $v$ can change because of action $a_u$.
+
+\vspace{0.4em}
+Hence one should not expect
+\[
+P(s'\mid s,a)=\prod_{u=1}^K P_u(s_u'\mid s_u,a_u)
+\]
+to hold exactly. The interaction is induced by the Tanner graph itself through shared VNs and cycles.
+\end{frame}
+
+\begin{frame}{Step 6: Where the direct restless-bandit mapping fails}
+The problem is also not a textbook restless bandit.
+
+\vspace{0.4em}
+In a classical restless bandit, each arm has its own active and passive transition kernels:
+\[
+P_u(s_u'\mid s_u, a_u=1),
+\qquad
+P_u(s_u'\mid s_u, a_u=0),
+\]
+independent of the actions taken on other arms.
+
+\vspace{0.4em}
+In clustered LDPC scheduling, arm $v$ can be affected by the decision taken on arm $u \neq v$. Therefore the arms are \emph{interacting}. This breaks the exact assumptions behind a direct Whittle-index formulation.
+\end{frame}
+
+\begin{frame}{Intermediate conclusion}
+For LDPC scheduling with cluster interactions:
+\begin{itemize}
+  \item it \textbf{does} resemble a weakly coupled MDP in the sense of a shared activation constraint,
+  \item it \textbf{does} resemble a restless bandit in the sense of arm-like subsystems that evolve over time,
+  \item but it is \textbf{not exactly} either model because the transitions are graph-coupled.
+\end{itemize}
+The best exact viewpoint is therefore a \textbf{sparsely dynamically coupled factored MDP}.
+\end{frame}
+
+\begin{frame}{Step 7: Why RELDEC is still only partially using global information}
+RELDEC defines a cluster state from local hard-decision outputs around that cluster and selects actions from local state-dependent action values.
+
+\vspace{0.4em}
+This keeps learning feasible, but it does not explicitly encode the current pressure exerted by the rest of the graph on the selected cluster. In other words, the scheduler uses a local state but not the full joint state.
+
+\vspace{0.4em}
+That is precisely where an augmented-state formulation can help.
+\end{frame}
+
+\begin{frame}{Step 8: State augmentation idea}
+For each cluster $u$, define an augmented state
+\[
+\tilde s_u = (s_u, \phi_u),
+\]
+where $s_u$ is the local cluster state and $\phi_u$ is a low-dimensional summary of how the rest of the graph currently influences cluster $u$.
+
+\vspace{0.4em}
+A generic form is
+\[
+\phi_u = \sum_{v\neq u} \lambda_{vu} f(s_v),
+\]
+where $\lambda_{vu}$ measures structural coupling between clusters $v$ and $u$, and $f(s_v)$ extracts a small feature from cluster $v$ such as residual mass, unsatisfied-check fraction, or local error proxy.
+\end{frame}
+
+\begin{frame}{Step 9: Why the augmentation is feasible}
+The full joint state $s=(s_1,\dots,s_K)$ is usually too large. The augmented state keeps only:
+\begin{itemize}
+  \item local information $s_u$, and
+  \item a compressed coupling statistic $\phi_u$.
+\end{itemize}
+So the scheduler for cluster $u$ can use a local score such as
+\[
+g_u(\tilde s_u)=g_u(s_u,\phi_u),
+\]
+and then activate the top-scoring cluster(s). This preserves the cheap action-selection structure of bandit-style scheduling while injecting global context.
+
+\vspace{0.4em}
+Conceptually, this is closer to sparse-interaction factored control, value decomposition, and aggregate-state approximations than to a strict Whittle index.
+\end{frame}
+
+\begin{frame}{Step 10: Can we still call it a WC-MDP or a restless bandit?}
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{2.6cm} X}
+\toprule
+Model & Exact fit? & Comment \\
+\midrule
+Classical WC-MDP & No & Shared budget fits, but transition factorization fails because cluster actions affect neighboring cluster states. \\
+Classical restless bandit & No & Arm evolution is not independent under active/passive modes; arms interact through Tanner-graph coupling. \\
+Approximate WC-MDP / approximate RMAB & Yes, as approximation & Reasonable when clustering makes cross-cluster interaction weak enough to be treated perturbatively. \\
+Dynamically coupled factored MDP & Yes, best exact label & Captures local subsystems with sparse graph-induced transition dependence. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\end{frame}
+
+\begin{frame}{Step 11: Closest existing concepts in the literature}
+The augmentation idea is directly related to several existing directions:
+\begin{itemize}
+  \item \textbf{Factored MDPs}: global state decomposes into interacting local components.
+  \item \textbf{Dynamically coupled systems}: local next-states depend on neighboring states/actions.
+  \item \textbf{Approximate weak coupling}: use local control plus correction terms when coupling is small.
+  \item \textbf{Interacting/networked restless bandits}: bandit-like activation under sparse arm interactions.
+  \item \textbf{Aggregate-state / mean-field summaries}: replace the full rest-of-system state by a compressed statistic.
+  \item \textbf{Value decomposition / sparse-interaction RL}: local scores with limited interaction terms.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Final takeaway}
+If we build the argument carefully, the clean academic statement is:
+
+\vspace{0.5em}
+\begin{block}{Recommended formulation}
+Clustered LDPC scheduling is best modeled as a \textbf{sparsely dynamically coupled factored MDP} with a scheduling-budget constraint. It is \textbf{not exactly} a classical weakly coupled MDP or a classical restless bandit, although both provide useful approximation languages when cross-cluster interactions are weak.
+\end{block}
+
+\vspace{0.5em}
+The proposed augmentation
+\[
+\tilde s_u=(s_u,\phi_u)
+\]
+is then a principled compromise: it preserves local decision structure while importing a compact summary of global coupling.
+\end{frame}
+
+\end{document}

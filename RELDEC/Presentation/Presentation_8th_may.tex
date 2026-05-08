@@ -1,0 +1,289 @@
+\documentclass{beamer}
+%Information to be included in the title page:
+\title{RL-LDPC presentation}
+\author{}
+\institute{}
+\date{11th April 2026}
+
+\begin{document}
+
+\frame{\titlepage}
+% -------------------------------------------------------------------------
+
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+\section{Mutual Information}
+% Contents Slide
+\begin{frame}{Overview}
+\begin{itemize}
+    \item Implemented naive mutual information based decoding
+    \item Changed RELDEC MDRP formulation based on Mutual information
+\end{itemize}
+\end{frame}
+% -------------------------------------------------------------------------
+\subsection{Intro to Mutual Info}
+\begin{frame}{Mutual Information: Intuition}
+\begin{itemize}
+    \item It quantifies how much information messages carry about transmitted bits
+    \item Let $X \in \{0,1\}$ be the transmitted bit
+    \item Let $L$ be the LLR message
+    \item Mutual Information $I(X;L)$ measures:
+    \begin{block}{}
+        Reduction in uncertainty about $X$ after observing $L$
+    \end{block}
+    \item Range:
+    \begin{itemize}
+        \item $0$ $\rightarrow$ no information
+        \item $1$ $\rightarrow$ perfect knowledge
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Formal Definition}
+\begin{itemize}
+    \item Mutual Information:
+\end{itemize}
+
+\[
+I(X;L) = \mathbb{E}\left[\log_2 \frac{p(L|X)}{p(L)}\right]
+\]
+
+\begin{itemize}
+    \item $X \in \{0,1\}$, $L$ is the LLR
+    \item Typically assume all-zero codeword (symmetry)
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{MI and LLRs}
+\begin{itemize}
+    \item For symmetric channels, MI depends only on LLR distribution
+    \item Practical computation:
+    \begin{itemize}
+        \item Generate LLR samples
+        \item Estimate MI empirically
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Mutual Information for a Cluster}
+\begin{itemize}
+    \item Consider a cluster of check nodes: $\mathcal{C}_k$
+    \item Collect all outgoing LLR messages from this cluster:
+    \[
+    \{L_i : i \in \mathcal{C}_k\}
+    \]
+
+    \item Treat these messages as samples from a random variable $L^{(k)}$
+
+    \item Define cluster MI as:
+    \[
+    I_k = I(X; L^{(k)})
+    \]
+
+    \item Interpretation:
+    \begin{itemize}
+        \item Measures average information content of messages from cluster $\mathcal{C}_k$
+        \item Each cluster has its own MI evolution
+    \end{itemize}
+\end{itemize}
+\end{frame}
+%------------------------------------------------
+%------------------------------------------------
+\begin{frame}{Computing MI}
+\begin{itemize}
+    \item Assume LLRs are Gaussian:
+    \[
+    L \sim \mathcal{N}(\mu, 2\mu)
+    \] 
+    \item Exact formula (when conditioned on $x_j = +1$), we have
+$$I_{E,V} = 1 - \int_{-\infty}^{\infty} \frac{1}{\sqrt{2\pi}\sigma} e^{-(l-\sigma^2/2)^2/(2\sigma^2)} \log_2(1+e^{-l}) dl. $$
+
+For convenience we write this as
+$$I_{E,V} = J(\sigma) = J\left(\sqrt{(d_v-1)\sigma_A^2 + \sigma_{ch}^2}\right). $$
+        \item Approximation: 
+For computer implementation, the $J(\sigma)$ function is split into two intervals based on a threshold of $\sigma^* = 1.6363$:
+
+$$J(\sigma) \approx \begin{cases} 
+a_{J,1} \sigma^3 + b_{J,1} \sigma^2 + c_{J,1} \sigma, & 0 \leq \sigma \leq \sigma^* \\
+1 - e^{a_{J,2} \sigma^3 + b_{J,2} \sigma^2 + c_{J,2} \sigma + d_{J,2}}, & \sigma^* < \sigma < 10 \\
+1, & \sigma > 10 
+\end{cases}$$
+
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+%------------------------------------------------
+\begin{frame}{Apprximation}
+\begin{itemize}
+
+        \item Approximation: 
+For computer implementation, the $J(\sigma)$ function is split into two intervals based on a threshold of $\sigma^* = 1.6363$:
+
+$$J(\sigma) \approx \begin{cases} 
+a_{J,1} \sigma^3 + b_{J,1} \sigma^2 + c_{J,1} \sigma, & 0 \leq \sigma \leq \sigma^* \\
+1 - e^{a_{J,2} \sigma^3 + b_{J,2} \sigma^2 + c_{J,2} \sigma + d_{J,2}}, & \sigma^* < \sigma < 10 \\
+1, & \sigma > 10 
+\end{cases}$$
+
+Numerical Constants for $J(\sigma)$:
+\begin{itemize}
+    \item $a_{J,1} = -0.0421061$
+    \item $b_{J,1} = 0.209252$
+    \item $c_{J,1} = -0.00640081$
+    \item $a_{J,2} = 0.00181491$
+    \item $b_{J,2} = -0.142675$
+    \item $c_{J,2} = -0.0822054$
+    \item $d_{J,2} = 0.0549608$
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{MI Evolution in Iterations}
+\begin{itemize}
+    \item Early iterations:
+    \begin{itemize}
+        \item Low MI (noisy information)
+    \end{itemize}
+    \item As iterations proceed:
+    \begin{itemize}
+        \item Messages become more reliable
+        \item MI increases
+    \end{itemize}
+    \item Outcomes:
+    \begin{itemize}
+        \item Successful decoding: $I \rightarrow 1$
+        \item Failure: MI saturates below 1
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+%------------------------------------------------
+
+\begin{frame}{EXIT Chart (High-Level)}
+\begin{itemize}
+    \item Plot relationship between input and output MI
+    \item Axes:
+    \begin{itemize}
+        \item x-axis: $I_A$ (output)
+        \item y-axis: $I_E$ (input)
+    \end{itemize}
+    \item Two curves:
+    \begin{itemize}
+        \item Variable node curve
+        \item Check node curve
+    \end{itemize}
+    \item Decoding succeeds if curves form an ``open tunnel''
+\end{itemize}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{image9.png}
+    \label{fig:placeholder}
+\end{figure}
+\end{frame}
+
+%------------------------------------------------
+\subsection{Algorithms and Results}
+
+\begin{frame}{Naive MI based decoding}
+\begin{itemize}
+    \item Goal: select the next check-node cluster $\mathcal{C}_k$ that yields the largest information gain
+
+    \item For each cluster, track input mutual information:
+    \[
+    I^{(k)}_{\text{in}} = I(X; L^{(k)})
+    \]
+    \item Compute expected gain from next iteration:
+    \[
+    \Delta I_k = I^{(k)}_{\text{out}} - I^{(k)}_{\text{in}}
+    \]
+
+    \item Select cluster with max $\Delta I_k\$
+
+    \item Insight:
+    \begin{itemize}
+        \item Prioritize regions where decoding can improve most
+        \item Avoid wasting updates on already reliable clusters
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+\frametitle{Mutual Information State Space Q-Learning (MI-Tabular)}
+\begin{itemize}
+    \item \textbf{State:} For cluster $c$, state is MI-binned:
+    $$s_c = \left\lfloor I_c \cdot (B-1) \right\rfloor, \quad s_c \in \{0, 1, \ldots, B-1\}$$
+    where $I_c$ is mutual information of LLR posteriors on cluster $c$ neighbors, $B$ is the number of bins (default 21).
+    
+    \item \textbf{Reward:} MI-gain from cluster update:
+    $$r(a) = I_a^{\text{after}} - I_a^{\text{before}}$$    
+    
+    \item Algorithms: Epsilon greedy Q learning and DQN
+    
+    \item \textbf{Note: } State is continuous for DQN version
+\end{itemize}
+
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Results}
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{image5.png}
+\end{figure}
+\end{frame}
+
+
+%------------------------------------------------
+\begin{frame}{Results}
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{image3.png}
+\end{figure}
+\end{frame}
+
+
+\section{PPO+GNN method}
+
+\section{Other MDP formulation changes}
+\subsection{Directly using global state space}
+\subsection{Note on Restless MABs and Whittles Index}
+\subsection{Augmented State space}
+
+
+
+%------------------------------------------------
+\section{Ongoing tasks and Goals}
+
+\begin{frame}{Ongoing task}
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{WhatsApp Image 2026-04-22 at 23.05.32.jpeg}
+    \caption{Deep RELDEC loss explodes after a point in training}
+\end{figure}
+\end{frame}
+
+\begin{frame}{Immediate Goals}
+\begin{itemize}
+    \item Refactor (Reorganize) the codebase as it is not possible to work with it anymore
+    \item Optimize training and evaluation
+\end{itemize}
+\end{frame}
+
+
+
+\end{document}
+
