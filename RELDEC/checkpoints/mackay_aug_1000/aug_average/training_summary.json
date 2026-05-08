@@ -1,0 +1,40 @@
+{
+  "config": {
+    "code": "mackay",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "episodes_per_snr": 200,
+    "code_rate": 0.5,
+    "seed": 7,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 10
+    },
+    "cluster_size": 2
+  },
+  "h_shape": [
+    48,
+    96
+  ],
+  "h_nnz": 288,
+  "policy_type": "augmented_average_zx",
+  "progress": {
+    "episodes_completed": 1000,
+    "total_updates": 10000,
+    "mean_reward": 0.9459666666666667,
+    "elapsed_sec": 0.0
+  },
+  "artifacts": {
+    "checkpoint_latest": "checkpoints/mackay_aug_1000/aug_average/checkpoint_latest.npz",
+    "checkpoint_final": "checkpoints/mackay_aug_1000/aug_average/checkpoint_final.npz",
+    "dqn_checkpoint": "checkpoints/mackay_aug_1000/aug_average/dqn_final.npz"
+  }
+}
