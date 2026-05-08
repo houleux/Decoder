@@ -1,0 +1,69 @@
+==========================================
+SLURM_JOB_ID = 2612922
+SLURM_NODELIST = gnode068
+SLURM_JOB_GPUS = 0
+==========================================
+[eval] code=wran matrix=RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=5
+[eval] methods=['flooding', 'random', 'round_robin', 'reldec', 'mi_naive_z2']
+[eval] SNR points=[4.0, 5.0, 5.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=4.00 dB
+  - flooding    frames=  10000 FER=1.580000e-02 BER=1.161458e-04 avg_msgs=3339.27
+  - random      frames=  10000 FER=3.100000e-03 BER=9.088542e-05 avg_msgs=2234.43
+  - round_robin frames=  10000 FER=1.900000e-03 BER=6.796875e-05 avg_msgs=2248.30
+  - reldec      frames=  10000 FER=1.000000e-04 BER=4.166667e-06 avg_msgs=1653.44
+  - mi_naive_z2 frames=  10000 FER=2.800000e-03 BER=8.671875e-05 avg_msgs=2423.00
+[eval] snr=5.00 dB
+  - flooding    frames=  10000 FER=3.000000e-04 BER=2.083333e-06 avg_msgs=2195.94
+  - random      frames=  10000 FER=2.000000e-04 BER=7.812500e-07 avg_msgs=1552.09
+  - round_robin frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1593.56
+  - reldec      frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1378.04
+  - mi_naive_z2 frames=  10000 FER=1.000000e-04 BER=1.041667e-06 avg_msgs=1675.86
+[eval] snr=5.50 dB
+  - flooding    frames=  10000 FER=1.000000e-04 BER=7.812500e-07 avg_msgs=1812.59
+  - random      frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1404.99
+  - round_robin frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1433.51
+  - reldec      frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1331.25
+  - mi_naive_z2 frames=  10000 FER=1.000000e-04 BER=2.604167e-07 avg_msgs=1474.46
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_baseline_tabular_mi_naive_20260423_064535_gt3db.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_baseline_tabular_mi_naive_20260423_064535_gt3db.json
+[eval] code=wran matrix=RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=5
+[eval] methods=['deep_reldec_z1']
+[eval] SNR points=[4.0, 5.0, 5.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=4.00 dB
+  - deep_reldec_z1 frames=  10000 FER=3.200000e-03 BER=1.158854e-04 avg_msgs=2415.74
+[eval] snr=5.00 dB
+  - deep_reldec_z1 frames=  10000 FER=2.000000e-04 BER=7.552083e-06 avg_msgs=1667.56
+[eval] snr=5.50 dB
+  - deep_reldec_z1 frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1477.96
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_deep_z1_20260423_064535_gt3db.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_deep_z1_20260423_064535_gt3db.json
+[eval] code=wran matrix=RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=5
+[eval] methods=['deep_reldec_z2']
+[eval] SNR points=[4.0, 5.0, 5.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=4.00 dB
+  - deep_reldec_z2 frames=  10000 FER=3.200000e-03 BER=1.158854e-04 avg_msgs=2415.74
+[eval] snr=5.00 dB
+  - deep_reldec_z2 frames=  10000 FER=2.000000e-04 BER=7.552083e-06 avg_msgs=1667.56
+[eval] snr=5.50 dB
+  - deep_reldec_z2 frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1477.96
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_deep_z2_20260423_064535_gt3db.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_deep_z2_20260423_064535_gt3db.json
+[eval] code=wran matrix=RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=5
+[eval] methods=['mi_dqn_z2']
+[eval] SNR points=[4.0, 5.0, 5.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=4.00 dB
+  - mi_dqn_z2   frames=  10000 FER=2.200000e-03 BER=5.234375e-05 avg_msgs=2242.21
+[eval] snr=5.00 dB
+  - mi_dqn_z2   frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1551.57
+[eval] snr=5.50 dB
+  - mi_dqn_z2   frames=  10000 FER=0.000000e+00 BER=0.000000e+00 avg_msgs=1409.92
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_mi_dqn_z2_20260423_064535_gt3db.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/wran/results_full_fe300_mf10000/wran_full_mi_dqn_z2_20260423_064535_gt3db.json

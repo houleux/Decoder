@@ -173,6 +173,47 @@ class FullStateBinaryTabularTrainer:
         
         return episode_reward
 
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+        
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = self._state_from_llr(llr_post)
+        messages = 0
+        
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+            
+            for _ in range(self.num_actions):
+                state_hash = _state_hash(x_hat)
+                q_vals = self._get_q_values(state_hash)
+                
+                # greedy selection
+                valid_actions = np.flatnonzero(~scheduled)
+                best_val = float('-inf')
+                best_actions = []
+                for a in valid_actions:
+                    if q_vals[a] > best_val:
+                        best_val = q_vals[a]
+                        best_actions = [a]
+                    elif q_vals[a] == best_val:
+                        best_actions.append(a)
+                action = int(rng.choice(best_actions))
+                
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                
+                scheduled[action] = True
+                messages += int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] 
+                                        for cn in self.map.clusters[action]]))
+            
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+        
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
 
 class FullStateBinaryDeepTrainer:
     """
@@ -359,6 +400,49 @@ class FullStateBinaryDeepTrainer:
                 episode_loss += self._train_step(rng)
         
         return episode_reward, episode_loss
+
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+        
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = _hard_decision(llr_post)
+        messages = 0
+        
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+            
+            for _ in range(self.num_actions):
+                state = self._state_from_llr(llr_post)
+                
+                with torch.no_grad():
+                    state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                    q_vals = self.online_net(state_t)[0].cpu().numpy()
+                
+                valid_actions = np.flatnonzero(~scheduled)
+                best_val = float('-inf')
+                best_actions = []
+                for a in valid_actions:
+                    if q_vals[a] > best_val:
+                        best_val = q_vals[a]
+                        best_actions = [a]
+                    elif q_vals[a] == best_val:
+                        best_actions.append(a)
+                action = int(rng.choice(best_actions))
+                
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                
+                scheduled[action] = True
+                messages += int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] 
+                                        for cn in self.map.clusters[action]]))
+            
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+        
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
 
 
 class FullStateLLRDeepDecoder:
@@ -628,3 +712,46 @@ class FullStateLLRDeepTrainer:
                 episode_loss += self._train_step(rng)
         
         return episode_reward, episode_loss
+
+    def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+        self.decoder.reset()
+        self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+        
+        llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+        x_hat = _hard_decision(llr_post)
+        messages = 0
+        
+        for iter_idx in range(1, int(i_max) + 1):
+            scheduled = np.zeros(self.num_actions, dtype=bool)
+            
+            for _ in range(self.num_actions):
+                state = self._state_from_llr(llr_post)
+                
+                with torch.no_grad():
+                    state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+                    q_vals = self.online_net(state_t)[0].cpu().numpy()
+                
+                valid_actions = np.flatnonzero(~scheduled)
+                best_val = float('-inf')
+                best_actions = []
+                for a in valid_actions:
+                    if q_vals[a] > best_val:
+                        best_val = q_vals[a]
+                        best_actions = [a]
+                    elif q_vals[a] == best_val:
+                        best_actions.append(a)
+                action = int(rng.choice(best_actions))
+                
+                llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+                neighbors = self.map.cluster_neighbors[action]
+                if neighbors.size:
+                    x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+                
+                scheduled[action] = True
+                messages += int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] 
+                                        for cn in self.map.clusters[action]]))
+            
+            if syndrome_is_zero(self.h, x_hat):
+                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+        
+        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)

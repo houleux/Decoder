@@ -1,0 +1,41 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "RELDEC/matrices/H_AB_3_7_196.csv",
+    "train_snr_db": [
+      1.0,
+      1.5,
+      2.0,
+      2.5,
+      3.0,
+      3.25
+    ],
+    "episodes_per_snr": 2500,
+    "code_rate": 0.5714285714285714,
+    "seed": 7,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 7
+  },
+  "h_shape": [
+    84,
+    196
+  ],
+  "h_nnz": 588,
+  "policy_type": "deep_z7",
+  "progress": {
+    "episodes_completed": 250,
+    "total_updates": 12500,
+    "mean_reward": 0.9474775510204083,
+    "elapsed_sec": 0.0
+  },
+  "artifacts": {
+    "checkpoint_latest": "notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z7_1k/checkpoint_latest.npz",
+    "checkpoint_final": "notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z7_1k/checkpoint_final.npz",
+    "dqn_checkpoint": "notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z7_1k/dqn_final.npz"
+  }
+}

@@ -1,0 +1,38 @@
+==========================================
+SLURM_JOB_ID = 2620286
+SLURM_NODELIST = gnode035
+SLURM_JOB_GPUS = 0
+==========================================
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - flooding    frames=    400 FER=7.500000e-01 BER=9.992187e-02 avg_msgs=11447.28
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_190524.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_190524.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - round_robin frames=    400 FER=7.500000e-01 BER=9.960938e-02 avg_msgs=11152.80
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_190527.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_190527.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - reldec      frames=    418 FER=7.177033e-01 BER=9.579346e-02 avg_msgs=10453.44
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_190540.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_190540.json
+Selected q-table matching expected shape: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --methods flooding  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_190524.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --methods round_robin  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_190527.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --methods reldec  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_190540.csv
+No checkpoint found for deep_reldec_z6, attempting short training to produce one: notebook_runs/continuous_reldec/active_run/wran/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/train_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --policy-type deep_reldec_z6 --device cpu --resume '' --checkpoint-dir notebook_runs/continuous_reldec/active_run/wran/checkpoints/checkpoints_deep_z6_1k --checkpoint-every-episodes 250 --log-every 100 --max-episodes 250

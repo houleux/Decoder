@@ -1,0 +1,2 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+reldec,2.0,1982,3406,300,0.017900689539186006,0.15136226034308778,2623.095862764884,9.107971745711403,1687,ab,RELDEC/matrices/H_Mackay_96_48.csv,0.5,50,300,10000,True

@@ -40,6 +40,13 @@ CODE_PRESETS: Dict[str, CodePreset] = {
         eval_snr_db=tuple(float(x) for x in np.arange(1.0, 5.5 + 1e-9, 0.5)),
         inference_i_max=5,
     ),
+    "mackay": CodePreset(
+        code="mackay",
+        matrix_csv=THIS_DIR / "matrices" / "H_Mackay_96_48.csv",
+        train_snr_db=(0.5, 1.0, 1.5, 2.0, 2.5),
+        eval_snr_db=(0.5, 1.0, 1.5, 2.0, 2.5),
+        inference_i_max=10,
+    ),
 }
 
 

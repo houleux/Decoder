@@ -1,0 +1,2 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,2.5,4023,3931,300,0.004985364764847028,0.07457121551081283,5186.180462341536,8.820034799900572,3729,ab,RELDEC/matrices/H_AB_3_7_196.csv,0.5714285714285714,50,300,10000,True

@@ -1,0 +1,19 @@
+==========================================
+SLURM_JOB_ID = 2620280
+SLURM_NODELIST = gnode012
+SLURM_JOB_GPUS = 
+==========================================
+[train] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[train] H shape=(48, 96) nnz=288 rate=0.500000
+[train] episodes=250 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=tabular cluster_size=1
+[train] episode=50/250 mean_reward=0.952200 updates=2500
+[train] episode=100/250 mean_reward=0.953733 updates=5000
+[train] episode=150/250 mean_reward=0.956489 updates=7500
+[train] episode=200/250 mean_reward=0.956550 updates=10000
+[checkpoint] saved at episode 250
+[train] episode=250/250 mean_reward=0.954160 updates=12500
+[done] training complete
+[done] episodes_completed=250
+[done] total_updates=12500
+[done] mean_reward=0.954160
+[done] artifacts: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular

@@ -5,14 +5,53 @@ import numpy as np
 import scipy.sparse as sp
 from pathlib import Path
 
-from reldec_core import load_parity_check_from_sparse_csv, bpsk_awgn_llr, nominal_code_rate
+from reldec_core import load_parity_check_from_sparse_csv, bpsk_awgn_llr, nominal_code_rate, MethodStats
 from reldec_global_mdp import (
     FullStateBinaryTabularTrainer,
     FullStateBinaryDeepTrainer,
     FullStateLLRDeepTrainer,
 )
+import csv
+import json
 
 THIS_DIR = Path(__file__).parent
+RESULTS_DIR = THIS_DIR / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
+
+def evaluate_and_save(trainer, code_name: str, method_name: str, config: dict):
+    print(f"\nEvaluating {method_name} on {code_name}...")
+    stats_list = []
+    
+    rng = np.random.default_rng(42)
+    for snr_db in config["snr_db"]:
+        stats = MethodStats(method=method_name, n=trainer.n)
+        target_fe = 60
+        max_frames = 3000
+        
+        while stats.frame_errors < target_fe and stats.frames < max_frames:
+            tx_bits = np.zeros(trainer.n, dtype=np.uint8)
+            llr = bpsk_awgn_llr(tx_bits, snr_db, config["code_rate"], rng)
+            decoded = trainer.decode(llr, i_max=config["l_max"], rng=rng)
+            stats.update(tx_bits, decoded)
+            
+        row = stats.summary(snr_db=snr_db)
+        row["code"] = code_name
+        row["matrix_csv"] = str(config["matrix"])
+        row["code_rate"] = config["code_rate"]
+        row["i_max"] = config["l_max"]
+        row["target_frame_errors"] = target_fe
+        row["max_frames"] = max_frames
+        row["all_zero_only"] = True
+        stats_list.append(row)
+        print(f"  SNR {snr_db}dB: BER={row['ber']:.4e} FER={row['fer']:.4e} Frames={row['frames']}")
+        
+    csv_path = RESULTS_DIR / f"eval_global_mdp_{method_name}_{code_name}.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=stats_list[0].keys())
+        writer.writeheader()
+        writer.writerows(stats_list)
+    print(f"Saved evaluation to {csv_path}")
+
 
 # ============================================================================
 # CONFIG
@@ -208,16 +247,26 @@ if __name__ == "__main__":
     print("WRAN Code Training")
     wran_cfg = SMOKE_CONFIG["wran"]
     wran_tabular = train_tabular_method("wran", wran_cfg)
+    evaluate_and_save(wran_tabular, "wran", "full_state_tabular_z", wran_cfg)
+    
     wran_binary_deep = train_binary_deep_method("wran", wran_cfg)
+    evaluate_and_save(wran_binary_deep, "wran", "full_binary_state_deep_z", wran_cfg)
+    
     wran_llr_deep = train_llr_deep_method("wran", wran_cfg)
+    evaluate_and_save(wran_llr_deep, "wran", "full_llr_state_deep_z", wran_cfg)
     
     # ========== MACKAY ==========
     print("\n" + "▶ "*35)
     print("Mackay Code Training")
     mackay_cfg = SMOKE_CONFIG["mackay"]
     mackay_tabular = train_tabular_method("mackay", mackay_cfg)
+    evaluate_and_save(mackay_tabular, "mackay", "full_state_tabular_z", mackay_cfg)
+    
     mackay_binary_deep = train_binary_deep_method("mackay", mackay_cfg)
+    evaluate_and_save(mackay_binary_deep, "mackay", "full_binary_state_deep_z", mackay_cfg)
+    
     mackay_llr_deep = train_llr_deep_method("mackay", mackay_cfg)
+    evaluate_and_save(mackay_llr_deep, "mackay", "full_llr_state_deep_z", mackay_cfg)
     
     print("\n" + "="*70)
     print("✓ All smoke test training runs complete!")

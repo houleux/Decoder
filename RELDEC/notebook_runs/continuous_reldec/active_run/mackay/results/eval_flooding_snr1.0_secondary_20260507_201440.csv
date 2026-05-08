@@ -1,0 +1,2 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,1.0,507,3445,300,0.07077991452991453,0.591715976331361,9344.94674556213,32.447731755424066,210,ab,RELDEC/matrices/H_Mackay_96_48.csv,0.5,50,300,10000,True

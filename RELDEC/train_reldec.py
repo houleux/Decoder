@@ -14,6 +14,7 @@ from reldec_deep import (
     load_deep_training_checkpoint,
     save_deep_training_checkpoint,
 )
+from reldec_augmented import AugmentedDeepReldecTrainer
 from reldec_core import (
     THIS_DIR,
     ReldecHyperParams,
@@ -35,7 +36,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, MI-DQN z=2, or MI-tabular z=2)."
     )
-    parser.add_argument("--code", choices=["ab", "wran"], default="ab")
+    parser.add_argument("--code", choices=["ab", "wran", "mackay"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
     parser.add_argument("--snr-db", type=float, nargs="+", default=None)
     parser.add_argument("--episodes-per-snr", type=int, default=2500)
@@ -53,7 +54,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-history", action="store_true")
     parser.add_argument(
         "--policy-type",
-        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2", "mi_tabular_zx", "deep_zx", "mi_dqn_zx"],
+        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2", "mi_tabular_zx", "deep_zx", "mi_dqn_zx", "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"],
         default="tabular",
     )
     parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx policies")
@@ -110,7 +111,7 @@ def _cluster_size_for_policy(policy_type: str, args_z: int | None = None) -> int
         return 2
     if policy_type == "mi_dqn_z2":
         return 2
-    if policy_type in ("mi_tabular_zx", "deep_zx", "mi_dqn_zx"):
+    if policy_type in ("mi_tabular_zx", "deep_zx", "mi_dqn_zx", "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
         if args_z is None:
             raise ValueError(f"--z must be provided for policy {policy_type}")
         return args_z
@@ -234,13 +235,22 @@ def _main() -> None:
             )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         deep_config = checkpoint.dqn_config
-        deep_trainer = DeepReldecTrainer(
-            h_csr=h,
-            dqn_config=deep_config,
-            beta_discount=config.hyperparams.beta,
-            l_max=config.hyperparams.l_max,
-            device=args.device,
-        )
+        if args.policy_type in ("augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
+            deep_trainer = AugmentedDeepReldecTrainer(
+                h_csr=h,
+                dqn_config=deep_config,
+                beta_discount=config.hyperparams.beta,
+                l_max=config.hyperparams.l_max,
+                device=args.device,
+            )
+        else:
+            deep_trainer = DeepReldecTrainer(
+                h_csr=h,
+                dqn_config=deep_config,
+                beta_discount=config.hyperparams.beta,
+                l_max=config.hyperparams.l_max,
+                device=args.device,
+            )
         deep_trainer.import_checkpoint_payload(
             checkpoint.q_online_bytes,
             checkpoint.q_target_bytes,
@@ -271,13 +281,22 @@ def _main() -> None:
 
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         deep_config = _build_deep_config(args, cluster_size=cluster_size)
-        deep_trainer = DeepReldecTrainer(
-            h_csr=h,
-            dqn_config=deep_config,
-            beta_discount=config.hyperparams.beta,
-            l_max=config.hyperparams.l_max,
-            device=args.device,
-        )
+        if args.policy_type in ("augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
+            deep_trainer = AugmentedDeepReldecTrainer(
+                h_csr=h,
+                dqn_config=deep_config,
+                beta_discount=config.hyperparams.beta,
+                l_max=config.hyperparams.l_max,
+                device=args.device,
+            )
+        else:
+            deep_trainer = DeepReldecTrainer(
+                h_csr=h,
+                dqn_config=deep_config,
+                beta_discount=config.hyperparams.beta,
+                l_max=config.hyperparams.l_max,
+                device=args.device,
+            )
         progress = TrainProgress()
 
         rng = np.random.default_rng(config.seed)

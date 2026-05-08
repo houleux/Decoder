@@ -1,0 +1,39 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "RELDEC/matrices/H_Mackay_96_48.csv",
+    "code_rate": 0.5,
+    "methods": [
+      "mi_dqn_z6"
+    ],
+    "snr_db": [
+      2.0
+    ],
+    "i_max": 50,
+    "target_frame_errors": 300,
+    "max_frames": 10000,
+    "all_zero_only": true,
+    "seed": 17
+  },
+  "results": [
+    {
+      "method": "mi_dqn_z6",
+      "snr_db": 2.0,
+      "frames": 1446,
+      "bit_errors": 3189,
+      "frame_errors": 300,
+      "ber": 0.0229728561549101,
+      "fer": 0.2074688796680498,
+      "avg_messages": 3689.228215767635,
+      "avg_iterations": 12.809820193637622,
+      "converged_frames": 1159,
+      "code": "ab",
+      "matrix_csv": "RELDEC/matrices/H_Mackay_96_48.csv",
+      "code_rate": 0.5,
+      "i_max": 50,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    }
+  ]
+}

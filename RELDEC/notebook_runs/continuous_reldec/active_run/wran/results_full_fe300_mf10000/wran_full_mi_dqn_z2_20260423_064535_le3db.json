@@ -1,0 +1,79 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "mi_dqn_z2"
+    ],
+    "snr_db": [
+      1.0,
+      2.0,
+      3.0
+    ],
+    "i_max": 5,
+    "target_frame_errors": 300,
+    "max_frames": 10000,
+    "all_zero_only": true,
+    "seed": 17
+  },
+  "results": [
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 1.0,
+      "frames": 304,
+      "bit_errors": 9106,
+      "frame_errors": 300,
+      "ber": 0.07800507127192982,
+      "fer": 0.9868421052631579,
+      "avg_messages": 6467.210526315789,
+      "avg_iterations": 4.990131578947368,
+      "converged_frames": 4,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    },
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 2.0,
+      "frames": 500,
+      "bit_errors": 4880,
+      "frame_errors": 300,
+      "ber": 0.025416666666666667,
+      "fer": 0.6,
+      "avg_messages": 5855.328,
+      "avg_iterations": 4.518,
+      "converged_frames": 200,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    },
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 3.0,
+      "frames": 4229,
+      "bit_errors": 3592,
+      "frame_errors": 300,
+      "ber": 0.002211909828958777,
+      "fer": 0.07093875620714117,
+      "avg_messages": 3601.1577205013004,
+      "avg_iterations": 2.7786710806337194,
+      "converged_frames": 3930,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+==========================================
+SLURM_JOB_ID = 2620273
+SLURM_NODELIST = gnode080
+SLURM_JOB_GPUS = 1
+==========================================
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - flooding    frames=    400 FER=7.500000e-01 BER=9.992187e-02 avg_msgs=11447.28
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260508_000118.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260508_000118.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - round_robin frames=    400 FER=7.500000e-01 BER=9.960938e-02 avg_msgs=11152.80
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260508_000223.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260508_000223.json
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --methods flooding  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260508_000118.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --methods round_robin  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260508_000223.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --methods reldec  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260508_000237.csv

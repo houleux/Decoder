@@ -1,0 +1,4 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+mi_dqn_z2,4.0,10000,201,22,5.234375e-05,0.0022,2242.2096,1.7301,9978,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
+mi_dqn_z2,5.0,10000,0,0,0.0,0.0,1551.5712,1.1972,10000,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True
+mi_dqn_z2,5.5,10000,0,0,0.0,0.0,1409.9184,1.0879,10000,wran,RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,5,300,10000,True

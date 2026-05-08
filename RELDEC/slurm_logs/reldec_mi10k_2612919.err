@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 409, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 195, in _main
+    deep_trainer = DeepReldecTrainer(
+  File "/home2/harshitlalwani/Decoder/RELDEC/reldec_deep.py", line 347, in __init__
+    self.online_net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1384, in to
+    return self._apply(convert)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 934, in _apply
+    module._apply(fn)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 934, in _apply
+    module._apply(fn)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 965, in _apply
+    param_applied = fn(param)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1370, in convert
+    return t.to(
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/torch/cuda/__init__.py", line 478, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: The NVIDIA driver on your system is too old (found version 12080). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver.

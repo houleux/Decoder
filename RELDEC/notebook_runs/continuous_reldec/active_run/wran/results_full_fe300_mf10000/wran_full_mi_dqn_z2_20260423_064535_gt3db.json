@@ -1,0 +1,79 @@
+{
+  "config": {
+    "code": "wran",
+    "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "mi_dqn_z2"
+    ],
+    "snr_db": [
+      4.0,
+      5.0,
+      5.5
+    ],
+    "i_max": 5,
+    "target_frame_errors": 300,
+    "max_frames": 10000,
+    "all_zero_only": true,
+    "seed": 17
+  },
+  "results": [
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 4.0,
+      "frames": 10000,
+      "bit_errors": 201,
+      "frame_errors": 22,
+      "ber": 5.234375e-05,
+      "fer": 0.0022,
+      "avg_messages": 2242.2096,
+      "avg_iterations": 1.7301,
+      "converged_frames": 9978,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    },
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 5.0,
+      "frames": 10000,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "ber": 0.0,
+      "fer": 0.0,
+      "avg_messages": 1551.5712,
+      "avg_iterations": 1.1972,
+      "converged_frames": 10000,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    },
+    {
+      "method": "mi_dqn_z2",
+      "snr_db": 5.5,
+      "frames": 10000,
+      "bit_errors": 0,
+      "frame_errors": 0,
+      "ber": 0.0,
+      "fer": 0.0,
+      "avg_messages": 1409.9184,
+      "avg_iterations": 1.0879,
+      "converged_frames": 10000,
+      "code": "wran",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "code_rate": 0.6666666666666667,
+      "i_max": 5,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'pandas'
+Traceback (most recent call last):
+  File "/home2/harshitlalwani/Decoder/RELDEC/scripts/run_eval_sequence.py", line 207, in <module>
+    run_cmd(f"python3 - <<'PY'\n{merge_py}\nPY")
+  File "/home2/harshitlalwani/Decoder/RELDEC/scripts/run_eval_sequence.py", line 23, in run_cmd
+    subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command 'python3 - <<'PY'
+
+from pathlib import Path
+import pandas as pd
+rd=Path('RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results')
+acc=rd/'accumulated_results.csv'
+frames=[]
+if acc.exists():
+    frames.append(pd.read_csv(acc))
+for p in sorted(rd.glob('eval_*.csv')):
+    frames.append(pd.read_csv(p))
+if frames:
+    df=pd.concat(frames,ignore_index=True)
+    key_cols=['method','snr_db','code','matrix_csv','target_frame_errors','max_frames','all_zero_only']
+    df=df.drop_duplicates(subset=key_cols,keep='last')
+    df=df.sort_values(['snr_db','method']).reset_index(drop=True)
+    df.to_csv(acc,index=False)
+    print('wrote', acc)
+
+PY' returned non-zero exit status 1.

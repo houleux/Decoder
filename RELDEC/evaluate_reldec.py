@@ -11,6 +11,7 @@ import numpy as np
 from reldec_deep import evaluate_deep_method, load_deep_decoder_from_checkpoint
 from reldec_deep import MiReldecBaselineDecoder
 from reldec_deep import MiTabularQDecoder, evaluate_mi_tabular_method
+from reldec_augmented import load_augmented_deep_decoder_from_checkpoint
 from reldec_core import (
     THIS_DIR,
     ReldecDecoderSuite,
@@ -26,7 +27,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Evaluate RELDEC and baseline LDPC schedulers over SNR sweeps."
     )
-    parser.add_argument("--code", choices=["ab", "wran"], default="ab")
+    parser.add_argument("--code", choices=["ab", "wran", "mackay"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
     parser.add_argument("--q-table", type=str, default=None)
     parser.add_argument("--mi-tabular-q-table", type=str, default=None)
@@ -37,7 +38,8 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2 "
-            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2 deep_reldec_zx mi_naive_zx mi_dqn_zx mi_tabular_zx"
+            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2 deep_reldec_zx mi_naive_zx mi_dqn_zx mi_tabular_zx "
+            "augmented_max_avg_zx augmented_max_zx augmented_average_zx"
         ),
     )
     parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx methods")
@@ -80,6 +82,9 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
         "mi_naive_zx",
         "mi_dqn_zx",
         "mi_tabular_zx",
+        "augmented_max_avg_zx",
+        "augmented_max_zx",
+        "augmented_average_zx",
     }
     for method in methods:
         if method not in valid:
@@ -119,6 +124,8 @@ def _main() -> None:
         raise ValueError("--deep-checkpoint is required when evaluating mi_dqn_z2")
     if "mi_dqn_zx" in methods and not args.deep_checkpoint:
         raise ValueError("--deep-checkpoint is required when evaluating mi_dqn_zx")
+    if any(m in methods for m in ["augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"]) and not args.deep_checkpoint:
+        raise ValueError("--deep-checkpoint is required when evaluating augmented deep methods")
     if "mi_tabular_zx" in methods and not args.mi_tabular_q_table:
         raise ValueError("--mi-tabular-q-table is required when evaluating method 'mi_tabular_zx'")
     
@@ -163,6 +170,24 @@ def _main() -> None:
             checkpoint_path=args.deep_checkpoint,
             matrix_csv=matrix_csv,
             expected_policy_label="mi_dqn_zx",
+        )
+    if "augmented_max_avg_zx" in methods:
+        deep_decoders["augmented_max_avg_zx"] = load_augmented_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="augmented_max_avg_zx",
+        )
+    if "augmented_max_zx" in methods:
+        deep_decoders["augmented_max_zx"] = load_augmented_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="augmented_max_zx",
+        )
+    if "augmented_average_zx" in methods:
+        deep_decoders["augmented_average_zx"] = load_augmented_deep_decoder_from_checkpoint(
+            checkpoint_path=args.deep_checkpoint,
+            matrix_csv=matrix_csv,
+            expected_policy_label="augmented_average_zx",
         )
 
     mi_naive_decoder = None
@@ -227,7 +252,7 @@ def _main() -> None:
                     rng=rng,
                     all_zero_only=all_zero_only,
                 )
-            elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2", "deep_reldec_zx", "mi_dqn_zx"}:
+            elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2", "deep_reldec_zx", "mi_dqn_zx", "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"}:
                 stats = evaluate_deep_method(
                     decoder=deep_decoders[method],
                     snr_db=float(snr_db),

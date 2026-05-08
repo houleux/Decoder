@@ -1,0 +1,39 @@
+{
+  "config": {
+    "code": "ab",
+    "matrix_csv": "RELDEC/matrices/H_AB_3_7_196.csv",
+    "code_rate": 0.5714285714285714,
+    "methods": [
+      "mi_naive_z7"
+    ],
+    "snr_db": [
+      2.5
+    ],
+    "i_max": 50,
+    "target_frame_errors": 300,
+    "max_frames": 10000,
+    "all_zero_only": true,
+    "seed": 17
+  },
+  "results": [
+    {
+      "method": "mi_naive_z7",
+      "snr_db": 2.5,
+      "frames": 4947,
+      "bit_errors": 4326,
+      "frame_errors": 300,
+      "ber": 0.004461578445811314,
+      "fer": 0.06064281382656155,
+      "avg_messages": 3767.5027289266222,
+      "avg_iterations": 6.407317566201739,
+      "converged_frames": 4659,
+      "code": "ab",
+      "matrix_csv": "RELDEC/matrices/H_AB_3_7_196.csv",
+      "code_rate": 0.5714285714285714,
+      "i_max": 50,
+      "target_frame_errors": 300,
+      "max_frames": 10000,
+      "all_zero_only": true
+    }
+  ]
+}

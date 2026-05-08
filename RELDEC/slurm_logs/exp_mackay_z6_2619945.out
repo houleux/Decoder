@@ -1,0 +1,6 @@
+==========================================
+SLURM_JOB_ID = 2619945
+SLURM_NODELIST = gnode042
+SLURM_JOB_GPUS = 0
+==========================================
+CMD: python3 RELDEC/evaluate_reldec.py --code custom --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --methods flooding  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_064230.csv

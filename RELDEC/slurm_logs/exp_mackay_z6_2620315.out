@@ -1,0 +1,476 @@
+==========================================
+SLURM_JOB_ID = 2620315
+SLURM_NODELIST = gnode035
+SLURM_JOB_GPUS = 0
+==========================================
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - flooding    frames=    400 FER=7.500000e-01 BER=9.992187e-02 avg_msgs=11447.28
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_195328.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_195328.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['random']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - random      frames=    404 FER=7.425743e-01 BER=9.405941e-02 avg_msgs=10961.11
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr0.5_primary_20260507_195332.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr0.5_primary_20260507_195332.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - round_robin frames=    400 FER=7.500000e-01 BER=9.960938e-02 avg_msgs=11152.80
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_195346.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_195346.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - reldec      frames=    418 FER=7.177033e-01 BER=9.579346e-02 avg_msgs=10453.44
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_195400.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_195400.json
+[train] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[train] H shape=(48, 96) nnz=288 rate=0.500000
+[train] episodes=250 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=deep_z6 cluster_size=6
+[train] episode=100/250 mean_reward=0.958572 updates=5000
+[train] episode=200/250 mean_reward=0.956214 updates=10000
+[checkpoint] saved deep checkpoint at episode 250
+[done] training complete
+[done] episodes_completed=250
+[done] total_updates=12500
+[done] mean_reward=0.952690
+[done] artifacts: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['deep_reldec_z6']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - deep_reldec_z6 frames=    400 FER=7.500000e-01 BER=9.963542e-02 avg_msgs=11145.60
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr0.5_primary_20260507_195529.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr0.5_primary_20260507_195529.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_naive_z6']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - mi_naive_z6 frames=    395 FER=7.594937e-01 BER=9.992089e-02 avg_msgs=11232.73
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr0.5_primary_20260507_195707.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr0.5_primary_20260507_195707.json
+[train] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[train] H shape=(48, 96) nnz=288 rate=0.500000
+[train] episodes=250 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=mi_tabular_z6 cluster_size=6
+[train] episode=100/250 mean_reward=0.011323 updates=5000
+[train] episode=200/250 mean_reward=0.010583 updates=10000
+[checkpoint] saved at episode 250
+[done] training complete
+[done] episodes_completed=250
+[done] total_updates=12500
+[done] mean_reward=0.010555
+[done] artifacts: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_tabular_z6']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - mi_tabular_z6 frames=    395 FER=7.594937e-01 BER=9.891878e-02 avg_msgs=11187.52
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr0.5_primary_20260507_195738.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr0.5_primary_20260507_195738.json
+[train] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[train] H shape=(48, 96) nnz=288 rate=0.500000
+[train] episodes=250 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=mi_dqn_z6 cluster_size=6
+[train] episode=100/250 mean_reward=0.011030 updates=5000
+[train] episode=200/250 mean_reward=0.011099 updates=10000
+[checkpoint] saved deep checkpoint at episode 250
+[done] training complete
+[done] episodes_completed=250
+[done] total_updates=12500
+[done] mean_reward=0.011075
+[done] artifacts: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_dqn_z6']
+[eval] SNR points=[0.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=0.50 dB
+  - mi_dqn_z6   frames=    400 FER=7.500000e-01 BER=9.981771e-02 avg_msgs=11160.00
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr0.5_primary_20260507_195829.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr0.5_primary_20260507_195829.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - flooding    frames=    794 FER=3.778338e-01 BER=4.444794e-02 avg_msgs=6578.30
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.5_primary_20260507_200059.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.5_primary_20260507_200059.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['random']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - random      frames=    835 FER=3.592814e-01 BER=4.170409e-02 avg_msgs=5936.59
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.5_primary_20260507_200102.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.5_primary_20260507_200102.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - round_robin frames=    806 FER=3.722084e-01 BER=4.355356e-02 avg_msgs=6016.91
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.5_primary_20260507_200121.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.5_primary_20260507_200121.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - reldec      frames=    912 FER=3.289474e-01 BER=3.957648e-02 avg_msgs=5122.11
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.5_primary_20260507_200137.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.5_primary_20260507_200137.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['deep_reldec_z6']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - deep_reldec_z6 frames=    809 FER=3.708282e-01 BER=4.362382e-02 avg_msgs=6027.71
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.5_primary_20260507_200316.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.5_primary_20260507_200316.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_naive_z6']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - mi_naive_z6 frames=    805 FER=3.726708e-01 BER=4.301242e-02 avg_msgs=6049.07
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.5_primary_20260507_200407.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.5_primary_20260507_200407.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_tabular_z6']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - mi_tabular_z6 frames=    780 FER=3.846154e-01 BER=4.391026e-02 avg_msgs=6229.29
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.5_primary_20260507_200444.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.5_primary_20260507_200444.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_dqn_z6']
+[eval] SNR points=[1.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.50 dB
+  - mi_dqn_z6   frames=    809 FER=3.708282e-01 BER=4.362382e-02 avg_msgs=6063.31
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.5_primary_20260507_200523.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.5_primary_20260507_200523.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - flooding    frames=   2850 FER=1.052632e-01 BER=1.089181e-02 avg_msgs=2557.84
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.5_primary_20260507_200650.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.5_primary_20260507_200650.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['random']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - random      frames=   3564 FER=8.417508e-02 BER=9.390783e-03 avg_msgs=1968.97
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.5_primary_20260507_200653.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.5_primary_20260507_200653.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - round_robin frames=   3204 FER=9.363296e-02 BER=9.899735e-03 avg_msgs=1982.38
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.5_primary_20260507_200717.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.5_primary_20260507_200717.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - reldec      frames=   5379 FER=5.577245e-02 BER=6.224050e-03 avg_msgs=1248.48
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.5_primary_20260507_200738.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.5_primary_20260507_200738.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['deep_reldec_z6']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - deep_reldec_z6 frames=   3605 FER=8.321775e-02 BER=8.865002e-03 avg_msgs=1894.41
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.5_primary_20260507_201002.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.5_primary_20260507_201002.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_naive_z6']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - mi_naive_z6 frames=   3627 FER=8.271299e-02 BER=8.765279e-03 avg_msgs=1963.04
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.5_primary_20260507_201115.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.5_primary_20260507_201115.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_tabular_z6']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - mi_tabular_z6 frames=   3286 FER=9.129641e-02 BER=9.513213e-03 avg_msgs=2077.35
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.5_primary_20260507_201204.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.5_primary_20260507_201204.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_dqn_z6']
+[eval] SNR points=[2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.50 dB
+  - mi_dqn_z6   frames=   3240 FER=9.259259e-02 BER=9.603266e-03 avg_msgs=2023.02
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.5_primary_20260507_201254.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.5_primary_20260507_201254.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - flooding    frames=    507 FER=5.917160e-01 BER=7.077991e-02 avg_msgs=9344.95
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.0_secondary_20260507_201440.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.0_secondary_20260507_201440.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['random']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - random      frames=    522 FER=5.747126e-01 BER=7.197877e-02 avg_msgs=8788.41
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.0_secondary_20260507_201444.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.0_secondary_20260507_201444.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - round_robin frames=    510 FER=5.882353e-01 BER=7.056781e-02 avg_msgs=8950.59
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.0_secondary_20260507_201459.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.0_secondary_20260507_201459.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - reldec      frames=    543 FER=5.524862e-01 BER=6.631753e-02 avg_msgs=8117.57
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.0_secondary_20260507_201513.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.0_secondary_20260507_201513.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['deep_reldec_z6']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - deep_reldec_z6 frames=    518 FER=5.791506e-01 BER=6.931708e-02 avg_msgs=8879.63
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.0_secondary_20260507_201650.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.0_secondary_20260507_201650.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_naive_z6']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - mi_naive_z6 frames=    515 FER=5.825243e-01 BER=6.978155e-02 avg_msgs=8924.09
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.0_secondary_20260507_201742.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.0_secondary_20260507_201742.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_tabular_z6']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - mi_tabular_z6 frames=    502 FER=5.976096e-01 BER=7.326942e-02 avg_msgs=8980.21
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.0_secondary_20260507_201815.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.0_secondary_20260507_201815.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_dqn_z6']
+[eval] SNR points=[1.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=1.00 dB
+  - mi_dqn_z6   frames=    510 FER=5.882353e-01 BER=7.005719e-02 avg_msgs=8999.15
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.0_secondary_20260507_201851.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.0_secondary_20260507_201851.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['flooding']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - flooding    frames=   1344 FER=2.232143e-01 BER=2.499535e-02 avg_msgs=4314.43
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.0_secondary_20260507_202007.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.0_secondary_20260507_202007.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['random']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - random      frames=   1528 FER=1.963351e-01 BER=2.156959e-02 avg_msgs=3623.75
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.0_secondary_20260507_202010.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.0_secondary_20260507_202010.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['round_robin']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - round_robin frames=   1434 FER=2.092050e-01 BER=2.301255e-02 avg_msgs=3661.86
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.0_secondary_20260507_202030.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.0_secondary_20260507_202030.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['reldec']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - reldec      frames=   1982 FER=1.513623e-01 BER=1.790069e-02 avg_msgs=2623.10
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.0_secondary_20260507_202047.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.0_secondary_20260507_202047.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['deep_reldec_z6']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - deep_reldec_z6 frames=   1494 FER=2.008032e-01 BER=2.208835e-02 avg_msgs=3547.37
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.0_secondary_20260507_202243.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.0_secondary_20260507_202243.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_naive_z6']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - mi_naive_z6 frames=   1443 FER=2.079002e-01 BER=2.349705e-02 avg_msgs=3742.60
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.0_secondary_20260507_202339.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.0_secondary_20260507_202339.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_tabular_z6']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - mi_tabular_z6 frames=   1452 FER=2.066116e-01 BER=2.252640e-02 avg_msgs=3729.92
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.0_secondary_20260507_202414.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.0_secondary_20260507_202414.json
+[eval] code=ab matrix=RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['mi_dqn_z6']
+[eval] SNR points=[2.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=10000
+[eval] snr=2.00 dB
+  - mi_dqn_z6   frames=   1446 FER=2.074689e-01 BER=2.297286e-02 avg_msgs=3689.23
+[done] wrote CSV: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.0_secondary_20260507_202457.csv
+[done] wrote JSON: RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.0_secondary_20260507_202457.json
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods flooding  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr0.5_primary_20260507_195328.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods random  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr0.5_primary_20260507_195332.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods round_robin  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr0.5_primary_20260507_195346.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods reldec  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr0.5_primary_20260507_195400.csv
+No checkpoint found for deep_reldec_z6, attempting short training to produce one: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/train_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --policy-type deep_z6 --device cpu --resume '' --checkpoint-dir notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k --checkpoint-every-episodes 250 --log-every 100 --max-episodes 250
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods deep_reldec_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr0.5_primary_20260507_195529.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_naive_z6  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr0.5_primary_20260507_195707.csv
+No checkpoint found for mi_tabular_z6, attempting short training to produce one: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/train_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --policy-type mi_tabular_z6 --device cpu --resume '' --checkpoint-dir notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k --checkpoint-every-episodes 250 --log-every 100 --max-episodes 250
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --mi-tabular-q-table notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/q_table_final.npy --methods mi_tabular_z6  --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr0.5_primary_20260507_195738.csv
+No checkpoint found for mi_dqn_z6, attempting short training to produce one: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/train_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --policy-type mi_dqn_z6 --device cpu --resume '' --checkpoint-dir notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k --checkpoint-every-episodes 250 --log-every 100 --max-episodes 250
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_dqn_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz --snr-db 0.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr0.5_primary_20260507_195829.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods flooding  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.5_primary_20260507_200059.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods random  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.5_primary_20260507_200102.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods round_robin  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.5_primary_20260507_200121.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods reldec  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.5_primary_20260507_200137.csv
+Found checkpoint for deep_reldec_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods deep_reldec_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.5_primary_20260507_200316.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_naive_z6  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.5_primary_20260507_200407.csv
+Found checkpoint for mi_tabular_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --mi-tabular-q-table notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/q_table_final.npy --methods mi_tabular_z6  --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.5_primary_20260507_200444.csv
+Found checkpoint for mi_dqn_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_dqn_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz --snr-db 1.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.5_primary_20260507_200523.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods flooding  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.5_primary_20260507_200650.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods random  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.5_primary_20260507_200653.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods round_robin  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.5_primary_20260507_200717.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods reldec  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.5_primary_20260507_200738.csv
+Found checkpoint for deep_reldec_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods deep_reldec_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.5_primary_20260507_201002.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_naive_z6  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.5_primary_20260507_201115.csv
+Found checkpoint for mi_tabular_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --mi-tabular-q-table notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/q_table_final.npy --methods mi_tabular_z6  --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.5_primary_20260507_201204.csv
+Found checkpoint for mi_dqn_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_dqn_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz --snr-db 2.5 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.5_primary_20260507_201254.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods flooding  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr1.0_secondary_20260507_201440.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods random  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr1.0_secondary_20260507_201444.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods round_robin  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr1.0_secondary_20260507_201459.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods reldec  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr1.0_secondary_20260507_201513.csv
+Found checkpoint for deep_reldec_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods deep_reldec_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr1.0_secondary_20260507_201650.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_naive_z6  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr1.0_secondary_20260507_201742.csv
+Found checkpoint for mi_tabular_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --mi-tabular-q-table notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/q_table_final.npy --methods mi_tabular_z6  --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr1.0_secondary_20260507_201815.csv
+Found checkpoint for mi_dqn_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_dqn_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz --snr-db 1.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr1.0_secondary_20260507_201851.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods flooding  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_flooding_snr2.0_secondary_20260507_202007.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods random  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_random_snr2.0_secondary_20260507_202010.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods round_robin  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_round_robin_snr2.0_secondary_20260507_202030.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods reldec  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_reldec_snr2.0_secondary_20260507_202047.csv
+Found checkpoint for deep_reldec_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods deep_reldec_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_deep_z6_1k/checkpoint_latest.npz --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_deep_reldec_z6_snr2.0_secondary_20260507_202243.csv
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_naive_z6  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_naive_z6_snr2.0_secondary_20260507_202339.csv
+Found checkpoint for mi_tabular_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy --mi-tabular-q-table notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_tabular_z6_1k/q_table_final.npy --methods mi_tabular_z6  --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_tabular_z6_snr2.0_secondary_20260507_202414.csv
+Found checkpoint for mi_dqn_z6: notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz
+CMD: python3 RELDEC/evaluate_reldec.py --code ab --matrix-csv RELDEC/matrices/H_Mackay_96_48.csv --q-table RELDEC/notebook_runs/continuous_reldec/active_run/mackay/checkpoints_reldec_tabular/q_table_final.npy  --methods mi_dqn_z6 --deep-checkpoint notebook_runs/continuous_reldec/active_run/ab/checkpoints/checkpoints_mi_dqn_z6_1k/checkpoint_latest.npz --snr-db 2.0 --target-frame-errors 300 --max-frames 10000 --seed 17 --output-csv RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results/eval_mi_dqn_z6_snr2.0_secondary_20260507_202457.csv
+CMD: python3 - <<'PY'
+
+from pathlib import Path
+import pandas as pd
+rd=Path('RELDEC/notebook_runs/continuous_reldec/active_run/mackay/results')
+acc=rd/'accumulated_results.csv'
+frames=[]
+if acc.exists():
+    frames.append(pd.read_csv(acc))
+for p in sorted(rd.glob('eval_*.csv')):
+    frames.append(pd.read_csv(p))
+if frames:
+    df=pd.concat(frames,ignore_index=True)
+    key_cols=['method','snr_db','code','matrix_csv','target_frame_errors','max_frames','all_zero_only']
+    df=df.drop_duplicates(subset=key_cols,keep='last')
+    df=df.sort_values(['snr_db','method']).reset_index(drop=True)
+    df.to_csv(acc,index=False)
+    print('wrote', acc)
+
+PY
