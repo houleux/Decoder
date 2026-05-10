@@ -1,3 +1,4 @@
+\PassOptionsToPackage{demo}{graphicx}
 \documentclass{beamer}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -218,7 +219,7 @@ Numerical Constants for $J(\sigma)$:
     \Delta I_k = I^{(k)}_{\text{out}} - I^{(k)}_{\text{in}}
     \]
 
-    \item Select cluster with max $\Delta I_k\$
+    \item Select cluster with max $\Delta I_k$
 
     \item Insight:
     \begin{itemize}
@@ -246,6 +247,20 @@ Numerical Constants for $J(\sigma)$:
 \end{itemize}
 
 
+\end{frame}
+
+\begin{frame}{Algorithms: Mutual Information State Space}
+\begin{table}
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} X X X}
+\toprule
+\textbf{Name} & \textbf{State Space} & \textbf{Action Space} & \textbf{Reward} \\
+\midrule
+MI-Tabular & Discrete: Binned MI of LLR posteriors $s_c \in \{0, \dots, B-1\}$ & Cluster selection & MI gain: $I_a^{\text{after}} - I_a^{\text{before}}$ \\
+MI-Deep (DQN) & Continuous: MI of LLR posteriors & Cluster selection & MI gain: $I_a^{\text{after}} - I_a^{\text{before}}$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
 \end{frame}
 
 %------------------------------------------------
@@ -276,92 +291,91 @@ Numerical Constants for $J(\sigma)$:
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Algorithms: PPO+GNN}
+\begin{table}
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} X X X}
+\toprule
+\textbf{Name} & \textbf{State Space} & \textbf{Action Space} & \textbf{Reward} \\
+\midrule
+PPO+GNN & Graph-structured state (LLRs, CN degrees) processed via GNN & Policy distribution over clusters & Task-specific (e.g., decoding success / step penalty) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{frame}
+
 \begin{frame}{PPO+GNN Results}
 % Empty frame for results
 \end{frame}
 
 \section{Other MDP formulation changes}
 
-\begin{frame}{Roadmap}
-\begin{enumerate}
-  \item Define weakly coupled MDPs, restless bandits, and factored MDPs.
-  \item Map clustered LDPC scheduling to these concepts.
-  \item Explain why the mapping is not exact.
-  \item Introduce the state-augmentation idea and its interpretation.
-  \item State the most accurate classification and nearest literature connections.
-\end{enumerate}
-\end{frame}
-
-\subsection{Directly using global state space}
-
-\begin{frame}{Step 3: Factored and dynamically coupled MDPs}
-A factored MDP represents the global state by components $s=(s_1,\dots,s_K)$ (here states of clusters) and exploits sparse conditional dependence (the fact that clusters are almost independent).
-
-\vspace{0.4em}
-In a \emph{dynamically coupled} factored MDP, the next state of subsystem $u$ may depend on neighboring subsystem states/actions:
-\[
-P(s_u' \mid s,a) = P_u\bigl(s_u'\mid s_{\mathcal N(u)}, a_{\mathcal N(u)}\bigr),
-\]
-for a sparse interaction graph $\mathcal N(u)$. This is strictly more general than a classical weakly coupled MDP.
-\end{frame}
-
-\begin{frame}{Step 7: Why RELDEC is still only partially using global information}
-RELDEC defines a cluster state from local hard-decision outputs around that cluster and selects actions from local state-dependent action values.
-
-\vspace{0.4em}
-This keeps learning feasible, but it does not explicitly encode the current pressure exerted by the rest of the graph on the selected cluster. In other words, the scheduler uses a local state but not the full joint state.
-
-\vspace{0.4em}
-That is precisely where an augmented-state formulation can help.
-\end{frame}
-
-\subsection{Weakly Coupled MDPs and Restless Bandits}
+\subsection{Note on Restless Bandits and WC-MDPs}
 
 \begin{frame}{Weakly Coupled MDPs (WC-MDP)}
-A weakly coupled MDP consists of multiple sub-MDPs (arms) that evolve independently in their local dynamics, but are linked by a shared resource constraint.
+A weakly coupled MDP is built from multiple sub-MDPs where:
 \begin{itemize}
-    \item \textbf{Global State:} $S = S_1 \times S_2 \times \dots \times S_K$
-    \item \textbf{Transitions:} $P(s' | s, a) = \prod_{i=1}^K P_i(s_i' | s_i, a_i)$ (Independent transitions)
-    \item \textbf{Coupling:} The actions are constrained by a shared budget:
-    \[ \sum_{i=1}^K c_i(a_i) \leq B \]
+  \item \textbf{Local dynamics are independent}: $P(s'\mid s,a)=\prod_{u=1}^K P_u(s_u'\mid s_u,a_u)$
+  \item \textbf{Coupling through shared constraints}: Usually a budget $B$ on total resource/action.
+  \[
+  A(s) = \Bigl\{a=(a_1,\dots,a_K): \sum_{u=1}^K c_u(a_u) \le B\Bigr\}
+  \]
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Restless Bandit Problem (RMAB)}
+\begin{frame}{Restless Bandit Problem}
 A special case of WC-MDP where:
 \begin{itemize}
-    \item Each arm $i$ has two actions: \textbf{Active} ($a_i=1$) and \textbf{Passive} ($a_i=0$).
-    \item The state of an arm evolves even when it is passive (\textit{restless} property):
-    \[ P_i(s_i' | s_i, a_i=0) \neq \delta_{s_i} \]
-    \item Goal: Select a subset of arms to activate to maximize long-term reward.
+  \item Each subsystem is an "arm" with actions $a_u \in \{0,1\}$ (Active/Passive).
+  \item \textbf{Restless}: Passive arms ($a_u=0$) still undergo state transitions.
+  \[
+  P_u(s_u'\mid s_u, a_u=0) \neq \delta_{s_u}
+  \]
+  \item \textbf{Constraint}: Only $B$ arms can be activated at each time.
+  \item Index-based solutions (e.g., Whittle Index) are used to decide which arms to activate.
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Framing LDPC Scheduling as WC-MDP}
-We can frame Clustered LDPC scheduling as a Weakly Coupled MDP:
+Clustered LDPC decoding can be mapped to this framework:
 \begin{itemize}
-    \item \textbf{Arms:} Each cluster of check nodes $\mathcal{C}_k$ is an arm.
-    \item \textbf{Local State:} $s_k$ is the local syndrome/LLR summary of the cluster.
-    \item \textbf{Budget Constraint:} At each time step, \textbf{exactly one arm} is scheduled to be updated ($B=1$).
-    \[ \sum_{k=1}^K a_k = 1, \quad a_k \in \{0, 1\} \]
-    \item \textbf{Reward:} Information gain or syndrome weight reduction.
+  \item \textbf{Subsystem $u$}: Cluster $C_u$.
+  \item \textbf{Local State $s_u$}: Cluster syndrome features / LLR statistics.
+  \item \textbf{Action $a_u$}: Whether cluster $u$ is scheduled now.
+  \item \textbf{Budget Constraint}: Exactly one arm is scheduled at each step.
+  \[
+  \sum_{u=1}^K a_u = 1, \quad a_u \in \{0, 1\}
+  \]
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Limitations of the RMAB Framing}
-There are two fundamental issues with this framing for LDPC decoding:
+\begin{frame}{Problems with the WC-MDP Formulation}
 \begin{enumerate}
-    \item \textbf{Violation of Independence:} The transition dynamics of clusters are \textit{not} independent. Updating cluster $A$ changes messages on shared variable nodes, which instantly changes the state of neighboring cluster $B$.
-    \item \textbf{Methodological Triviality:}
-    \begin{itemize}
-        \item Computing Whittle indices typically requires estimating values for each arm in isolation.
-        \item With $B=1$, the index-based policy becomes \textbf{mathematically equivalent to Q-learning} on the cluster states.
-        \item The only difference is implementation: Indexing uses Monte Carlo runs per arm, while RELDEC uses temporal difference learning (DQN).
-    \end{itemize}
+  \item \textbf{Assumption of Independence}:
+  \begin{itemize}
+    \item WC-MDP assumes arms transition independently.
+    \item In LDPC, clusters are \textbf{coupled via the Tanner graph}. Updating cluster $u$ changes the state of neighboring cluster $v$.
+  \end{itemize}
+  \item \textbf{Equivalence to Q-Learning}:
+  \begin{itemize}
+    \item For $B=1$, the "index" is simply the state-action value $Q(s, a)$.
+    \item The formulation becomes trivially equal to standard Q-learning.
+    \item \textbf{Only difference}: Whittle approaches typically use Monte Carlo runs to estimate indices, whereas RELDEC uses iterative Q-updates.
+  \end{itemize}
 \end{enumerate}
 \end{frame}
 
-\subsection{Augmented State space}
+\subsection{Augmentation}
+
+\begin{frame}{Why RELDEC is still only partially using global information}
+RELDEC defines a cluster state from local hard-decision outputs around that cluster and selects actions from local state-dependent action values.
+
+\vspace{0.4em}
+This keeps learning feasible, but it does not utilize full infromation about the matrix
+
+\vspace{0.4em}
+That is precisely where an augmented-state formulation can help.
+\end{frame}
 
 \begin{frame}{State augmentation idea}
 For each cluster $u$, define an augmented state
@@ -378,19 +392,64 @@ A generic form is
 where $\lambda_{vu}$ measures structural coupling between clusters $v$ and $u$, and $f(s_v)$ extracts a small feature from cluster $v$ such as residual mass, unsatisfied-check fraction, or local error proxy.
 \end{frame}
 
-
-\begin{frame}{Final takeaway}
-
-\begin{block}{Recommended formulation}
-Clustered LDPC scheduling is best modeled as a \textbf{sparsely dynamically coupled factored MDP} with a scheduling-budget constraint. It is \textbf{not exactly} a classical weakly coupled MDP or a classical restless bandit, although both provide useful approximation languages when cross-cluster interactions are weak.
-\end{block}
-
-\vspace{0.5em}
-The proposed augmentation
+\begin{frame}{Lagrangian for the Constrained Problem}
+We can interpret the scheduling objective via the Lagrangian of the global constrained optimization problem:
 \[
-\tilde s_u=(s_u,\phi_u)
+L = R(s, a) - \sum_{i} \lambda_i
 \]
-is then a principled compromise: it preserves local decision structure while importing a compact summary of global coupling.
+where the multipliers satisfy:
+\[
+\sum_{i} \lambda_i = 1
+\]
+\begin{itemize}
+    \item \textbf{Global Reward}: $R(s, a)$ is the total reward (e.g., global syndrome reduction).
+    \item \textbf{Equivalence}: Since the second term is constant ($\sum \lambda_i = 1$), maximizing $L$ is equivalent to maximizing $R(s, a)$.
+\end{itemize}
+\begin{block}{Insight}
+This proves that the scheduler's goal, even when using local augmented states $\tilde{s}_u$, is fundamentally about maximizing the global reward across the entire graph.
+\end{block}
+\end{frame}
+
+\begin{frame}{Algorithms: Augmented State Space}
+\begin{table}
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} X X X}
+\toprule
+\textbf{Name} & \textbf{State Space} & \textbf{Action Space} & \textbf{Reward} \\
+\midrule
+Augmented RELDEC & Augmented state $\tilde s_u = (s_u, \phi_u)$ (local state + global coupling summary) & Cluster selection & Decrease in syndrome weight \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{frame}
+
+\subsection{Augmentation special case: global state space}
+
+\begin{frame}{Global state space as an augmentation}
+The full joint state $s=(s_1,\dots,s_K)$ can be seen as an extreme case of state augmentation where $\phi_u$ contains all information from all other clusters.
+\end{frame}
+
+\begin{frame}{Algorithms: Global State Space}
+\begin{table}
+\centering
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.5cm} X X X}
+\toprule
+\textbf{Name} & \textbf{State Space} & \textbf{Action Space} & \textbf{Reward} \\
+\midrule
+Full RELDEC & Global joint state $s=(s_1,\dots,s_K)$ (e.g., all local cluster states) & Cluster selection & Decrease in syndrome weight \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{frame}
+
+\subsection{Other augmentations applied}
+
+\begin{frame}{Other possible augmentations}
+\begin{itemize}
+  \item \textbf{Syndrome-based summaries}: $\phi_u$ extracts unsatisfied-check fraction or local error proxy.
+  \item \textbf{Message-passing statistics}: Average LLR magnitude or variance in neighboring clusters.
+  \item \textbf{Graph-structural features}: Distance to cycles or bottlenecks.
+\end{itemize}
 \end{frame}
 
 \begin{frame}{Formulation Changes Results}

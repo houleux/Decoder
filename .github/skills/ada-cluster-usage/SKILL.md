@@ -22,6 +22,8 @@ Use this skill to run ML or decoding experiments on the IIIT Ada cluster with sa
 
 If your actual Ada login differs from your email identifier, always use the Ada login username in commands.
 
+Authentication on Ada is password-based (no SSH auth keys). Whenever running SSH/rsync/tunneling commands, always prompt the user to enter their password in the terminal.
+
 ## Workflow
 
 ### 1. Pre-flight checks
