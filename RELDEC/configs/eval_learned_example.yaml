@@ -1,0 +1,28 @@
+# Example evaluation config for learned methods with checkpoints
+
+experiment:
+  code: ab
+  matrix_csv: null  # Will be auto-loaded from code preset
+
+evaluation:
+  methods:
+    - reldec
+    - deep_reldec_z2
+    - mi_tabular_z2
+  snr_db: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+  i_max: 100
+  target_frame_errors: 100
+  max_frames: 100000
+
+parameters:
+  z: 2
+  mi_bins: 21
+
+checkpoints:
+  q_table: ./checkpoints/reldec_q_table.npz
+  mi_tabular_q_table: ./checkpoints/mi_tabular_q_table.npz
+  deep_checkpoint: ./checkpoints/deep_reldec_z2.npz
+
+system:
+  seed: 42
+  random_codewords: false

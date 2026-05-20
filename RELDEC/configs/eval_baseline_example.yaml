@@ -1,0 +1,25 @@
+# Example evaluation config for baseline methods
+
+experiment:
+  code: ab
+  matrix_csv: null  # Will be auto-loaded from code preset
+
+evaluation:
+  methods:
+    - flooding
+    - random
+    - round_robin
+  snr_db: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+  i_max: 100
+  target_frame_errors: 100
+  max_frames: 100000
+
+parameters:
+  z: 1
+  mi_bins: 21
+
+checkpoints: {}  # No checkpoints needed for baseline methods
+
+system:
+  seed: 42
+  random_codewords: false

@@ -2,23 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
 
 from reldec_deep import (
     DeepDqnConfig,
-    DeepReldecTrainer,
     DeepTrainingCheckpoint,
-    MiTabularQTrainer,
     load_deep_training_checkpoint,
     save_deep_training_checkpoint,
 )
-from reldec_augmented import AugmentedDeepReldecTrainer
+from experiments import ExperimentSpec, RunManifest, ConfigLoader
+from trainer_factory import TrainerFactory
 from reldec_core import (
     THIS_DIR,
     ReldecHyperParams,
-    ReldecTrainer,
     TrainProgress,
     TrainingCheckpoint,
     TrainingConfig,
@@ -30,12 +29,16 @@ from reldec_core import (
     save_training_checkpoint,
     train_reldec,
 )
+from registry import supported_training_policy_names, training_policy_spec
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, MI-DQN z=2, or MI-tabular z=2)."
     )
+    # Config file support
+    parser.add_argument("--config", type=str, default=None, help="Load defaults from YAML/JSON config file")
+    
     parser.add_argument("--code", choices=["ab", "wran", "mackay"], default="ab")
     parser.add_argument("--matrix-csv", type=str, default=None)
     parser.add_argument("--snr-db", type=float, nargs="+", default=None)
@@ -54,7 +57,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--no-history", action="store_true")
     parser.add_argument(
         "--policy-type",
-        choices=["tabular", "mi_tabular_z2", "deep_z1", "deep_z2", "mi_dqn_z2", "mi_tabular_zx", "deep_zx", "mi_dqn_zx", "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"],
+        choices=supported_training_policy_names(),
         default="tabular",
     )
     parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx policies")
@@ -70,7 +73,28 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--dqn-epsilon-start", type=float, default=0.6)
     parser.add_argument("--dqn-epsilon-end", type=float, default=0.05)
     parser.add_argument("--dqn-epsilon-decay-steps", type=int, default=10000)
-    return parser.parse_args()
+    
+    args = parser.parse_args()
+    
+    # Load config file if provided (CLI args override config file)
+    if args.config:
+        try:
+            config_dict = ConfigLoader.load(args.config)
+            config_args = ConfigLoader.training_config_to_args(config_dict)
+            
+            # Apply config defaults only if CLI arg wasn't explicitly set
+            for key, value in config_args.items():
+                if hasattr(args, key):
+                    # Check if this was the default value (not explicitly set)
+                    # This is a simplification; for now we merge config_dict into defaults
+                    current_val = getattr(args, key)
+                    # If current value is the parser default and config has a value, use config
+                    if current_val is None or (key not in {"code"} and current_val == parser.get_default(key)):
+                        setattr(args, key, value)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Warning: Could not load config file: {e}")
+    
+    return args
 
 
 def _build_config_from_args(args: argparse.Namespace) -> TrainingConfig:
@@ -101,21 +125,15 @@ def _build_config_from_args(args: argparse.Namespace) -> TrainingConfig:
 
 
 def _cluster_size_for_policy(policy_type: str, args_z: int | None = None) -> int:
-    if policy_type == "tabular":
-        return 1
-    if policy_type == "mi_tabular_z2":
-        return 2
-    if policy_type == "deep_z1":
-        return 1
-    if policy_type == "deep_z2":
-        return 2
-    if policy_type == "mi_dqn_z2":
-        return 2
-    if policy_type in ("mi_tabular_zx", "deep_zx", "mi_dqn_zx", "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
+    spec = training_policy_spec(policy_type)
+    z_value = spec.parameters.get("z")
+    if z_value == "dynamic":
         if args_z is None:
             raise ValueError(f"--z must be provided for policy {policy_type}")
-        return args_z
-    raise ValueError(f"Unsupported policy type: {policy_type}")
+        return int(args_z)
+    if z_value is not None:
+        return int(z_value)
+    return 1
 
 
 def _build_deep_config(args: argparse.Namespace, cluster_size: int) -> DeepDqnConfig:
@@ -159,6 +177,7 @@ def _main() -> None:
     q_table_path = checkpoint_dir / "q_table_final.npy"
     dqn_final_path = checkpoint_dir / "dqn_final.npz"
     summary_path = checkpoint_dir / "training_summary.json"
+    manifest_path = checkpoint_dir / "run_manifest.json"
 
     if args.resume and args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         resume_path = Path(args.resume)
@@ -202,18 +221,16 @@ def _main() -> None:
             cluster_size=cluster_size,
         )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
-        if args.policy_type == "tabular":
-            trainer = ReldecTrainer(h, config.hyperparams)
-        else:
-            trainer = MiTabularQTrainer(
+        
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+            trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
-                alpha=config.hyperparams.alpha,
-                beta=config.hyperparams.beta,
-                epsilon=config.hyperparams.epsilon,
-                l_max=config.hyperparams.l_max,
-                cluster_size=cluster_size,
+                config=config,
+                policy_type=args.policy_type,
                 mi_bins=int(args.mi_bins),
             )
+        else:
+            trainer = None  # Not needed for deep trainers
         progress = TrainProgress()
 
         rng = np.random.default_rng(config.seed)
@@ -235,27 +252,12 @@ def _main() -> None:
             )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         deep_config = checkpoint.dqn_config
-        if args.policy_type in ("augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
-            deep_trainer = AugmentedDeepReldecTrainer(
-                h_csr=h,
-                dqn_config=deep_config,
-                beta_discount=config.hyperparams.beta,
-                l_max=config.hyperparams.l_max,
-                device=args.device,
-            )
-        else:
-            deep_trainer = DeepReldecTrainer(
-                h_csr=h,
-                dqn_config=deep_config,
-                beta_discount=config.hyperparams.beta,
-                l_max=config.hyperparams.l_max,
-                device=args.device,
-            )
-        deep_trainer.import_checkpoint_payload(
-            checkpoint.q_online_bytes,
-            checkpoint.q_target_bytes,
-            checkpoint.optimizer_bytes,
-            checkpoint.global_step,
+        deep_trainer = TrainerFactory.create_trainer_from_checkpoint(
+            checkpoint=checkpoint,
+            h_csr=h,
+            config=config,
+            policy_type=args.policy_type,
+            device=args.device,
         )
 
         progress = checkpoint.progress
@@ -281,22 +283,13 @@ def _main() -> None:
 
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         deep_config = _build_deep_config(args, cluster_size=cluster_size)
-        if args.policy_type in ("augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"):
-            deep_trainer = AugmentedDeepReldecTrainer(
-                h_csr=h,
-                dqn_config=deep_config,
-                beta_discount=config.hyperparams.beta,
-                l_max=config.hyperparams.l_max,
-                device=args.device,
-            )
-        else:
-            deep_trainer = DeepReldecTrainer(
-                h_csr=h,
-                dqn_config=deep_config,
-                beta_discount=config.hyperparams.beta,
-                l_max=config.hyperparams.l_max,
-                device=args.device,
-            )
+        deep_trainer = TrainerFactory.create_deep_trainer(
+            h_csr=h,
+            config=config,
+            policy_type=args.policy_type,
+            deep_dqn_config=deep_config,
+            device=args.device,
+        )
         progress = TrainProgress()
 
         rng = np.random.default_rng(config.seed)
@@ -451,12 +444,32 @@ def _main() -> None:
         "artifacts": {
             "checkpoint_latest": str(latest_path),
             "checkpoint_final": str(final_path),
+            "run_manifest": str(manifest_path),
         },
     }
     if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)
+    run_id = time.strftime("%Y%m%d_%H%M%S")
+    experiment = ExperimentSpec(
+        code=config.code,
+        matrix_csv=config.matrix_csv,
+        policy_type=args.policy_type,
+        parameters={
+            "z": args.z,
+            "mi_bins": int(args.mi_bins),
+            "device": args.device,
+            "checkpoint_every_episodes": int(args.checkpoint_every_episodes),
+        },
+    )
+    manifest = RunManifest.create(
+        run_id=run_id,
+        experiment=experiment,
+        training_config=config.to_dict(),
+        artifacts=summary["artifacts"],
+    )
+    manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     print("[done] training complete")

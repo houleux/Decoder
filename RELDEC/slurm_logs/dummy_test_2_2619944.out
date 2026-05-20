@@ -1,8 +1,0 @@
-==========================================
-SLURM_JOB_ID = 2619944
-SLURM_NODELIST = gnode012
-SLURM_JOB_GPUS = 
-==========================================
-START Thu May  7 06:41:34 AM IST 2026 HOST=gnode012 CPUS=2
-done loops 82913
-END Thu May  7 06:42:05 AM IST 2026

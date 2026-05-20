@@ -1,6 +1,0 @@
-==========================================
-SLURM_JOB_ID = 2612919
-SLURM_NODELIST = gnode050
-SLURM_JOB_GPUS = 2
-==========================================
-[extend] RELDEC/notebook_runs/continuous_reldec/active_run/wran/checkpoints_mi_dqn_z2_1k/checkpoint_latest.npz | episodes_completed=1000 | schedule 1000 -> 10000 | backup=checkpoint_latest_before_extend_20260423_011051Z.npz
