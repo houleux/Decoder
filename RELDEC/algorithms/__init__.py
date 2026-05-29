@@ -1,14 +1,82 @@
-"""RELDEC algorithms package (shims re-exporting existing implementations).
+"""Canonical RELDEC algorithm implementations."""
 
-This package provides backwards-compatible module paths under
-`RELDEC.algorithms.*`. Each module here re-exports the implementations
-from the original top-level modules to avoid breaking existing imports
-while exposing the new one-file-per-algo layout.
-"""
+from .reldec_augmented import AugmentedDeepReldecTrainer, load_augmented_deep_decoder_from_checkpoint
+from .reldec_core import (
+    CODE_PRESETS,
+    CodePreset,
+    DecodeResult,
+    MethodStats,
+    ReldecDecoderSuite,
+    ReldecHyperParams,
+    ReldecTrainer,
+    TrainProgress,
+    TrainingCheckpoint,
+    TrainingConfig,
+    all_zero_awgn_llr,
+    build_training_snr_schedule,
+    bpsk_awgn_llr,
+    evaluate_single_method,
+    get_code_preset,
+    load_parity_check_from_sparse_csv,
+    load_q_table,
+    load_training_checkpoint,
+    nominal_code_rate,
+    save_training_checkpoint,
+    syndrome_is_zero,
+    train_reldec,
+)
+from .reldec_deep import (
+    DeepDqnConfig,
+    DeepReldecDecoder,
+    DeepReldecTrainer,
+    DeepTrainingCheckpoint,
+    MiReldecBaselineDecoder,
+    MiTabularQDecoder,
+    MiTabularQTrainer,
+    evaluate_deep_method,
+    evaluate_mi_tabular_method,
+    load_deep_decoder_from_checkpoint,
+    load_deep_training_checkpoint,
+    save_deep_training_checkpoint,
+)
+from .reldec_global_mdp import FullStateBinaryTabularTrainer
 
 __all__ = [
-    "reldec_deep",
-    "reldec_core",
-    "reldec_augmented",
-    "reldec_global_mdp",
+    "AugmentedDeepReldecTrainer",
+    "CODE_PRESETS",
+    "CodePreset",
+    "DecodeResult",
+    "DeepDqnConfig",
+    "DeepReldecDecoder",
+    "DeepReldecTrainer",
+    "DeepTrainingCheckpoint",
+    "FullStateBinaryTabularTrainer",
+    "MethodStats",
+    "MiReldecBaselineDecoder",
+    "MiTabularQDecoder",
+    "MiTabularQTrainer",
+    "ReldecDecoderSuite",
+    "ReldecHyperParams",
+    "ReldecTrainer",
+    "TrainProgress",
+    "TrainingCheckpoint",
+    "TrainingConfig",
+    "all_zero_awgn_llr",
+    "build_training_snr_schedule",
+    "bpsk_awgn_llr",
+    "evaluate_deep_method",
+    "evaluate_mi_tabular_method",
+    "evaluate_single_method",
+    "get_code_preset",
+    "load_augmented_deep_decoder_from_checkpoint",
+    "load_deep_decoder_from_checkpoint",
+    "load_deep_training_checkpoint",
+    "load_parity_check_from_sparse_csv",
+    "load_q_table",
+    "load_training_checkpoint",
+    "nominal_code_rate",
+    "save_deep_training_checkpoint",
+    "save_training_checkpoint",
+    "syndrome_is_zero",
+    "train_reldec",
 ]

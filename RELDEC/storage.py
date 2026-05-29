@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from .spec import RunManifest, EvaluationManifest
+
+
+def _normalize_config_value(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_normalize_config_value(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _normalize_config_value(v) for k, v in value.items()}
+    if isinstance(value, (int, float, str, bool)) or value is None:
+        return value
+    if hasattr(value, "tolist"):
+        return value.tolist()
+    return str(value)
+
+
+def compute_config_hash(config: Dict[str, Any]) -> str:
+    normalized = _normalize_config_value(config)
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class RunStore:

@@ -5,8 +5,9 @@ import csv
 import json
 import time
 from pathlib import Path
-from experiments import EvaluationManifest, EvaluationSpec, ConfigLoader
-from registry import (
+from RELDEC.experiments import EvaluationManifest, EvaluationSpec, ConfigLoader
+from RELDEC.storage import RunStore, compute_config_hash
+from RELDEC.registry import (
     supported_method_names,
     methods_requiring_q_table,
     methods_requiring_mi_tabular_q_table,
@@ -15,13 +16,13 @@ from registry import (
 
 import numpy as np
 
-from reldec_deep import evaluate_deep_method, load_deep_decoder_from_checkpoint
-from reldec_deep import MiReldecBaselineDecoder
-from reldec_deep import MiTabularQDecoder, evaluate_mi_tabular_method
-from reldec_augmented import load_augmented_deep_decoder_from_checkpoint
-from method_dispatcher import MethodDispatcher
-from evaluation_router import evaluate_method_with_dispatcher
-from reldec_core import (
+from RELDEC.algorithms.reldec_deep import evaluate_deep_method, load_deep_decoder_from_checkpoint
+from RELDEC.algorithms.reldec_deep import MiReldecBaselineDecoder
+from RELDEC.algorithms.reldec_deep import MiTabularQDecoder, evaluate_mi_tabular_method
+from RELDEC.algorithms.reldec_augmented import load_augmented_deep_decoder_from_checkpoint
+from RELDEC.method_dispatcher import MethodDispatcher
+from RELDEC.evaluation_router import evaluate_method_with_dispatcher
+from RELDEC.algorithms.reldec_core import (
     THIS_DIR,
     ReldecDecoderSuite,
     evaluate_single_method,
@@ -159,19 +160,36 @@ def _main() -> None:
     rng = np.random.default_rng(args.seed)
     all_zero_only = not args.random_codewords
 
-    ts = time.strftime("%Y%m%d_%H%M%S")
-    output_csv = (
-        Path(args.output_csv)
-        if args.output_csv
-        else THIS_DIR / "results" / f"eval_{args.code}_{ts}.csv"
-    )
-    output_json = (
-        Path(args.output_json)
-        if args.output_json
-        else output_csv.with_suffix(".json")
-    )
-    manifest_path = output_json.with_name("evaluation_manifest.json")
+    run_identity = {
+        "kind": "evaluation",
+        "code": str(args.code),
+        "matrix_csv": str(matrix_csv),
+        "methods": sorted(methods),
+        "parameters": {
+            "z": args.z,
+            "mi_bins": int(args.mi_bins),
+            "i_max": int(i_max),
+            "target_frame_errors": int(args.target_frame_errors),
+            "max_frames": int(args.max_frames),
+            "random_codewords": bool(args.random_codewords),
+        },
+    }
+    run_hash = compute_config_hash(run_identity)
+    run_id = f"eval_{run_hash[:12]}"
 
+    output_dir = THIS_DIR / "results" / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_csv = Path(args.output_csv) if args.output_csv else output_dir / "results.csv"
+    output_json = Path(args.output_json) if args.output_json else output_dir / "results.json"
+    manifest_path = output_dir / "evaluation_manifest.json"
+
+    if output_json.exists() and output_csv.exists() and manifest_path.exists():
+        print(f"[eval] run_id={run_id} already exists; reusing stored results")
+        print(f"[eval] CSV: {output_csv}")
+        print(f"[eval] JSON: {output_json}")
+        return
+
+    print(f"[eval] run_id={run_id}")
     print(f"[eval] code={args.code} matrix={matrix_csv}")
     print(f"[eval] H shape={h.shape} nnz={h.nnz} rate={code_rate:.6f} i_max={i_max}")
     print(f"[eval] methods={methods}")
@@ -239,7 +257,7 @@ def _main() -> None:
     }
     output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     manifest = EvaluationManifest.create(
-        run_id=ts,
+        run_id=run_id,
         experiment=EvaluationSpec(
             code=args.code,
             matrix_csv=str(matrix_csv),
@@ -257,9 +275,11 @@ def _main() -> None:
         artifacts={
             "results_csv": str(output_csv),
             "results_json": str(output_json),
+            "config_hash": run_hash,
         },
     )
     manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
+    RunStore(THIS_DIR / "runs").save_evaluation_run(manifest, output_dir)
 
     print(f"[done] wrote CSV: {output_csv}")
     print(f"[done] wrote JSON: {output_json}")

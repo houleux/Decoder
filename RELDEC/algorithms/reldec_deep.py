@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -18,9 +19,9 @@ import numpy as np
 import scipy.sparse as sp
 
 from ldpc.bp_decoder import BpDecoder
-from interfaces import Trainer
+from RELDEC.interfaces import Trainer
 
-from .reldec_core import (
+from RELDEC.algorithms.reldec_core import (
 	DecodeResult,
 	ReldecHyperParams,
 	TrainProgress,
@@ -558,4 +559,448 @@ class DeepReldecTrainer(Trainer):
 			batch_size=config.get("batch_size", 64),
 			replay_capacity=config.get("replay_capacity", 10000),
 		)
+
+
+class DeepReldecDecoder:
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		dqn_config: DeepDqnConfig,
+		q_online_bytes: np.ndarray,
+		device: str = "cpu",
+	):
+		if torch is None or nn is None:
+			raise RuntimeError("PyTorch is required for Deep RELDEC")
+
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
+		self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+		self.device = torch.device(device)
+
+		self.net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
+		self.net.load_state_dict(_torch_from_bytes(q_online_bytes, map_location=str(self.device)))
+		self.net.eval()
+
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+		self.cluster_messages = np.array(
+			[int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+			dtype=np.int32,
+		)
+
+	def _state_for_action(self, llr_post: np.ndarray, action: int) -> np.ndarray:
+		return _state_vector(llr_post, self.map.cluster_neighbors[action], self.state_dim)
+
+	def _choose_greedy(self, llr_post: np.ndarray, valid_actions: np.ndarray, rng: np.random.Generator) -> int:
+		state_stack = np.zeros((valid_actions.size, self.state_dim), dtype=np.float32)
+		for i, action in enumerate(valid_actions):
+			state_stack[i] = self._state_for_action(llr_post, int(action))
+
+		with torch.no_grad():
+			states = torch.as_tensor(state_stack, dtype=torch.float32, device=self.device)
+			q_vals = self.net(states)
+			idx = torch.arange(valid_actions.size, device=self.device)
+			selected_q = q_vals[idx, torch.as_tensor(valid_actions, device=self.device)]
+			best_val = torch.max(selected_q)
+			ties = torch.where(selected_q == best_val)[0].cpu().numpy()
+
+		pick = int(ties[rng.integers(0, ties.size)])
+		return int(valid_actions[pick])
+
+	def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+		self.decoder.reset()
+		self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = _hard_decision(llr_post)
+
+		messages = 0
+		for iter_idx in range(1, int(i_max) + 1):
+			scheduled = np.zeros(self.num_actions, dtype=bool)
+			for _ in range(self.num_actions):
+				valid = np.flatnonzero(~scheduled).astype(np.int64)
+				action = self._choose_greedy(llr_post, valid, rng)
+
+				llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+				neighbors = self.map.cluster_neighbors[action]
+				if neighbors.size:
+					x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+				scheduled[action] = True
+				messages += int(self.cluster_messages[action])
+
+			if syndrome_is_zero(self.h, x_hat):
+				return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+		return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+
+class MiReldecBaselineDecoder:
+	"""Naive MI-based cluster scheduler using the J(sigma) approximation."""
+
+	def __init__(self, h_csr: sp.csr_matrix, cluster_size: int = 2, device: str = "cpu"):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.cluster_messages = np.array(
+			[int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+			dtype=np.int32,
+		)
+		self.device = device
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+	def _cluster_mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+		return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+
+	def _choose_action(
+		self,
+		current_state: np.ndarray,
+		previous_state: np.ndarray,
+		scheduled: np.ndarray,
+		rng: np.random.Generator,
+	) -> int:
+		valid = np.flatnonzero(~scheduled).astype(np.int64)
+		if valid.size == 0:
+			raise ValueError("No valid actions left to schedule")
+
+		delta = np.abs(current_state - previous_state)
+		valid_delta = delta[valid]
+		if np.all(valid_delta == 0.0):
+			best = float(np.max(current_state[valid]))
+			candidates = valid[current_state[valid] == best]
+		else:
+			best = float(np.max(valid_delta))
+			candidates = valid[valid_delta == best]
+
+		return int(candidates[rng.integers(0, candidates.size)])
+
+	def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+		self.decoder.reset()
+		self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = _hard_decision(llr_post)
+		previous_state = self._cluster_mi_state(llr_post)
+		messages = 0
+
+		for iter_idx in range(1, int(i_max) + 1):
+			scheduled = np.zeros(self.num_actions, dtype=bool)
+
+			for _ in range(self.num_actions):
+				current_state = self._cluster_mi_state(llr_post)
+				action = self._choose_action(current_state, previous_state, scheduled, rng)
+
+				llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+				neighbors = self.map.cluster_neighbors[action]
+				if neighbors.size:
+					x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+				messages += int(self.cluster_messages[action])
+				scheduled[action] = True
+				previous_state = current_state
+
+			if syndrome_is_zero(self.h, x_hat):
+				return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+		return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+	def evaluate(
+		self,
+		snr_db: float,
+		code_rate: float,
+		i_max: int,
+		target_frame_errors: int,
+		max_frames: int,
+		rng: np.random.Generator,
+		all_zero_only: bool = True,
+		method_name: str = "mi_naive_z2",
+	):
+		from RELDEC.algorithms.reldec_core import MethodStats, bpsk_awgn_llr
+
+		stats = MethodStats(method=method_name, n=self.n)
+
+		while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+			if all_zero_only:
+				tx_bits = np.zeros(self.n, dtype=np.uint8)
+			else:
+				tx_bits = rng.integers(0, 2, size=self.n, dtype=np.uint8)
+
+			llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+			decoded = self.decode(llr, i_max=i_max, rng=rng)
+			stats.update(tx_bits, decoded)
+
+		return stats
+
+
+class MiTabularQTrainer:
+	"""Tabular Q-learning over MI state bins for z=2 CN clusters."""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		alpha: float,
+		beta: float,
+		epsilon: float,
+		l_max: int,
+		cluster_size: int = 2,
+		mi_bins: int = 21,
+		q_table: Optional[np.ndarray] = None,
+	):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.cluster_messages = np.array(
+			[int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+			dtype=np.int32,
+		)
+
+		self.alpha = float(alpha)
+		self.beta = float(beta)
+		self.epsilon = float(epsilon)
+		self.l_max = int(l_max)
+		self.hyperparams = ReldecHyperParams(
+			alpha=self.alpha,
+			beta=self.beta,
+			epsilon=self.epsilon,
+			l_max=self.l_max,
+		)
+		self.mi_bins = int(max(2, mi_bins))
+
+		if q_table is None:
+			self.q_table = np.zeros((self.mi_bins, self.num_actions), dtype=np.float64)
+		else:
+			q_arr = np.asarray(q_table, dtype=np.float64)
+			expected = (self.mi_bins, self.num_actions)
+			if q_arr.shape != expected:
+				raise ValueError(f"Q-table shape {q_arr.shape} does not match expected {expected}")
+			self.q_table = q_arr
+
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+	def _mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+		mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+		bins = np.floor(mi * float(self.mi_bins - 1)).astype(np.int64)
+		return np.clip(bins, 0, self.mi_bins - 1)
+
+	def _select_action_train(self, state_bins: np.ndarray, scheduled: np.ndarray, rng: np.random.Generator) -> int:
+		valid = np.flatnonzero(~scheduled).astype(np.int64)
+		if valid.size == 0:
+			raise ValueError("No valid actions left to schedule")
+
+		if rng.random() < self.epsilon:
+			return int(valid[rng.integers(0, valid.size)])
+
+		q_vals = np.array([self.q_table[int(state_bins[a]), int(a)] for a in valid], dtype=np.float64)
+		best = float(np.max(q_vals))
+		ties = valid[np.flatnonzero(q_vals == best)]
+		return int(ties[rng.integers(0, ties.size)])
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> float:
+		self.decoder.reset()
+		self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+		state_bins = self._mi_state(llr_post)
+
+		episode_reward = 0.0
+
+		for _ in range(self.l_max):
+			scheduled = np.zeros(self.num_actions, dtype=bool)
+
+			for _ in range(self.num_actions):
+				action = self._select_action_train(state_bins, scheduled, rng)
+				prev_bin = int(state_bins[action])
+				prev_mi = float(mi[action])
+
+				llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+				mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+				state_bins = self._mi_state(llr_post)
+
+				reward = float(mi[action] - prev_mi)
+				next_bin = int(state_bins[action])
+
+				old_q = float(self.q_table[prev_bin, action])
+				next_best_q = float(np.max(self.q_table[next_bin, :]))
+				self.q_table[prev_bin, action] = (1.0 - self.alpha) * old_q + self.alpha * (reward + self.beta * next_best_q)
+
+				scheduled[action] = True
+				episode_reward += reward
+
+			if syndrome_is_zero(self.h, _hard_decision(llr_post)):
+				break
+
+		return episode_reward
+
+
+class MiTabularQDecoder:
+	"""Greedy inference decoder using a trained MI-tabular Q-table for z=2 clusters."""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		q_table: np.ndarray,
+		cluster_size: int = 2,
+		mi_bins: int = 21,
+	):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.mi_bins = int(max(2, mi_bins))
+		self.q_table = np.asarray(q_table, dtype=np.float64)
+
+		expected = (self.mi_bins, self.num_actions)
+		if self.q_table.shape != expected:
+			raise ValueError(f"Q-table shape {self.q_table.shape} does not match expected {expected}")
+
+		self.cluster_messages = np.array(
+			[int(np.sum([self.h.indptr[int(cn) + 1] - self.h.indptr[int(cn)] for cn in cl])) for cl in self.map.clusters],
+			dtype=np.int32,
+		)
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+	def _mi_state(self, llr_post: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+		mi = _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+		bins = np.floor(mi * float(self.mi_bins - 1)).astype(np.int64)
+		bins = np.clip(bins, 0, self.mi_bins - 1)
+		return mi, bins
+
+	def _choose_greedy(self, state_bins: np.ndarray, scheduled: np.ndarray, rng: np.random.Generator) -> int:
+		valid = np.flatnonzero(~scheduled).astype(np.int64)
+		if valid.size == 0:
+			raise ValueError("No valid actions left to schedule")
+
+		q_vals = np.array([self.q_table[int(state_bins[a]), int(a)] for a in valid], dtype=np.float64)
+		best = float(np.max(q_vals))
+		ties = valid[np.flatnonzero(q_vals == best)]
+		return int(ties[rng.integers(0, ties.size)])
+
+	def decode(self, llr_channel: np.ndarray, i_max: int, rng: np.random.Generator) -> DecodeResult:
+		self.decoder.reset()
+		self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = _hard_decision(llr_post)
+		messages = 0
+
+		for iter_idx in range(1, int(i_max) + 1):
+			scheduled = np.zeros(self.num_actions, dtype=bool)
+
+			for _ in range(self.num_actions):
+				_, state_bins = self._mi_state(llr_post)
+				action = self._choose_greedy(state_bins, scheduled, rng)
+
+				llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+				neighbors = self.map.cluster_neighbors[action]
+				if neighbors.size:
+					x_hat[neighbors] = _hard_decision(llr_post[neighbors])
+				scheduled[action] = True
+				messages += int(self.cluster_messages[action])
+
+			if syndrome_is_zero(self.h, x_hat):
+				return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
+
+		return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+
+
+def evaluate_mi_tabular_method(
+	decoder: MiTabularQDecoder,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	method_name: str = "mi_tabular_z2",
+):
+	from RELDEC.algorithms.reldec_core import MethodStats
+
+	stats = MethodStats(method=method_name, n=decoder.n)
+
+	while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+		if all_zero_only:
+			tx_bits = np.zeros(decoder.n, dtype=np.uint8)
+		else:
+			tx_bits = rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+
+		llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+		decoded = decoder.decode(llr, i_max=i_max, rng=rng)
+		stats.update(tx_bits, decoded)
+
+	return stats
+
+
+def evaluate_deep_method(
+	decoder: DeepReldecDecoder,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	method_name: str = "deep_reldec_z2",
+):
+	from RELDEC.algorithms.reldec_core import MethodStats
+
+	stats = MethodStats(method=method_name, n=decoder.n)
+
+	while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+		if all_zero_only:
+			tx_bits = np.zeros(decoder.n, dtype=np.uint8)
+		else:
+			tx_bits = rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+
+		llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+		decoded = decoder.decode(llr, i_max=i_max, rng=rng)
+		stats.update(tx_bits, decoded)
+
+	return stats
+
+
+def load_deep_decoder_from_checkpoint(
+	checkpoint_path: str | Path,
+	matrix_csv: str | Path,
+	expected_policy_label: str,
+	device: str = "cpu",
+) -> DeepReldecDecoder:
+	checkpoint = load_deep_training_checkpoint(checkpoint_path)
+	if checkpoint.dqn_config.policy_label != expected_policy_label:
+		raise ValueError(
+			f"Checkpoint policy label '{checkpoint.dqn_config.policy_label}' does not match "
+			f"expected '{expected_policy_label}'"
+		)
+
+	h = load_parity_check_from_sparse_csv(matrix_csv)
+	return DeepReldecDecoder(
+		h_csr=h,
+		dqn_config=checkpoint.dqn_config,
+		q_online_bytes=checkpoint.q_online_bytes,
+		device=device,
+	)
 

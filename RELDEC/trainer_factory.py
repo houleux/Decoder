@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import scipy.sparse as sp
 
-from reldec_deep import ReldecTrainer, MiTabularQTrainer
-from RELDEC.algorithms.deep_reldec import (
+from RELDEC.algorithms.reldec_core import ReldecTrainer, TrainingConfig
+from RELDEC.algorithms.reldec_deep import (
     DeepReldecTrainer,
     AugmentedDeepReldecTrainer,
     DeepTrainingCheckpoint,
+    MiTabularQTrainer,
 )
-from reldec_core import TrainingConfig
-from registry import training_policy_spec
+from RELDEC.registry import training_policy_spec
 
 
 class TrainerFactory:

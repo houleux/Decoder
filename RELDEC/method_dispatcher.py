@@ -6,14 +6,14 @@ from pathlib import Path
 import numpy as np
 import scipy.sparse as sp
 
-from reldec_deep import (
+from RELDEC.algorithms.reldec_deep import (
     load_deep_decoder_from_checkpoint,
     MiReldecBaselineDecoder,
     MiTabularQDecoder,
     evaluate_mi_tabular_method,
 )
-from reldec_augmented import load_augmented_deep_decoder_from_checkpoint
-from reldec_core import load_q_table, load_parity_check_from_sparse_csv
+from RELDEC.algorithms.reldec_augmented import load_augmented_deep_decoder_from_checkpoint
+from RELDEC.algorithms.reldec_core import load_q_table, load_parity_check_from_sparse_csv
 
 
 class MethodDispatcher:
@@ -59,7 +59,7 @@ class MethodDispatcher:
     def get_decoder(self, method: str) -> Any:
         """Get or create a decoder for the given method."""
         if method == "reldec":
-            from reldec_core import ReldecDecoderSuite
+            from RELDEC.algorithms.reldec_core import ReldecDecoderSuite
             suite = ReldecDecoderSuite(self.h_csr)
             if self.q_table is not None:
                 suite.set_q_table(self.q_table)

@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 import numpy as np
 
-from reldec_core import ReldecDecoderSuite, evaluate_single_method
-from reldec_deep import evaluate_deep_method, evaluate_mi_tabular_method, MiReldecBaselineDecoder
-from reldec_deep import MiTabularQDecoder
+from RELDEC.algorithms.reldec_core import ReldecDecoderSuite, evaluate_single_method
+from RELDEC.algorithms.reldec_deep import evaluate_deep_method, evaluate_mi_tabular_method, MiReldecBaselineDecoder
+from RELDEC.algorithms.reldec_deep import MiTabularQDecoder
 
 
 def evaluate_method_with_dispatcher(

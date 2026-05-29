@@ -7,15 +7,17 @@ from pathlib import Path
 
 import numpy as np
 
-from reldec_deep import (
+from RELDEC.algorithms.reldec_deep import (
     DeepDqnConfig,
     DeepTrainingCheckpoint,
+    MiTabularQTrainer,
     load_deep_training_checkpoint,
     save_deep_training_checkpoint,
 )
-from experiments import ExperimentSpec, RunManifest, ConfigLoader
-from trainer_factory import TrainerFactory
-from reldec_core import (
+from RELDEC.experiments import ExperimentSpec, RunManifest, ConfigLoader
+from RELDEC.storage import RunStore, compute_config_hash
+from RELDEC.trainer_factory import TrainerFactory
+from RELDEC.algorithms.reldec_core import (
     THIS_DIR,
     ReldecHyperParams,
     TrainProgress,
@@ -29,7 +31,7 @@ from reldec_core import (
     save_training_checkpoint,
     train_reldec,
 )
-from registry import supported_training_policy_names, training_policy_spec
+from RELDEC.registry import supported_training_policy_names, training_policy_spec
 
 
 def _parse_args() -> argparse.Namespace:
@@ -165,19 +167,7 @@ def _main() -> None:
     args = _parse_args()
     cluster_size = _cluster_size_for_policy(args.policy_type, args.z)
 
-    checkpoint_dir = (
-        Path(args.checkpoint_dir)
-        if args.checkpoint_dir
-        else THIS_DIR / "checkpoints" / args.code.lower()
-    )
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-    latest_path = checkpoint_dir / "checkpoint_latest.npz"
-    final_path = checkpoint_dir / "checkpoint_final.npz"
-    q_table_path = checkpoint_dir / "q_table_final.npy"
-    dqn_final_path = checkpoint_dir / "dqn_final.npz"
-    summary_path = checkpoint_dir / "training_summary.json"
-    manifest_path = checkpoint_dir / "run_manifest.json"
+    run_store = RunStore(THIS_DIR / "runs")
 
     if args.resume and args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         resume_path = Path(args.resume)
@@ -300,6 +290,73 @@ def _main() -> None:
             rng_schedule,
         )
 
+    run_identity = {
+        "kind": "training",
+        "policy_type": str(args.policy_type),
+        "training_config": config.to_dict(),
+        "cluster_size": int(cluster_size),
+        "mi_bins": int(args.mi_bins),
+        "device": str(args.device),
+        "deep_config": deep_config.to_dict() if args.policy_type not in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} else None,
+    }
+    run_hash = compute_config_hash(run_identity)
+    run_id = f"train_{run_hash[:12]}"
+
+    checkpoint_dir = (
+        Path(args.checkpoint_dir)
+        if args.checkpoint_dir
+        else THIS_DIR / "checkpoints" / run_id
+    )
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    latest_path = checkpoint_dir / "checkpoint_latest.npz"
+    final_path = checkpoint_dir / "checkpoint_final.npz"
+    q_table_path = checkpoint_dir / "q_table_final.npy"
+    dqn_final_path = checkpoint_dir / "dqn_final.npz"
+    summary_path = checkpoint_dir / "training_summary.json"
+    manifest_path = checkpoint_dir / "run_manifest.json"
+
+    auto_resume = False
+    if args.resume is None and latest_path.exists():
+        auto_resume = True
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+            checkpoint = load_training_checkpoint(latest_path)
+            config = checkpoint.config
+            progress = checkpoint.progress
+            snr_schedule_db = checkpoint.snr_schedule_db
+            h = load_parity_check_from_sparse_csv(config.matrix_csv)
+            if args.policy_type == "tabular":
+                trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
+            else:
+                trainer = MiTabularQTrainer(
+                    h_csr=h,
+                    alpha=config.hyperparams.alpha,
+                    beta=config.hyperparams.beta,
+                    epsilon=config.hyperparams.epsilon,
+                    l_max=config.hyperparams.l_max,
+                    cluster_size=cluster_size,
+                    mi_bins=int(args.mi_bins),
+                    q_table=checkpoint.q_table,
+                )
+            rng = np.random.default_rng()
+            rng.bit_generator.state = checkpoint.rng_state
+        else:
+            checkpoint = load_deep_training_checkpoint(latest_path)
+            config = checkpoint.config
+            deep_config = checkpoint.dqn_config
+            progress = checkpoint.progress
+            snr_schedule_db = checkpoint.snr_schedule_db
+            h = load_parity_check_from_sparse_csv(config.matrix_csv)
+            deep_trainer = TrainerFactory.create_trainer_from_checkpoint(
+                checkpoint=checkpoint,
+                h_csr=h,
+                config=config,
+                policy_type=args.policy_type,
+                device=args.device,
+            )
+            rng = np.random.default_rng()
+            rng.bit_generator.state = checkpoint.rng_state
+
     if args.max_episodes is not None:
         max_episodes = min(int(args.max_episodes), int(snr_schedule_db.size))
         snr_schedule_db = snr_schedule_db[:max_episodes]
@@ -312,6 +369,7 @@ def _main() -> None:
             f"Checkpoint episodes_completed={start_episode} exceeds total episodes={total_episodes}"
         )
 
+    print(f"[train] run_id={run_id} auto_resume={auto_resume}")
     print(f"[train] code={config.code} matrix={config.matrix_csv}")
     print(f"[train] H shape={h.shape} nnz={h.nnz} rate={config.code_rate:.6f}")
     print(
@@ -367,6 +425,10 @@ def _main() -> None:
             save_deep_training_checkpoint(hist_path, payload)
         print(f"[checkpoint] saved deep checkpoint at episode {ep_done}")
 
+    if start_episode >= total_episodes:
+        print("[train] run already complete; reusing existing results")
+        return
+
     if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         progress = train_reldec(
             trainer=trainer,
@@ -379,7 +441,7 @@ def _main() -> None:
             log_every=max(0, int(args.log_every)),
         )
     else:
-        from reldec_core import all_zero_awgn_llr
+        from RELDEC.algorithms.reldec_core import all_zero_awgn_llr
 
         for ep_idx in range(start_episode, total_episodes):
             llr = all_zero_awgn_llr(
@@ -431,6 +493,9 @@ def _main() -> None:
         save_deep_training_checkpoint(dqn_final_path, final_checkpoint)
 
     summary = {
+        "run_id": run_id,
+        "config_hash": run_hash,
+        "run_identity": run_identity,
         "config": config.to_dict(),
         "h_shape": [int(h.shape[0]), int(h.shape[1])],
         "h_nnz": int(h.nnz),
@@ -445,13 +510,13 @@ def _main() -> None:
             "checkpoint_latest": str(latest_path),
             "checkpoint_final": str(final_path),
             "run_manifest": str(manifest_path),
+            "config_hash": run_hash,
         },
     }
     if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)
-    run_id = time.strftime("%Y%m%d_%H%M%S")
     experiment = ExperimentSpec(
         code=config.code,
         matrix_csv=config.matrix_csv,
@@ -471,6 +536,8 @@ def _main() -> None:
     )
     manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    run_store.save_training_run(manifest, checkpoint_dir)
 
     print("[done] training complete")
     print(f"[done] episodes_completed={progress.episodes_completed}")
