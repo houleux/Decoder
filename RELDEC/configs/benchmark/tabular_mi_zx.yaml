@@ -1,5 +1,5 @@
 # Phase 6: Normalized Benchmark - MI Tabular ZX
-# Budget: 100k episodes (16,667 per SNR)
+# Budget: 15k episodes (2,500 per SNR)
 # Family: mi_tabular
 # Method: mi_tabular_zx
 
@@ -11,7 +11,7 @@ experiment:
 training:
   policy_type: mi_tabular_zx
   snr_db: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
-  episodes_per_snr: 16667
+  episodes_per_snr: 2500
 
 hyperparams:
   alpha: 0.1        # Learning rate
@@ -20,7 +20,7 @@ hyperparams:
   l_max: 50         # Max iterations
 
 parameters:
-  z: dynamic
+  z: 6
   mi_bins: 21
 
 checkpoint:
@@ -30,5 +30,5 @@ checkpoint:
 system:
   device: cpu
   seed: 42
-  budget_episodes: 100000
-  budget_description: "100k total episodes (16.7k per SNR)"
+  budget_episodes: 15000
+  budget_description: "15k total episodes (2.5k per SNR)"

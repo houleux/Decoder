@@ -1,5 +1,5 @@
 # Phase 6: Normalized Benchmark - MI DQN ZX
-# Budget: 400k episodes (66,667 per SNR)
+# Budget: 15k episodes (2,500 per SNR)
 # Family: mi_dqn
 # Method: mi_dqn_zx
 
@@ -11,7 +11,7 @@ experiment:
 training:
   policy_type: mi_dqn_zx
   snr_db: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
-  episodes_per_snr: 66667
+  episodes_per_snr: 2500
 
 hyperparams:
   alpha: 0.0        # Not used for deep training
@@ -20,7 +20,7 @@ hyperparams:
   l_max: 50         # Max iterations
 
 parameters:
-  z: dynamic
+  z: 6
   mi_bins: 21
 
 dqn:
@@ -37,5 +37,5 @@ checkpoint:
 system:
   device: cuda
   seed: 42
-  budget_episodes: 400000
-  budget_description: "400k total episodes (66.7k per SNR)"
+  budget_episodes: 15000
+  budget_description: "15k total episodes (2.5k per SNR)"
