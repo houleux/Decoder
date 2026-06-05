@@ -50,9 +50,10 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         default=None,
         help=(
-            "Subset of: flooding random round_robin reldec deep_reldec_z1 deep_reldec_z2 "
-            "mi_naive_z2 mi_dqn_z2 mi_tabular_z2 deep_reldec_zx mi_naive_zx mi_dqn_zx mi_tabular_zx "
-            "augmented_max_avg_zx augmented_max_zx augmented_average_zx"
+            "Subset of: flooding random round_robin reldec deep_reldec_z1 "
+            "mi_tabular_zx deep_reldec_zx mi_naive_zx mi_dqn_zx mi_tabular_zx "
+            "augmented_max_avg_zx augmented_max_zx augmented_average_zx "
+            "tabular_augmented_max_avg_zx tabular_augmented_max_zx tabular_augmented_average_zx"
         ),
     )
     parser.add_argument("--z", type=int, default=None, help="Cluster size for _zx methods")
@@ -64,6 +65,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-frames", type=int, default=200000)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--random-codewords", action="store_true")
+    parser.add_argument("--tabular-augmented-q-table", type=str, default=None)
     parser.add_argument("--output-csv", type=str, default=None)
     parser.add_argument("--output-json", type=str, default=None)
     
@@ -93,10 +95,10 @@ def _normalize_methods(args: argparse.Namespace) -> list[str]:
         methods = ["flooding", "random", "round_robin"]
         if args.q_table:
             methods.append("reldec")
-        if args.deep_checkpoint:
-            methods.append("deep_reldec_z2")
         if args.mi_tabular_q_table:
-            methods.append("mi_tabular_z2")
+            methods.append("mi_tabular_zx")
+        if args.tabular_augmented_q_table:
+            methods.append("tabular_augmented_max_avg_zx")
         return methods
 
     methods = [m.lower() for m in args.methods]
@@ -135,6 +137,9 @@ def _main() -> None:
         raise ValueError("--q-table is required when evaluating RELDEC tabular method")
     if methods_requiring_mi_tabular_q_table(methods) and not args.mi_tabular_q_table:
         raise ValueError("--mi-tabular-q-table is required when evaluating MI tabular methods")
+    from RELDEC.registry import methods_requiring_tabular_augmented_q_table
+    if methods_requiring_tabular_augmented_q_table(methods) and not args.tabular_augmented_q_table:
+        raise ValueError("--tabular-augmented-q-table is required when evaluating tabular augmented methods")
     if methods_requiring_deep_checkpoint(methods) and not args.deep_checkpoint:
         raise ValueError("--deep-checkpoint is required when evaluating deep learning methods")
     
@@ -152,6 +157,7 @@ def _main() -> None:
         h_csr=h,
         q_table_path=args.q_table,
         mi_tabular_q_table_path=args.mi_tabular_q_table,
+        tabular_augmented_q_table_path=args.tabular_augmented_q_table,
         deep_checkpoint_path=args.deep_checkpoint,
         mi_bins=int(args.mi_bins),
         args_z=args.z,

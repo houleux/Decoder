@@ -65,32 +65,31 @@ METHOD_CATALOG: tuple[MethodSpec, ...] = (
     MethodSpec(name="round_robin", family="baseline"),
     MethodSpec(name="reldec", family="tabular"),
     MethodSpec(name="deep_reldec_z1", family="deep", parameters={"z": 1}),
-    MethodSpec(name="deep_reldec_z2", family="deep", parameters={"z": 2}),
     MethodSpec(name="deep_reldec_zx", family="deep", parameters={"z": "dynamic"}),
-    MethodSpec(name="mi_naive_z2", family="mi_naive", parameters={"z": 2}),
     MethodSpec(name="mi_naive_zx", family="mi_naive", parameters={"z": "dynamic"}),
-    MethodSpec(name="mi_dqn_z2", family="mi_dqn", parameters={"z": 2}),
     MethodSpec(name="mi_dqn_zx", family="mi_dqn", parameters={"z": "dynamic"}),
-    MethodSpec(name="mi_tabular_z2", family="mi_tabular", parameters={"z": 2}),
     MethodSpec(name="mi_tabular_zx", family="mi_tabular", parameters={"z": "dynamic"}),
     MethodSpec(name="augmented_max_avg_zx", family="augmented", parameters={"z": "dynamic", "mode": "max_avg"}),
     MethodSpec(name="augmented_max_zx", family="augmented", parameters={"z": "dynamic", "mode": "max"}),
     MethodSpec(name="augmented_average_zx", family="augmented", parameters={"z": "dynamic", "mode": "average"}),
+    MethodSpec(name="tabular_augmented_max_avg_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "max_avg"}),
+    MethodSpec(name="tabular_augmented_max_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "max"}),
+    MethodSpec(name="tabular_augmented_average_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "average"}),
 )
 
 
 TRAINING_POLICY_CATALOG: tuple[MethodSpec, ...] = (
     MethodSpec(name="tabular", family="tabular"),
-    MethodSpec(name="mi_tabular_z2", family="mi_tabular", parameters={"z": 2}),
     MethodSpec(name="deep_z1", family="deep", parameters={"z": 1}),
-    MethodSpec(name="deep_z2", family="deep", parameters={"z": 2}),
-    MethodSpec(name="mi_dqn_z2", family="mi_dqn", parameters={"z": 2}),
     MethodSpec(name="mi_tabular_zx", family="mi_tabular", parameters={"z": "dynamic"}),
     MethodSpec(name="deep_zx", family="deep", parameters={"z": "dynamic"}),
     MethodSpec(name="mi_dqn_zx", family="mi_dqn", parameters={"z": "dynamic"}),
     MethodSpec(name="augmented_max_avg_zx", family="augmented", parameters={"z": "dynamic", "mode": "max_avg"}),
     MethodSpec(name="augmented_max_zx", family="augmented", parameters={"z": "dynamic", "mode": "max"}),
     MethodSpec(name="augmented_average_zx", family="augmented", parameters={"z": "dynamic", "mode": "average"}),
+    MethodSpec(name="tabular_augmented_max_avg_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "max_avg"}),
+    MethodSpec(name="tabular_augmented_max_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "max"}),
+    MethodSpec(name="tabular_augmented_average_zx", family="tabular_augmented", parameters={"z": "dynamic", "mode": "average"}),
 )
 
 
@@ -127,17 +126,24 @@ def methods_requiring_q_table(methods: list[str]) -> list[str]:
 
 def methods_requiring_mi_tabular_q_table(methods: list[str]) -> list[str]:
     """Return methods that require an MI tabular Q-table checkpoint."""
-    mi_tabular_methods = {"mi_tabular_z2", "mi_tabular_zx"}
+    mi_tabular_methods = {"mi_tabular_zx"}
     return [m for m in methods if m in mi_tabular_methods]
 
+
+def methods_requiring_tabular_augmented_q_table(methods: list[str]) -> list[str]:
+    """Return methods that require a tabular augmented Q-table checkpoint."""
+    tabular_augmented_methods = {
+        "tabular_augmented_max_avg_zx",
+        "tabular_augmented_max_zx",
+        "tabular_augmented_average_zx",
+    }
+    return [m for m in methods if m in tabular_augmented_methods]
 
 def methods_requiring_deep_checkpoint(methods: list[str]) -> list[str]:
     """Return methods that require a deep learning checkpoint."""
     deep_methods = {
         "deep_reldec_z1",
-        "deep_reldec_z2",
         "deep_reldec_zx",
-        "mi_dqn_z2",
         "mi_dqn_zx",
         "augmented_max_avg_zx",
         "augmented_max_zx",

@@ -20,6 +20,7 @@ from RELDEC.trainer_factory import TrainerFactory
 from RELDEC.algorithms.reldec_core import (
     THIS_DIR,
     ReldecHyperParams,
+    ReldecTrainer,
     TrainProgress,
     TrainingCheckpoint,
     TrainingConfig,
@@ -169,7 +170,7 @@ def _main() -> None:
 
     run_store = RunStore(THIS_DIR / "runs")
 
-    if args.resume and args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+    if args.resume and (args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_")):
         resume_path = Path(args.resume)
         checkpoint = load_training_checkpoint(resume_path)
         _validate_checkpoint_config(checkpoint.config, args)
@@ -182,23 +183,20 @@ def _main() -> None:
         if args.policy_type == "tabular":
             trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
         else:
-            trainer = MiTabularQTrainer(
+            trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
-                alpha=config.hyperparams.alpha,
-                beta=config.hyperparams.beta,
-                epsilon=config.hyperparams.epsilon,
-                l_max=config.hyperparams.l_max,
-                cluster_size=cluster_size,
+                config=config,
+                policy_type=args.policy_type,
                 mi_bins=int(args.mi_bins),
-                q_table=checkpoint.q_table,
             )
+            trainer.q_table = checkpoint.q_table
 
         rng = np.random.default_rng()
         rng.bit_generator.state = checkpoint.rng_state
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
         config = _build_config_from_args(args)
         config = TrainingConfig(
             code=config.code,
@@ -212,7 +210,7 @@ def _main() -> None:
         )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         
-        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
             trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
                 config=config,
@@ -357,16 +355,19 @@ def _main() -> None:
             rng = np.random.default_rng()
             rng.bit_generator.state = checkpoint.rng_state
 
+    full_snr_schedule_db = snr_schedule_db
+    active_snr_schedule_db = snr_schedule_db
     if args.max_episodes is not None:
-        max_episodes = min(int(args.max_episodes), int(snr_schedule_db.size))
-        snr_schedule_db = snr_schedule_db[:max_episodes]
+        max_episodes = min(int(args.max_episodes), int(full_snr_schedule_db.size))
+        active_snr_schedule_db = full_snr_schedule_db[:max_episodes]
 
-    total_episodes = int(snr_schedule_db.size)
+    planned_total_episodes = int(full_snr_schedule_db.size)
+    total_episodes = int(active_snr_schedule_db.size)
     start_episode = int(progress.episodes_completed)
 
-    if start_episode > total_episodes:
+    if start_episode > planned_total_episodes:
         raise ValueError(
-            f"Checkpoint episodes_completed={start_episode} exceeds total episodes={total_episodes}"
+            f"Checkpoint episodes_completed={start_episode} exceeds total episodes={planned_total_episodes}"
         )
 
     print(f"[train] run_id={run_id} auto_resume={auto_resume}")
@@ -391,7 +392,7 @@ def _main() -> None:
             config=config,
             progress=prog,
             rng_state=rng.bit_generator.state,
-            snr_schedule_db=snr_schedule_db,
+            snr_schedule_db=full_snr_schedule_db,
         )
 
         save_training_checkpoint(latest_path, payload)
@@ -412,7 +413,7 @@ def _main() -> None:
             dqn_config=deep_trainer.dqn_config,
             progress=prog,
             rng_state=rng.bit_generator.state,
-            snr_schedule_db=snr_schedule_db,
+            snr_schedule_db=full_snr_schedule_db,
             global_step=deep_trainer.global_step,
             q_online_bytes=q_online,
             q_target_bytes=q_target,
@@ -425,14 +426,14 @@ def _main() -> None:
             save_deep_training_checkpoint(hist_path, payload)
         print(f"[checkpoint] saved deep checkpoint at episode {ep_done}")
 
-    if start_episode >= total_episodes:
+    if start_episode >= planned_total_episodes:
         print("[train] run already complete; reusing existing results")
         return
 
     if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         progress = train_reldec(
             trainer=trainer,
-            snr_schedule_db=snr_schedule_db,
+            snr_schedule_db=active_snr_schedule_db,
             code_rate=config.code_rate,
             rng=rng,
             start_episode=start_episode,
@@ -470,7 +471,7 @@ def _main() -> None:
             config=config,
             progress=progress,
             rng_state=rng.bit_generator.state,
-            snr_schedule_db=snr_schedule_db,
+            snr_schedule_db=full_snr_schedule_db,
         )
         save_training_checkpoint(final_path, final_checkpoint)
         save_training_checkpoint(latest_path, final_checkpoint)
@@ -482,7 +483,7 @@ def _main() -> None:
             dqn_config=deep_trainer.dqn_config,
             progress=progress,
             rng_state=rng.bit_generator.state,
-            snr_schedule_db=snr_schedule_db,
+            snr_schedule_db=full_snr_schedule_db,
             global_step=deep_trainer.global_step,
             q_online_bytes=q_online,
             q_target_bytes=q_target,

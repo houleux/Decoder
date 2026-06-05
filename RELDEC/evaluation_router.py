@@ -26,7 +26,7 @@ def evaluate_method_with_dispatcher(
     
     Args:
         dispatcher: MethodDispatcher instance
-        method: Method name (e.g., "reldec", "deep_reldec_z1", "mi_naive_z2")
+        method: Method name (e.g., "reldec", "deep_reldec_z1", "mi_naive_zx")
         suite: Optional ReldecDecoderSuite for "reldec" and baseline methods
         Other args: Standard evaluation parameters
         
@@ -50,7 +50,7 @@ def evaluate_method_with_dispatcher(
             all_zero_only=bool(all_zero_only),
         )
     
-    elif method in {"deep_reldec_z1", "deep_reldec_z2", "mi_dqn_z2", "deep_reldec_zx", "mi_dqn_zx",
+    elif method in {"deep_reldec_z1", "deep_reldec_zx", "mi_dqn_zx",
                     "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"}:
         # These are deep decoders
         decoder = dispatcher.get_decoder(method)
@@ -66,8 +66,8 @@ def evaluate_method_with_dispatcher(
             method_name=method,
         )
     
-    elif method in {"mi_tabular_z2", "mi_tabular_zx"}:
-        # MI tabular decoders
+    elif method in {"mi_tabular_zx", "tabular_augmented_max_avg_zx", "tabular_augmented_max_zx", "tabular_augmented_average_zx"}:
+        # Tabular binned methods (MI or Augmented)
         decoder = dispatcher.get_decoder(method)
         return evaluate_mi_tabular_method(
             decoder=decoder,
@@ -81,7 +81,7 @@ def evaluate_method_with_dispatcher(
             method_name=method,
         )
     
-    elif method in {"mi_naive_z2", "mi_naive_zx"}:
+    elif method in {"mi_naive_zx"}:
         # MI naive decoders
         decoder = dispatcher.get_decoder(method)
         if not isinstance(decoder, MiReldecBaselineDecoder):
