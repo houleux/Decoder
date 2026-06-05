@@ -440,9 +440,95 @@ class DeepReldecTrainer(Trainer):
 		self.optimizer.step()
 
 		if self.global_step % max(cfg.target_sync_steps, 1) == 0:
-			self.target_net.load_state_dict(self.policy_net.state_dict())
+			self.target_net.load_state_dict(self.online_net.state_dict())
 
 		return float(loss.detach().cpu().item())
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+		"""Run a single training episode using the current DQN trainer.
+
+		Returns a tuple of (episode_reward, episode_loss).
+		"""
+		# Initialize decoder state from provided channel LLRs
+		self.decoder.reset()
+		# Some decoder implementations expect an explicit initialise call
+		try:
+			self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			# Fallback: decoder.reset may be sufficient for some decoders
+			pass
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+
+		# Build initial state cache depending on MI vs raw state
+		if self.use_mi_state:
+			state_cache = self._cluster_mi_state(llr_post)
+			mi = state_cache.copy()
+		else:
+			state_cache = np.zeros((self.num_actions, self.state_dim), dtype=np.float32)
+			for a in range(self.num_actions):
+				state_cache[a] = _state_vector(llr_post, self.map.cluster_neighbors[a], self.state_dim)
+
+		episode_reward = 0.0
+		episode_loss = 0.0
+
+		for _ in range(self.l_max):
+			action = self._choose_action(state_cache, rng=rng, training=True)
+
+			if self.use_mi_state:
+				prev_state = state_cache.copy()
+				prev_mi = float(mi[action])
+			else:
+				prev_state = state_cache[action].copy()
+
+			# Apply action by decoding the selected cluster
+			llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+
+			if self.use_mi_state:
+				mi = self._cluster_mi_state(llr_post)
+				reward = float(mi[action] - prev_mi)
+				next_state = mi.copy()
+			else:
+				neighbors = self.map.cluster_neighbors[action]
+				if neighbors.size == 0:
+					reward = 1.0
+				else:
+					reward = float(np.mean(llr_post[neighbors] >= 0.0))
+				# recompute full state cache for continuous features
+				next_state = np.zeros((self.num_actions, self.state_dim), dtype=np.float32)
+				for a in range(self.num_actions):
+					next_state[a] = _state_vector(llr_post, self.map.cluster_neighbors[a], self.state_dim)
+
+			# Store transition in replay buffer
+			if self.use_mi_state:
+				self.replay.add(prev_state.astype(np.float32), action, reward, next_state.astype(np.float32), False)
+				state_cache = next_state
+			else:
+				self.replay.add(prev_state.astype(np.float32), action, reward, next_state[action].astype(np.float32), False)
+				state_cache = next_state
+
+			episode_reward += reward
+			self.global_step += 1
+			episode_loss += self._train_step(rng)
+
+			if syndrome_is_zero(self.h, _hard_decision(llr_post)):
+				break
+
+		return episode_reward, episode_loss
+
+	def export_checkpoint_payload(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+		"""Export network and optimizer state as byte arrays suitable for checkpointing."""
+		q_online = _torch_bytes(self.online_net.state_dict())
+		q_target = _torch_bytes(self.target_net.state_dict())
+		optimizer_bytes = _torch_bytes(self.optimizer.state_dict())
+		return q_online, q_target, optimizer_bytes
+
+	def import_checkpoint_payload(self, q_online_bytes: np.ndarray, q_target_bytes: np.ndarray, optimizer_bytes: np.ndarray, global_step: int) -> None:
+		"""Load network and optimizer state from exported byte-arrays and set global step."""
+		self.online_net.load_state_dict(_torch_from_bytes(q_online_bytes, map_location=str(self.device)))
+		self.target_net.load_state_dict(_torch_from_bytes(q_target_bytes, map_location=str(self.device)))
+		self.optimizer.load_state_dict(_torch_from_bytes(optimizer_bytes, map_location=str(self.device)))
+		self.global_step = int(global_step)
 
 	# Required method from Trainer ABC
 	def train(self, run_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -508,7 +594,7 @@ class DeepReldecTrainer(Trainer):
 					steps += 1
 					self.step_count += 1
 					if self.step_count % self.target_update_every == 0:
-						self.target_net.load_state_dict(self.policy_net.state_dict())
+						self.target_net.load_state_dict(self.online_net.state_dict())
 
 					if done_flag or steps > run_config.get("max_steps_per_episode", 1000):
 						done = True
@@ -536,7 +622,7 @@ class DeepReldecTrainer(Trainer):
 		})
 		payload = {
 			"meta": meta,
-			"policy_state": self.policy_net.state_dict() if self.policy_net is not None else None,
+			"online_state": self.online_net.state_dict() if self.online_net is not None else None,
 			"target_state": self.target_net.state_dict() if self.target_net is not None else None,
 			"optimizer_state": self.optimizer.state_dict() if self.optimizer is not None else None,
 		}
@@ -577,7 +663,8 @@ class DeepReldecDecoder:
 		self.map = build_cn_clusters(self.h, dqn_config.cluster_size)
 		self.num_actions = len(self.map.clusters)
 		self.cluster_degrees = np.array([len(v) for v in self.map.cluster_neighbors], dtype=np.int32)
-		self.state_dim = int(max(self.cluster_degrees.max(initial=1), 1))
+		self.use_mi_state = str(dqn_config.policy_label).startswith("mi_")
+		self.state_dim = self.num_actions if self.use_mi_state else int(max(self.cluster_degrees.max(initial=1), 1))
 		self.device = torch.device(device)
 
 		self.net = QNetwork(self.state_dim, self.num_actions, dqn_config.hidden_dim).to(self.device)
@@ -597,6 +684,8 @@ class DeepReldecDecoder:
 		)
 
 	def _state_for_action(self, llr_post: np.ndarray, action: int) -> np.ndarray:
+		if self.use_mi_state:
+			return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
 		return _state_vector(llr_post, self.map.cluster_neighbors[action], self.state_dim)
 
 	def _choose_greedy(self, llr_post: np.ndarray, valid_actions: np.ndarray, rng: np.random.Generator) -> int:
@@ -990,11 +1079,25 @@ def load_deep_decoder_from_checkpoint(
 	device: str = "cpu",
 ) -> DeepReldecDecoder:
 	checkpoint = load_deep_training_checkpoint(checkpoint_path)
-	if checkpoint.dqn_config.policy_label != expected_policy_label:
-		raise ValueError(
-			f"Checkpoint policy label '{checkpoint.dqn_config.policy_label}' does not match "
-			f"expected '{expected_policy_label}'"
-		)
+	loaded_label = str(checkpoint.dqn_config.policy_label)
+	expected_label = str(expected_policy_label)
+	if loaded_label != expected_label:
+		loaded_family, _, loaded_suffix = loaded_label.rpartition("_")
+		expected_family, _, expected_suffix = expected_label.rpartition("_")
+		compatible = False
+		if loaded_family == expected_family:
+			loaded_z = checkpoint.dqn_config.cluster_size if loaded_suffix == "zx" else None
+			expected_z = checkpoint.dqn_config.cluster_size if expected_suffix == "zx" else None
+			if loaded_suffix.startswith("z") and loaded_suffix[1:].isdigit():
+				loaded_z = int(loaded_suffix[1:])
+			if expected_suffix.startswith("z") and expected_suffix[1:].isdigit():
+				expected_z = int(expected_suffix[1:])
+			compatible = loaded_z == expected_z == int(checkpoint.dqn_config.cluster_size)
+		if not compatible:
+			raise ValueError(
+				f"Checkpoint policy label '{loaded_label}' does not match expected '{expected_label}' "
+				f"and is not cluster-size compatible"
+			)
 
 	h = load_parity_check_from_sparse_csv(matrix_csv)
 	return DeepReldecDecoder(
