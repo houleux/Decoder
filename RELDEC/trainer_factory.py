@@ -10,10 +10,11 @@ import scipy.sparse as sp
 from RELDEC.algorithms.reldec_core import ReldecTrainer, TrainingConfig
 from RELDEC.algorithms.reldec_deep import (
     DeepReldecTrainer,
-    AugmentedDeepReldecTrainer,
     DeepTrainingCheckpoint,
     MiTabularQTrainer,
 )
+from RELDEC.algorithms.reldec_augmented import AugmentedDeepReldecTrainer
+from RELDEC.algorithms.reldec_tabular_augmented import TabularAugmentedQTrainer
 from RELDEC.registry import training_policy_spec
 
 
@@ -26,8 +27,8 @@ class TrainerFactory:
         config: TrainingConfig,
         policy_type: str,
         mi_bins: int = 21,
-    ) -> ReldecTrainer | MiTabularQTrainer:
-        """Create a tabular trainer (ReldecTrainer or MiTabularQTrainer).
+    ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer:
+        """Create a tabular trainer (ReldecTrainer, MiTabularQTrainer, or TabularAugmentedQTrainer).
         
         Args:
             h_csr: Parity check matrix
@@ -50,6 +51,19 @@ class TrainerFactory:
                 beta=config.hyperparams.beta,
                 epsilon=config.hyperparams.epsilon,
                 l_max=config.hyperparams.l_max,
+                cluster_size=cluster_size,
+                mi_bins=int(mi_bins),
+            )
+        elif policy_type.startswith("tabular_augmented_"):
+            spec = training_policy_spec(policy_type)
+            cluster_size = int(spec.parameters.get("z", 2))
+            return TabularAugmentedQTrainer(
+                h_csr=h_csr,
+                alpha=config.hyperparams.alpha,
+                beta=config.hyperparams.beta,
+                epsilon=config.hyperparams.epsilon,
+                l_max=config.hyperparams.l_max,
+                policy_label=policy_type,
                 cluster_size=cluster_size,
                 mi_bins=int(mi_bins),
             )

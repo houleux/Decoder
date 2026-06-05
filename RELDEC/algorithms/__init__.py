@@ -40,6 +40,7 @@ from .reldec_deep import (
     save_deep_training_checkpoint,
 )
 from .reldec_global_mdp import FullStateBinaryTabularTrainer
+from .reldec_tabular_augmented import TabularAugmentedQTrainer, TabularAugmentedQDecoder
 
 __all__ = [
     "AugmentedDeepReldecTrainer",
@@ -58,6 +59,8 @@ __all__ = [
     "ReldecDecoderSuite",
     "ReldecHyperParams",
     "ReldecTrainer",
+    "TabularAugmentedQDecoder",
+    "TabularAugmentedQTrainer",
     "TrainProgress",
     "TrainingCheckpoint",
     "TrainingConfig",

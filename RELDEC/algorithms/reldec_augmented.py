@@ -10,6 +10,8 @@ import numpy as np
 import scipy.sparse as sp
 from typing import Optional
 
+from ldpc.bp_decoder import BpDecoder
+
 from .reldec_deep import (
 	DeepReldecTrainer,
 	DeepReldecDecoder,
@@ -19,7 +21,7 @@ from .reldec_deep import (
 	QNetwork,
 	ReplayBuffer,
 )
-from .reldec_core import _hard_decision, syndrome_is_zero
+from .reldec_core import _hard_decision, syndrome_is_zero, load_parity_check_from_sparse_csv
 
 try:
 	import torch
