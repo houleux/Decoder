@@ -1,0 +1,50 @@
+benchmark:
+  name: mackay_tabular_variants
+  description: Mackay benchmark for tabular variants (MISQ, Delta).
+
+experiment:
+  code: mackay
+  matrix_csv: null
+
+benchmarking:
+  matrices:
+    - mackay
+  methods:
+    - flooding
+    - reldec
+    - reldec_misq_local
+    - reldec_misq_global
+    - rel_delta
+  train:
+    tabular:
+      episodes_per_snr: 2500
+      max_episodes: null
+      checkpoint_every_episodes: 2500
+      no_history: false
+    deep:
+      episodes_per_snr: 2500
+      max_episodes: null
+      checkpoint_every_episodes: 2500
+      no_history: false
+  evaluation:
+    snr_db: [0.5, 1.0, 1.5, 2.0, 2.5]
+    i_max: 25
+    target_frame_errors: 100
+    max_frames: 100000
+
+parameters:
+  z: 6
+  mi_bins: 21
+
+checkpoints:
+  q_table: null
+  mi_tabular_q_table: null
+  tabular_augmented_q_table: null
+  deep_checkpoint: null
+
+system:
+  seed: 42
+  random_codewords: false
+  cpu_workers: 40
+  gpu_workers: 4
+  device_policy: pinned

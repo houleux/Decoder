@@ -6,6 +6,20 @@ and reward functions so trainers can accept common primitives.
 
 from .state import StateEncoder
 from .action import ActionSpace
-from .reward import RewardFn
+from .reward import (
+    RewardFn,
+    MISQLocalReward,
+    MISQGlobalReward,
+    ReldecDeltaReward,
+    MeanNeighborSignReward,
+)
 
-__all__ = ["StateEncoder", "ActionSpace", "RewardFn"]
+__all__ = [
+    "StateEncoder",
+    "ActionSpace",
+    "RewardFn",
+    "MISQLocalReward",
+    "MISQGlobalReward",
+    "ReldecDeltaReward",
+    "MeanNeighborSignReward",
+]

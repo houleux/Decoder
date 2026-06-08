@@ -16,6 +16,7 @@ from RELDEC.algorithms.reldec_deep import (
 from RELDEC.algorithms.reldec_augmented import AugmentedDeepReldecTrainer
 from RELDEC.algorithms.reldec_tabular_augmented import TabularAugmentedQTrainer
 from RELDEC.registry import training_policy_spec
+from RELDEC.mdp import MISQLocalReward, MISQGlobalReward, ReldecDeltaReward, MeanNeighborSignReward
 
 
 class TrainerFactory:
@@ -39,8 +40,22 @@ class TrainerFactory:
         Returns:
             Initialized tabular trainer
         """
-        if policy_type == "tabular":
-            return ReldecTrainer(h_csr, config.hyperparams)
+        if policy_type == "tabular" or policy_type in {"reldec_misq_local", "reldec_misq_global", "rel_delta"}:
+            spec = training_policy_spec(policy_type)
+            reward_type = spec.parameters.get("reward")
+            
+            if reward_type == "mean_neighbor_sign":
+                reward_fn = MeanNeighborSignReward()
+            elif reward_type == "misq_local":
+                reward_fn = MISQLocalReward()
+            elif reward_type == "misq_global":
+                reward_fn = MISQGlobalReward()
+            elif reward_type == "reldec_delta":
+                reward_fn = ReldecDeltaReward()
+            else:
+                raise ValueError(f"Unknown or missing reward type '{reward_type}' for tabular trainer")
+                
+            return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn)
         elif policy_type.startswith("mi_tabular"):
             # Extract cluster size from policy spec
             spec = training_policy_spec(policy_type)
