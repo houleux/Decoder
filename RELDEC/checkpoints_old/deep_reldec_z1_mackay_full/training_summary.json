@@ -1,0 +1,87 @@
+{
+  "run_id": "train_dc029e46bc56",
+  "config_hash": "dc029e46bc562ee6e2da549d807d435ce8b9ac60d15c913374d5f6cfe19850f8",
+  "run_identity": {
+    "kind": "training",
+    "policy_type": "deep_z1",
+    "training_config": {
+      "code": "mackay",
+      "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+      "train_snr_db": [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        2.5
+      ],
+      "episodes_per_snr": 2500,
+      "code_rate": 0.5,
+      "seed": 42,
+      "hyperparams": {
+        "alpha": 0.1,
+        "beta": 0.9,
+        "epsilon": 0.6,
+        "l_max": 50
+      },
+      "cluster_size": 1
+    },
+    "cluster_size": 1,
+    "mi_bins": 21,
+    "device": "cuda",
+    "deep_config": {
+      "policy_label": "deep_z1",
+      "cluster_size": 1,
+      "hidden_dim": 128,
+      "learning_rate": 0.001,
+      "replay_capacity": 20000,
+      "replay_warmup": 1000,
+      "batch_size": 128,
+      "target_sync_steps": 200,
+      "train_every_steps": 1,
+      "epsilon_start": 0.6,
+      "epsilon_end": 0.05,
+      "epsilon_decay_steps": 10000,
+      "gamma": 0.9
+    }
+  },
+  "config": {
+    "code": "mackay",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "episodes_per_snr": 2500,
+    "code_rate": 0.5,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 1
+  },
+  "h_shape": [
+    48,
+    96
+  ],
+  "h_nnz": 288,
+  "policy_type": "deep_z1",
+  "progress": {
+    "episodes_completed": 12500,
+    "total_updates": 625000,
+    "mean_reward": 0.7516992000000005,
+    "elapsed_sec": 0.0
+  },
+  "artifacts": {
+    "checkpoint_latest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/deep_reldec_z1_mackay_full/checkpoint_latest.npz",
+    "checkpoint_final": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/deep_reldec_z1_mackay_full/checkpoint_final.npz",
+    "run_manifest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/deep_reldec_z1_mackay_full/run_manifest.json",
+    "config_hash": "dc029e46bc562ee6e2da549d807d435ce8b9ac60d15c913374d5f6cfe19850f8",
+    "dqn_checkpoint": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/deep_reldec_z1_mackay_full/dqn_final.npz"
+  }
+}

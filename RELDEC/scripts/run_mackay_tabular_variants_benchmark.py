@@ -59,6 +59,10 @@ TRAINING_METHODS = {
 
 
 def policy_for_method(method: str) -> str:
+    if method == "reldec":
+        return "tabular"
+    if method == "deep_reldec_zx":
+        return "deep_zx"
     return method
 
 
