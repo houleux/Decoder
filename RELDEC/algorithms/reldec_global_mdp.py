@@ -11,7 +11,7 @@ import numpy as np
 import scipy.sparse as sp
 from typing import Any, Optional
 
-from interfaces import Trainer
+from RELDEC.interfaces.trainer import Trainer
 
 from ldpc.bp_decoder import BpDecoder
 

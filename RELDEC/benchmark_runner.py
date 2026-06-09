@@ -114,21 +114,13 @@ class BenchmarkSuite:
             requires_training=False,
             device="cpu",
         ),
-        # Tabular methods (100k budget)
+        # Tabular methods (15k budget = 2.5k per SNR x 6 SNR points)
         "reldec": BenchmarkMethod(
             name="reldec",
             family="tabular",
             config_file="tabular_reldec.yaml",
             requires_training=True,
-            budget_episodes=100000,
-            device="cpu",
-        ),
-        "mi_tabular_z2": BenchmarkMethod(
-            name="mi_tabular_z2",
-            family="mi_tabular",
-            config_file="tabular_mi_z2.yaml",
-            requires_training=True,
-            budget_episodes=100000,
+            budget_episodes=15000,
             device="cpu",
         ),
         "mi_tabular_zx": BenchmarkMethod(
@@ -136,40 +128,16 @@ class BenchmarkSuite:
             family="mi_tabular",
             config_file="tabular_mi_zx.yaml",
             requires_training=True,
-            budget_episodes=100000,
+            budget_episodes=15000,
             device="cpu",
         ),
-        # Deep methods (400k budget)
-        "deep_reldec_z1": BenchmarkMethod(
-            name="deep_reldec_z1",
-            family="deep",
-            config_file="deep_reldec_z1.yaml",
-            requires_training=True,
-            budget_episodes=400000,
-            device="cuda",
-        ),
-        "deep_reldec_z2": BenchmarkMethod(
-            name="deep_reldec_z2",
-            family="deep",
-            config_file="deep_reldec_z2.yaml",
-            requires_training=True,
-            budget_episodes=400000,
-            device="cuda",
-        ),
+        # Deep methods (15k budget = 2.5k per SNR x 6 SNR points)
         "deep_reldec_zx": BenchmarkMethod(
             name="deep_reldec_zx",
             family="deep",
             config_file="deep_reldec_zx.yaml",
             requires_training=True,
-            budget_episodes=400000,
-            device="cuda",
-        ),
-        "mi_dqn_z2": BenchmarkMethod(
-            name="mi_dqn_z2",
-            family="mi_dqn",
-            config_file="mi_dqn_z2.yaml",
-            requires_training=True,
-            budget_episodes=400000,
+            budget_episodes=15000,
             device="cuda",
         ),
         "mi_dqn_zx": BenchmarkMethod(
@@ -177,7 +145,7 @@ class BenchmarkSuite:
             family="mi_dqn",
             config_file="mi_dqn_zx.yaml",
             requires_training=True,
-            budget_episodes=400000,
+            budget_episodes=15000,
             device="cuda",
         ),
         "augmented_max_avg_zx": BenchmarkMethod(
@@ -185,7 +153,7 @@ class BenchmarkSuite:
             family="augmented",
             config_file="augmented_max_avg_zx.yaml",
             requires_training=True,
-            budget_episodes=400000,
+            budget_episodes=15000,
             device="cuda",
         ),
         "augmented_max_zx": BenchmarkMethod(
@@ -193,7 +161,7 @@ class BenchmarkSuite:
             family="augmented",
             config_file="augmented_max_zx.yaml",
             requires_training=True,
-            budget_episodes=400000,
+            budget_episodes=15000,
             device="cuda",
         ),
         "augmented_average_zx": BenchmarkMethod(
@@ -201,7 +169,7 @@ class BenchmarkSuite:
             family="augmented",
             config_file="augmented_average_zx.yaml",
             requires_training=True,
-            budget_episodes=400000,
+            budget_episodes=15000,
             device="cuda",
         ),
     }

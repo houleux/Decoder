@@ -16,7 +16,8 @@ import numpy as np
 import scipy.sparse as sp
 
 from ldpc.bp_decoder import BpDecoder
-from interfaces import Trainer
+from RELDEC.interfaces.trainer import Trainer
+from RELDEC.interfaces.reward import RewardFn
 
 
 THIS_DIR = Path(__file__).resolve().parent
@@ -335,14 +336,18 @@ class ReldecTrainer(Trainer):
 		self,
 		h_csr: sp.csr_matrix,
 		hyperparams: ReldecHyperParams,
+		reward_fn: RewardFn,
 		q_table: Optional[np.ndarray] = None,
 		cluster_size: int = 1,
 	):
+		if reward_fn is None:
+			raise ValueError("reward_fn must be provided to ReldecTrainer.")
 		if cluster_size != 1:
 			raise ValueError("Only z=1 (single-CN clusters) is supported in RELDEC core.")
 
 		self.h = h_csr.tocsr().astype(np.uint8)
 		self.hyperparams = hyperparams
+		self.reward_fn = reward_fn
 		self.cluster_size = cluster_size
 		self.m, self.n = self.h.shape
 
@@ -402,14 +407,17 @@ class ReldecTrainer(Trainer):
 			action = self._select_action_train(states, rng)
 			prev_state = int(states[action])
 
+			llr_post_before = llr_post.copy()
+
 			llr_post = self.decoder.decode_cluster(self._singleton_actions[action])
 			neighbors = self.check_neighbors[action]
 
 			new_state = _state_from_llr_subset(llr_post, neighbors)
-			if neighbors.size == 0:
-				reward = 1.0
-			else:
-				reward = float(np.mean(llr_post[neighbors] >= 0.0))
+			
+			before_dict = {"llr": llr_post_before}
+			after_dict = {"llr_post": llr_post}
+			info_dict = {"neighbors": neighbors}
+			reward = self.reward_fn.compute(before_dict, after_dict, info_dict)
 
 			old_q = self.q_table[prev_state, action]
 			next_best_q = float(np.max(self.q_table[new_state, :]))
@@ -660,7 +668,15 @@ def evaluate_single_method(
 	all_zero_only: bool = True,
 ) -> MethodStats:
 	method = method.lower()
-	valid_methods = {"flooding", "random", "round_robin", "reldec"}
+	valid_methods = {
+		"flooding",
+		"random",
+		"round_robin",
+		"reldec",
+		"reldec_misq_local",
+		"reldec_misq_global",
+		"rel_delta",
+	}
 	if method not in valid_methods:
 		supported = ", ".join(sorted(valid_methods))
 		raise ValueError(f"Unknown method '{method}'. Supported methods: {supported}")
@@ -676,15 +692,15 @@ def evaluate_single_method(
 		llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
 
 		if method == "flooding":
-			decoded = suite.decode_flooding(llr, i_max)
+			res = suite.decode_flooding(llr, i_max)
 		elif method == "random":
-			decoded = suite.decode_random_sequential(llr, i_max, rng)
+			res = suite.decode_random_sequential(llr, i_max, rng)
 		elif method == "round_robin":
-			decoded = suite.decode_round_robin(llr, i_max)
+			res = suite.decode_round_robin(llr, i_max)
 		else:
-			decoded = suite.decode_reldec(llr, i_max, rng)
+			# It's one of the reldec variants
+			res = suite.decode_reldec(llr, i_max, rng)
 
-		stats.update(tx_bits, decoded)
+		stats.update(tx_bits, res)
 
 	return stats
-
