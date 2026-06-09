@@ -1,0 +1,44 @@
+benchmark:
+  name: benchmark_smoke
+  description: Minimal benchmark plan for fast validation before running the full suite.
+
+experiment:
+  code: mackay
+  matrix_csv: null
+
+benchmarking:
+  matrices:
+    - mackay
+  methods:
+    - flooding
+    - round_robin
+    - reldec
+    - deep_reldec_zx
+    - mi_tabular_zx
+    - augmented_average_zx
+  train:
+    episodes_per_snr: 120
+    max_episodes: 120
+    checkpoint_every_episodes: 20
+    no_history: true
+  evaluation:
+    snr_db: [0.5, 1.0, 1.5]
+    i_max: 20
+    target_frame_errors: 5
+    max_frames: 500
+
+parameters:
+  z: 6
+  mi_bins: 21
+
+checkpoints:
+  q_table: null
+  mi_tabular_q_table: null
+  deep_checkpoint: null
+
+system:
+  seed: 124
+  random_codewords: false
+  cpu_workers: 4
+  gpu_workers: 1
+  device_policy: auto
