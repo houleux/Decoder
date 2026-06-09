@@ -46,6 +46,9 @@ LOG_DIR = ROOT / "logs" / "wran_tabular_variants_benchmark"
 
 TRAINING_METHODS = {
     "reldec",
+    "reldec_misq_local",
+    "reldec_misq_global",
+    "rel_delta",
     "deep_reldec_zx",
     "mi_dqn_zx",
     "mi_tabular_zx",

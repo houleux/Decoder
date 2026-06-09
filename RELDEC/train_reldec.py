@@ -196,7 +196,7 @@ def _main() -> None:
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
+    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx", "reldec_misq_local", "reldec_misq_global", "rel_delta"} or args.policy_type.startswith("tabular_augmented_"):
         config = _build_config_from_args(args)
         config = TrainingConfig(
             code=config.code,
@@ -210,7 +210,7 @@ def _main() -> None:
         )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         
-        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx", "reldec_misq_local", "reldec_misq_global", "rel_delta"} or args.policy_type.startswith("tabular_augmented_"):
             trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
                 config=config,
