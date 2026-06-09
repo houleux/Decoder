@@ -46,9 +46,6 @@ LOG_DIR = ROOT / "logs" / "mackay_tabular_variants_benchmark"
 
 TRAINING_METHODS = {
     "reldec",
-    "reldec_misq_local",
-    "reldec_misq_global",
-    "rel_delta",
     "deep_reldec_zx",
     "mi_dqn_zx",
     "mi_tabular_zx",
@@ -61,9 +58,11 @@ TRAINING_METHODS = {
 def policy_for_method(method: str) -> str:
     if method == "reldec":
         return "tabular"
-    if method == "deep_reldec_zx":
+    if method.startswith("mi_tabular"):
+        return "mi_tabular_zx"
+    if method.endswith("_zx") or method.startswith("deep_") or method.startswith("mi_dqn") or method.startswith("augmented_"):
         return "deep_zx"
-    return method
+    return "tabular"
 
 
 def build_env(cuda_visible: str | None = None) -> Dict[str, str]:

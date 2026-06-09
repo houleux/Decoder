@@ -35,11 +35,6 @@ from RELDEC.algorithms.reldec_core import (
 from RELDEC.registry import supported_training_policy_names, training_policy_spec
 
 
-
-def _is_tabular_policy(policy_type: str) -> bool:
-    return policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx", "reldec_misq_local", "reldec_misq_global", "rel_delta"} or policy_type.startswith("tabular_augmented_")
-
-
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train RELDEC (tabular z=1, Deep RELDEC DQN z=1/z=2, MI-DQN z=2, or MI-tabular z=2)."
@@ -175,7 +170,7 @@ def _main() -> None:
 
     run_store = RunStore(THIS_DIR / "runs")
 
-    if args.resume and (_is_tabular_policy(args.policy_type)):
+    if args.resume and (args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_")):
         resume_path = Path(args.resume)
         checkpoint = load_training_checkpoint(resume_path)
         _validate_checkpoint_config(checkpoint.config, args)
@@ -201,7 +196,7 @@ def _main() -> None:
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif _is_tabular_policy(args.policy_type):
+    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
         config = _build_config_from_args(args)
         config = TrainingConfig(
             code=config.code,
@@ -215,7 +210,7 @@ def _main() -> None:
         )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         
-        if _is_tabular_policy(args.policy_type):
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
             trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
                 config=config,
@@ -300,7 +295,7 @@ def _main() -> None:
         "cluster_size": int(cluster_size),
         "mi_bins": int(args.mi_bins),
         "device": str(args.device),
-        "deep_config": deep_config.to_dict() if not _is_tabular_policy(args.policy_type) else None,
+        "deep_config": deep_config.to_dict() if args.policy_type not in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} else None,
     }
     run_hash = compute_config_hash(run_identity)
     run_id = f"train_{run_hash[:12]}"
@@ -322,19 +317,25 @@ def _main() -> None:
     auto_resume = False
     if args.resume is None and latest_path.exists():
         auto_resume = True
-        if _is_tabular_policy(args.policy_type):
+        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
             checkpoint = load_training_checkpoint(latest_path)
             config = checkpoint.config
             progress = checkpoint.progress
             snr_schedule_db = checkpoint.snr_schedule_db
             h = load_parity_check_from_sparse_csv(config.matrix_csv)
-            trainer = TrainerFactory.create_tabular_trainer(
-                h_csr=h,
-                config=config,
-                policy_type=args.policy_type,
-                mi_bins=int(args.mi_bins),
-            )
-            trainer.q_table = checkpoint.q_table
+            if args.policy_type == "tabular":
+                trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
+            else:
+                trainer = MiTabularQTrainer(
+                    h_csr=h,
+                    alpha=config.hyperparams.alpha,
+                    beta=config.hyperparams.beta,
+                    epsilon=config.hyperparams.epsilon,
+                    l_max=config.hyperparams.l_max,
+                    cluster_size=cluster_size,
+                    mi_bins=int(args.mi_bins),
+                    q_table=checkpoint.q_table,
+                )
             rng = np.random.default_rng()
             rng.bit_generator.state = checkpoint.rng_state
         else:
@@ -429,7 +430,7 @@ def _main() -> None:
         print("[train] run already complete; reusing existing results")
         return
 
-    if _is_tabular_policy(args.policy_type):
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         progress = train_reldec(
             trainer=trainer,
             snr_schedule_db=active_snr_schedule_db,
@@ -464,7 +465,7 @@ def _main() -> None:
                     f"mean_reward={progress.mean_reward():.6f} updates={progress.total_updates}"
                 )
 
-    if _is_tabular_policy(args.policy_type):
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         final_checkpoint = TrainingCheckpoint(
             q_table=trainer.q_table,
             config=config,
@@ -513,7 +514,7 @@ def _main() -> None:
             "config_hash": run_hash,
         },
     }
-    if _is_tabular_policy(args.policy_type):
+    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)

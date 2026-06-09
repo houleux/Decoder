@@ -30,7 +30,7 @@ def main() -> None:
     print(f"Loading matrix: {matrix_csv}")
     h_csr = load_parity_check_from_sparse_csv(matrix_csv)
 
-    hyper = ReldecHyperParams(alpha=0.1, beta=0.9, epsilon=0.6, l_max=5)
+    hyper = ReldecHyperParams(alpha=0.1, beta=0.9, epsilon=0.6, l_max=10)
 
     policies = ["tabular", "reldec_misq_local", "reldec_misq_global", "rel_delta"]
     methods = ["reldec", "reldec_misq_local", "reldec_misq_global", "rel_delta"]
@@ -38,9 +38,9 @@ def main() -> None:
 
     q_tables = {}
 
-    # Quick train
+    # Full train (reduced for <5 min execution)
     train_config = {
-        "snr_schedule_db": np.array([2.0, 2.5] * 20, dtype=np.float64),
+        "snr_schedule_db": np.array([2.0, 2.5] * 250, dtype=np.float64),
         "code_rate": 0.5,
         "seed": 42,
     }
@@ -51,7 +51,7 @@ def main() -> None:
             code="mackay",
             matrix_csv=matrix_csv,
             train_snr_db=[2.0, 2.5],
-            episodes_per_snr=20,
+            episodes_per_snr=250,
             code_rate=0.5,
             seed=42,
             hyperparams=hyper,
@@ -61,7 +61,7 @@ def main() -> None:
         q_tables[pol] = trainer.q_table
         print(f"  Mean reward: {progress.mean_reward():.6f}")
 
-    snr_points = [0.5, 1.0, 1.5, 2.0, 2.5]
+    snr_points = [0.5,1.0,1.5,2.0,2.5]
     rng = np.random.default_rng(12345)
 
     results = {m: [] for m in eval_methods}
@@ -83,8 +83,8 @@ def main() -> None:
                 snr_db=snr,
                 code_rate=0.5,
                 i_max=20,
-                target_frame_errors=10,
-                max_frames=50,
+                target_frame_errors=50,
+                max_frames=10000,
                 rng=rng,
                 all_zero_only=True,
             )
@@ -94,7 +94,7 @@ def main() -> None:
 
     # Plot
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-    fig.suptitle("Tabular Variants vs Flooding (MacKay, l_max=5)", fontsize=14, fontweight="bold")
+    fig.suptitle("Tabular Variants vs Flooding (MacKay, l_max=10)", fontsize=14, fontweight="bold")
 
     for m in eval_methods:
         fer = [r.summary(snr)["fer"] for r, snr in zip(results[m], snr_points)]
@@ -117,7 +117,7 @@ def main() -> None:
     axs[2].set_title("Avg Messages")
 
     plt.tight_layout()
-    out_path = Path("smoke_variants_plot.png").resolve()
+    out_path = Path("full_variants_plot.png").resolve()
     plt.savefig(out_path, dpi=150)
     print(f"\nPlot saved to: {out_path}")
 
