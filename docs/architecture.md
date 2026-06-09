@@ -26,10 +26,13 @@ Core package entry points and responsibilities:
 - RELDEC/evaluation_router.py - routes evaluation to the right evaluator.
 - RELDEC/experiments/ - ExperimentSpec/EvaluationSpec + config loaders for YAML/JSON.
 - RELDEC/storage.py - file-first persistence for run manifests.
+- RELDEC/data_catalog.py - SQL-free query layer over manifests and CSV/JSON result files.
 - RELDEC/context_sync.py - generates markdown summaries from registries and run store.
 - RELDEC/train_reldec.py - training CLI entry point.
 - RELDEC/evaluate_reldec.py - evaluation CLI entry point.
 - RELDEC/smoke_run.py - small 2-episode tabular smoke test.
+- RELDEC/jobs/query_results.py - CLI for querying stored runs/results without SQL.
+- RELDEC/jobs/plot_results.py - plotting CLI built on the same file-based catalog.
 
 RELDEC/algorithms/__init__.py re-exports the canonical algorithm surface for convenience.
 
@@ -99,6 +102,7 @@ flowchart TD
 - Manifests: ExperimentSpec/EvaluationSpec captured in JSON (experiments/spec.py).
 - RunStore (storage.py) records manifests and symlinks artifacts under RELDEC/runs/.
 - Run identity: training and evaluation runs use a deterministic run id derived from a config hash (storage.compute_config_hash). This enables reuse of identical configurations and auto-resume to extend a run when episodes are incomplete.
+- Query surface: the catalog scans manifests plus the result CSV/JSON files directly; plots are regenerated from the same rows instead of notebook state or ad hoc exports.
 
 ## Dependencies and runtime assumptions
 
