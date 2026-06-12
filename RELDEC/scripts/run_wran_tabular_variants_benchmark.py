@@ -234,12 +234,13 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
 
 def main() -> int:
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
+    parser = argparse.ArgumentParser(description="Run full tabular WRAN benchmark.")
+    parser.add_argument("--config", type=Path, required=True, help="Path to YAML config file")
     parser.add_argument("--z", type=int, default=None, help="Override z value from config")
+    parser.add_argument("--run-tag", type=str, default=None, help="Reuse an existing run_tag to resume interrupted jobs (e.g. 0613_013444)")
     args = parser.parse_args()
 
-    config_path = Path(args.config)
+    config_path = args.config
     print(f"[main] ROOT={ROOT}", flush=True)
     print(f"[main] config={config_path}", flush=True)
 
@@ -263,8 +264,8 @@ def main() -> int:
     mi_bins = int(cfg.get("parameters", {}).get("mi_bins", 21))
     flooding_only_z1 = bool(benchmarking.get("flooding_only_z1", False))
 
-    # Generate a unique run tag so every invocation gets fresh checkpoints/logs
-    run_tag = datetime.datetime.now().strftime("%m%d_%H%M%S")
+    # Use provided run_tag to resume, else generate a fresh one
+    run_tag = args.run_tag if args.run_tag else datetime.datetime.now().strftime("%m%d_%H%M%S")
     print(f"[main] run_tag={run_tag} z={z_value}", flush=True)
 
     matrix_csv = ROOT / "matrices" / "WRAN_irreg_384_256.csv"
