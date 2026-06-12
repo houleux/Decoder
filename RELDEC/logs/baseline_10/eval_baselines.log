@@ -1,0 +1,27 @@
+[eval] code=mackay matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=10
+[eval] methods=['flooding', 'random', 'round_robin']
+[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
+[eval] stop criteria: target_frame_errors=60 max_frames=3000
+[eval] snr=0.50 dB
+  - flooding    frames=     77 FER=7.792208e-01 BER=9.131494e-02 avg_msgs=2606.96
+  - random      frames=     78 FER=7.692308e-01 BER=1.053686e-01 avg_msgs=2470.15
+  - round_robin frames=     84 FER=7.142857e-01 BER=9.697421e-02 avg_msgs=2379.43
+[eval] snr=1.00 dB
+  - flooding    frames=     81 FER=7.407407e-01 BER=8.577675e-02 avg_msgs=2449.78
+  - random      frames=     96 FER=6.250000e-01 BER=7.269965e-02 avg_msgs=2151.00
+  - round_robin frames=     98 FER=6.122449e-01 BER=6.951531e-02 avg_msgs=2095.35
+[eval] snr=1.50 dB
+  - flooding    frames=    122 FER=4.918033e-01 BER=5.029030e-02 avg_msgs=2060.85
+  - random      frames=    175 FER=3.428571e-01 BER=3.619048e-02 avg_msgs=1667.11
+  - round_robin frames=    140 FER=4.285714e-01 BER=4.754464e-02 avg_msgs=1719.77
+[eval] snr=2.00 dB
+  - flooding    frames=    223 FER=2.690583e-01 BER=3.036248e-02 avg_msgs=1623.39
+  - random      frames=    268 FER=2.238806e-01 BER=2.083333e-02 avg_msgs=1347.58
+  - round_robin frames=    233 FER=2.575107e-01 BER=2.834406e-02 avg_msgs=1353.48
+[eval] snr=2.50 dB
+  - flooding    frames=    338 FER=1.775148e-01 BER=1.599482e-02 avg_msgs=1337.75
+  - random      frames=    418 FER=1.435407e-01 BER=1.472787e-02 avg_msgs=1011.44
+  - round_robin frames=    561 FER=1.069519e-01 BER=1.086230e-02 avg_msgs=922.52
+[done] wrote CSV: results/eval_mackay_baselines_10.csv
+[done] wrote JSON: results/eval_mackay_baselines_10.json

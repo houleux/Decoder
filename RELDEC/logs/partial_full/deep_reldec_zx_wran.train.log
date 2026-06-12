@@ -1,0 +1,218 @@
+/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py:266: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  return torch.load(buffer, map_location=map_location)
+[train] run_id=train_eb2c16661674 auto_resume=True
+[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[train] H shape=(128, 384) nnz=1296 rate=0.666667
+[train] episodes=15000 start=250 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=deep_zx cluster_size=1
+[train] episode=300/15000 mean_reward=0.941149 updates=15000
+[train] episode=400/15000 mean_reward=0.945006 updates=20000
+[checkpoint] saved deep checkpoint at episode 500
+[train] episode=500/15000 mean_reward=0.913925 updates=25000
+[train] episode=600/15000 mean_reward=0.887931 updates=30000
+[train] episode=700/15000 mean_reward=0.866973 updates=35000
+[checkpoint] saved deep checkpoint at episode 750
+[train] episode=800/15000 mean_reward=0.848534 updates=40000
+[train] episode=900/15000 mean_reward=0.835381 updates=45000
+[checkpoint] saved deep checkpoint at episode 1000
+[train] episode=1000/15000 mean_reward=0.826942 updates=50000
+[train] episode=1100/15000 mean_reward=0.816972 updates=55000
+[train] episode=1200/15000 mean_reward=0.812255 updates=60000
+[checkpoint] saved deep checkpoint at episode 1250
+[train] episode=1300/15000 mean_reward=0.809041 updates=65000
+[train] episode=1400/15000 mean_reward=0.805051 updates=70000
+[checkpoint] saved deep checkpoint at episode 1500
+[train] episode=1500/15000 mean_reward=0.802099 updates=75000
+[train] episode=1600/15000 mean_reward=0.800208 updates=80000
+[train] episode=1700/15000 mean_reward=0.797788 updates=85000
+[checkpoint] saved deep checkpoint at episode 1750
+[train] episode=1800/15000 mean_reward=0.796371 updates=90000
+[train] episode=1900/15000 mean_reward=0.793790 updates=95000
+[checkpoint] saved deep checkpoint at episode 2000
+[train] episode=2000/15000 mean_reward=0.792728 updates=100000
+[train] episode=2100/15000 mean_reward=0.791072 updates=105000
+[train] episode=2200/15000 mean_reward=0.789433 updates=110000
+[checkpoint] saved deep checkpoint at episode 2250
+[train] episode=2300/15000 mean_reward=0.788671 updates=115000
+[train] episode=2400/15000 mean_reward=0.788870 updates=120000
+[checkpoint] saved deep checkpoint at episode 2500
+[train] episode=2500/15000 mean_reward=0.786649 updates=125000
+[train] episode=2600/15000 mean_reward=0.786077 updates=130000
+[train] episode=2700/15000 mean_reward=0.786012 updates=135000
+[checkpoint] saved deep checkpoint at episode 2750
+[train] episode=2800/15000 mean_reward=0.785124 updates=140000
+[train] episode=2900/15000 mean_reward=0.785614 updates=145000
+[checkpoint] saved deep checkpoint at episode 3000
+[train] episode=3000/15000 mean_reward=0.784840 updates=150000
+[train] episode=3100/15000 mean_reward=0.783923 updates=155000
+[train] episode=3200/15000 mean_reward=0.783552 updates=160000
+[checkpoint] saved deep checkpoint at episode 3250
+[train] episode=3300/15000 mean_reward=0.783720 updates=165000
+[train] episode=3400/15000 mean_reward=0.783452 updates=170000
+[checkpoint] saved deep checkpoint at episode 3500
+[train] episode=3500/15000 mean_reward=0.783202 updates=175000
+[train] episode=3600/15000 mean_reward=0.782953 updates=180000
+[train] episode=3700/15000 mean_reward=0.782391 updates=185000
+[checkpoint] saved deep checkpoint at episode 3750
+[train] episode=3800/15000 mean_reward=0.782277 updates=190000
+[train] episode=3900/15000 mean_reward=0.782058 updates=195000
+[checkpoint] saved deep checkpoint at episode 4000
+[train] episode=4000/15000 mean_reward=0.781484 updates=200000
+[train] episode=4100/15000 mean_reward=0.781573 updates=205000
+[train] episode=4200/15000 mean_reward=0.781693 updates=210000
+[checkpoint] saved deep checkpoint at episode 4250
+[train] episode=4300/15000 mean_reward=0.781696 updates=215000
+[train] episode=4400/15000 mean_reward=0.780901 updates=220000
+[checkpoint] saved deep checkpoint at episode 4500
+[train] episode=4500/15000 mean_reward=0.780543 updates=225000
+[train] episode=4600/15000 mean_reward=0.780268 updates=230000
+[train] episode=4700/15000 mean_reward=0.779998 updates=235000
+[checkpoint] saved deep checkpoint at episode 4750
+[train] episode=4800/15000 mean_reward=0.779855 updates=240000
+[train] episode=4900/15000 mean_reward=0.779853 updates=245000
+[checkpoint] saved deep checkpoint at episode 5000
+[train] episode=5000/15000 mean_reward=0.779948 updates=250000
+[train] episode=5100/15000 mean_reward=0.780022 updates=255000
+[train] episode=5200/15000 mean_reward=0.779951 updates=260000
+[checkpoint] saved deep checkpoint at episode 5250
+[train] episode=5300/15000 mean_reward=0.780243 updates=265000
+[train] episode=5400/15000 mean_reward=0.780332 updates=270000
+[checkpoint] saved deep checkpoint at episode 5500
+[train] episode=5500/15000 mean_reward=0.780334 updates=275000
+[train] episode=5600/15000 mean_reward=0.780030 updates=280000
+[train] episode=5700/15000 mean_reward=0.780009 updates=285000
+[checkpoint] saved deep checkpoint at episode 5750
+[train] episode=5800/15000 mean_reward=0.779958 updates=290000
+[train] episode=5900/15000 mean_reward=0.780196 updates=295000
+[checkpoint] saved deep checkpoint at episode 6000
+[train] episode=6000/15000 mean_reward=0.780099 updates=300000
+[train] episode=6100/15000 mean_reward=0.779724 updates=305000
+[train] episode=6200/15000 mean_reward=0.779908 updates=310000
+[checkpoint] saved deep checkpoint at episode 6250
+[train] episode=6300/15000 mean_reward=0.779493 updates=315000
+[train] episode=6400/15000 mean_reward=0.779728 updates=320000
+[checkpoint] saved deep checkpoint at episode 6500
+[train] episode=6500/15000 mean_reward=0.779904 updates=325000
+[train] episode=6600/15000 mean_reward=0.779915 updates=330000
+[train] episode=6700/15000 mean_reward=0.780042 updates=335000
+[checkpoint] saved deep checkpoint at episode 6750
+[train] episode=6800/15000 mean_reward=0.780039 updates=340000
+[train] episode=6900/15000 mean_reward=0.779881 updates=345000
+[checkpoint] saved deep checkpoint at episode 7000
+[train] episode=7000/15000 mean_reward=0.780243 updates=350000
+[train] episode=7100/15000 mean_reward=0.780117 updates=355000
+[train] episode=7200/15000 mean_reward=0.779649 updates=360000
+[checkpoint] saved deep checkpoint at episode 7250
+[train] episode=7300/15000 mean_reward=0.779796 updates=365000
+[train] episode=7400/15000 mean_reward=0.780007 updates=370000
+[checkpoint] saved deep checkpoint at episode 7500
+[train] episode=7500/15000 mean_reward=0.779911 updates=375000
+[train] episode=7600/15000 mean_reward=0.779808 updates=380000
+[train] episode=7700/15000 mean_reward=0.779632 updates=385000
+[checkpoint] saved deep checkpoint at episode 7750
+[train] episode=7800/15000 mean_reward=0.779477 updates=390000
+[train] episode=7900/15000 mean_reward=0.779298 updates=395000
+[checkpoint] saved deep checkpoint at episode 8000
+[train] episode=8000/15000 mean_reward=0.779025 updates=400000
+[train] episode=8100/15000 mean_reward=0.779025 updates=405000
+[train] episode=8200/15000 mean_reward=0.779012 updates=410000
+[checkpoint] saved deep checkpoint at episode 8250
+[train] episode=8300/15000 mean_reward=0.779044 updates=415000
+[train] episode=8400/15000 mean_reward=0.779282 updates=420000
+[checkpoint] saved deep checkpoint at episode 8500
+[train] episode=8500/15000 mean_reward=0.779153 updates=425000
+[train] episode=8600/15000 mean_reward=0.779475 updates=430000
+[train] episode=8700/15000 mean_reward=0.779466 updates=435000
+[checkpoint] saved deep checkpoint at episode 8750
+[train] episode=8800/15000 mean_reward=0.779337 updates=440000
+[train] episode=8900/15000 mean_reward=0.779374 updates=445000
+[checkpoint] saved deep checkpoint at episode 9000
+[train] episode=9000/15000 mean_reward=0.779507 updates=450000
+[train] episode=9100/15000 mean_reward=0.779123 updates=455000
+[train] episode=9200/15000 mean_reward=0.779001 updates=460000
+[checkpoint] saved deep checkpoint at episode 9250
+[train] episode=9300/15000 mean_reward=0.779301 updates=465000
+[train] episode=9400/15000 mean_reward=0.779109 updates=470000
+[checkpoint] saved deep checkpoint at episode 9500
+[train] episode=9500/15000 mean_reward=0.779101 updates=475000
+[train] episode=9600/15000 mean_reward=0.779110 updates=480000
+[train] episode=9700/15000 mean_reward=0.779033 updates=485000
+[checkpoint] saved deep checkpoint at episode 9750
+[train] episode=9800/15000 mean_reward=0.779276 updates=490000
+[train] episode=9900/15000 mean_reward=0.779465 updates=495000
+[checkpoint] saved deep checkpoint at episode 10000
+[train] episode=10000/15000 mean_reward=0.779322 updates=500000
+[train] episode=10100/15000 mean_reward=0.779312 updates=505000
+[train] episode=10200/15000 mean_reward=0.779279 updates=510000
+[checkpoint] saved deep checkpoint at episode 10250
+[train] episode=10300/15000 mean_reward=0.779342 updates=515000
+[train] episode=10400/15000 mean_reward=0.779369 updates=520000
+[checkpoint] saved deep checkpoint at episode 10500
+[train] episode=10500/15000 mean_reward=0.779297 updates=525000
+[train] episode=10600/15000 mean_reward=0.779356 updates=530000
+[train] episode=10700/15000 mean_reward=0.779347 updates=535000
+[checkpoint] saved deep checkpoint at episode 10750
+[train] episode=10800/15000 mean_reward=0.779359 updates=540000
+[train] episode=10900/15000 mean_reward=0.779243 updates=545000
+[checkpoint] saved deep checkpoint at episode 11000
+[train] episode=11000/15000 mean_reward=0.779515 updates=550000
+[train] episode=11100/15000 mean_reward=0.779669 updates=555000
+[train] episode=11200/15000 mean_reward=0.779712 updates=560000
+[checkpoint] saved deep checkpoint at episode 11250
+[train] episode=11300/15000 mean_reward=0.779743 updates=565000
+[train] episode=11400/15000 mean_reward=0.779487 updates=570000
+[checkpoint] saved deep checkpoint at episode 11500
+[train] episode=11500/15000 mean_reward=0.779490 updates=575000
+[train] episode=11600/15000 mean_reward=0.779468 updates=580000
+[train] episode=11700/15000 mean_reward=0.779548 updates=585000
+[checkpoint] saved deep checkpoint at episode 11750
+[train] episode=11800/15000 mean_reward=0.779498 updates=590000
+[train] episode=11900/15000 mean_reward=0.779372 updates=595000
+[checkpoint] saved deep checkpoint at episode 12000
+[train] episode=12000/15000 mean_reward=0.779267 updates=600000
+[train] episode=12100/15000 mean_reward=0.779103 updates=605000
+[train] episode=12200/15000 mean_reward=0.779049 updates=610000
+[checkpoint] saved deep checkpoint at episode 12250
+[train] episode=12300/15000 mean_reward=0.779073 updates=615000
+[train] episode=12400/15000 mean_reward=0.779167 updates=620000
+[checkpoint] saved deep checkpoint at episode 12500
+[train] episode=12500/15000 mean_reward=0.779076 updates=625000
+[train] episode=12600/15000 mean_reward=0.778926 updates=630000
+[train] episode=12700/15000 mean_reward=0.778694 updates=635000
+[checkpoint] saved deep checkpoint at episode 12750
+[train] episode=12800/15000 mean_reward=0.778648 updates=640000
+[train] episode=12900/15000 mean_reward=0.778841 updates=645000
+[checkpoint] saved deep checkpoint at episode 13000
+[train] episode=13000/15000 mean_reward=0.778917 updates=650000
+[train] episode=13100/15000 mean_reward=0.778891 updates=655000
+[train] episode=13200/15000 mean_reward=0.778885 updates=660000
+[checkpoint] saved deep checkpoint at episode 13250
+[train] episode=13300/15000 mean_reward=0.778900 updates=665000
+[train] episode=13400/15000 mean_reward=0.778935 updates=670000
+[checkpoint] saved deep checkpoint at episode 13500
+[train] episode=13500/15000 mean_reward=0.778911 updates=675000
+[train] episode=13600/15000 mean_reward=0.778853 updates=680000
+[train] episode=13700/15000 mean_reward=0.778672 updates=685000
+[checkpoint] saved deep checkpoint at episode 13750
+[train] episode=13800/15000 mean_reward=0.778800 updates=690000
+[train] episode=13900/15000 mean_reward=0.778715 updates=695000
+[checkpoint] saved deep checkpoint at episode 14000
+[train] episode=14000/15000 mean_reward=0.778492 updates=700000
+[train] episode=14100/15000 mean_reward=0.778539 updates=705000
+[train] episode=14200/15000 mean_reward=0.778446 updates=710000
+[checkpoint] saved deep checkpoint at episode 14250
+[train] episode=14300/15000 mean_reward=0.778409 updates=715000
+[train] episode=14400/15000 mean_reward=0.778321 updates=720000
+[checkpoint] saved deep checkpoint at episode 14500
+[train] episode=14500/15000 mean_reward=0.778328 updates=725000
+[train] episode=14600/15000 mean_reward=0.778253 updates=730000
+[train] episode=14700/15000 mean_reward=0.778290 updates=735000
+[checkpoint] saved deep checkpoint at episode 14750
+[train] episode=14800/15000 mean_reward=0.778254 updates=740000
+[train] episode=14900/15000 mean_reward=0.778311 updates=745000
+[checkpoint] saved deep checkpoint at episode 15000
+[train] episode=15000/15000 mean_reward=0.778330 updates=750000
+[done] training complete
+[done] episodes_completed=15000
+[done] total_updates=750000
+[done] mean_reward=0.778330
+[done] artifacts: /home2/harshitlalwani/Decoder/RELDEC/checkpoints/deep_reldec_zx_wran_full

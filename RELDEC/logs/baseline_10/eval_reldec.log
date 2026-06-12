@@ -1,0 +1,17 @@
+[eval] code=mackay matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=10
+[eval] methods=['reldec']
+[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
+[eval] stop criteria: target_frame_errors=60 max_frames=3000
+[eval] snr=0.50 dB
+  - reldec      frames=     86 FER=6.976744e-01 BER=9.653585e-02 avg_msgs=2237.02
+[eval] snr=1.00 dB
+  - reldec      frames=    101 FER=5.940594e-01 BER=6.827558e-02 avg_msgs=1950.42
+[eval] snr=1.50 dB
+  - reldec      frames=    202 FER=2.970297e-01 BER=3.718028e-02 avg_msgs=1301.70
+[eval] snr=2.00 dB
+  - reldec      frames=    353 FER=1.699717e-01 BER=1.873820e-02 avg_msgs=943.14
+[eval] snr=2.50 dB
+  - reldec      frames=   1035 FER=5.797101e-02 BER=5.746779e-03 avg_msgs=607.44
+[done] wrote CSV: results/eval_mackay_reldec_10.csv
+[done] wrote JSON: results/eval_mackay_reldec_10.json

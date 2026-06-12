@@ -1,0 +1,22 @@
+[train] code=mackay matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv
+[train] H shape=(48, 96) nnz=288 rate=0.500000
+[train] episodes=1000 start=0 l_max=10 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=augmented_max_zx cluster_size=2
+[train] episode=100/1000 mean_reward=0.888833 updates=1000
+[train] episode=200/1000 mean_reward=0.912708 updates=2000
+[checkpoint] saved deep checkpoint at episode 250
+[train] episode=300/1000 mean_reward=0.926500 updates=3000
+[train] episode=400/1000 mean_reward=0.934271 updates=4000
+[checkpoint] saved deep checkpoint at episode 500
+[train] episode=500/1000 mean_reward=0.938367 updates=5000
+[train] episode=600/1000 mean_reward=0.942236 updates=6000
+[train] episode=700/1000 mean_reward=0.945440 updates=7000
+[checkpoint] saved deep checkpoint at episode 750
+[train] episode=800/1000 mean_reward=0.948187 updates=8000
+[train] episode=900/1000 mean_reward=0.949472 updates=9000
+[checkpoint] saved deep checkpoint at episode 1000
+[train] episode=1000/1000 mean_reward=0.953117 updates=10000
+[done] training complete
+[done] episodes_completed=1000
+[done] total_updates=10000
+[done] mean_reward=0.953117
+[done] artifacts: checkpoints/mackay_aug_1000/aug_max

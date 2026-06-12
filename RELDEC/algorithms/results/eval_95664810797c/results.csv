@@ -1,0 +1,6 @@
+method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
+flooding,0.5,300,11589,300,0.10059895833333334,1.0,64800.0,50.0,0,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,50,300,1000,True
+flooding,1.0,312,9118,300,0.0761051014957265,0.9615384615384616,63038.769230769234,48.64102564102564,12,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,50,300,1000,True
+flooding,1.5,412,7767,300,0.049093598300970875,0.7281553398058253,51931.22330097087,40.070388349514566,112,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,50,300,1000,True
+flooding,2.0,748,6604,300,0.022991867201426024,0.40106951871657753,33855.40106951872,26.122994652406415,448,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,50,300,1000,True
+flooding,2.5,1000,1887,101,0.0049140625,0.101,15224.112,11.747,899,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666667,50,300,1000,True

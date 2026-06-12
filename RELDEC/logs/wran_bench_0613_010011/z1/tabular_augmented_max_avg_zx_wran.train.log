@@ -1,0 +1,44 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 560, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 443, in _main
+    progress = train_reldec(
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_core.py", line 485, in train_reldec
+    episode_reward = trainer.train_episode(llr, rng)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_tabular_augmented.py", line 107, in train_episode
+    state_bin = self._get_binned_state(llr_post)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_tabular_augmented.py", line 68, in _get_binned_state
+    feature = get_augmented_feature(llr_post, self.mode, self.map.cluster_neighbors)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_augmented.py", line 39, in get_augmented_feature
+    avg = float(np.mean(abs_llr[neighbors]))
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/numpy/_core/fromnumeric.py", line 3860, in mean
+    return _methods._mean(a, axis=axis, dtype=dtype,
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/numpy/_core/_methods.py", line 123, in _mean
+    rcount = _count_reduce_items(arr, axis, keepdims=keepdims, where=where)
+  File "/home2/harshitlalwani/Decoder/.venv/lib/python3.10/site-packages/numpy/_core/_methods.py", line 87, in _count_reduce_items
+    items = nt.intp(items)
+KeyboardInterrupt
+[train] run_id=train_56ef65651b68 auto_resume=False
+[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[train] H shape=(128, 384) nnz=1296 rate=0.666667
+[train] episodes=3000 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=tabular_augmented_max_avg_zx cluster_size=1
+[train] episode=100/3000 mean_reward=30.848978 updates=5000
+[train] episode=200/3000 mean_reward=32.644835 updates=10000
+[checkpoint] saved at episode 250
+[train] episode=300/3000 mean_reward=31.019062 updates=15000
+[train] episode=400/3000 mean_reward=30.058377 updates=20000
+[checkpoint] saved at episode 500
+[train] episode=500/3000 mean_reward=31.654389 updates=25000
+[train] episode=600/3000 mean_reward=31.953551 updates=30000
+[train] episode=700/3000 mean_reward=31.941782 updates=35000
+[checkpoint] saved at episode 750
+[train] episode=800/3000 mean_reward=32.464370 updates=40000
+[train] episode=900/3000 mean_reward=32.139053 updates=45000
+[checkpoint] saved at episode 1000
+[train] episode=1000/3000 mean_reward=31.761075 updates=50000
+[train] episode=1100/3000 mean_reward=31.228966 updates=55000
+[train] episode=1200/3000 mean_reward=32.470688 updates=60000

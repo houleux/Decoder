@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 288, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 135, in _main
+    raise ValueError("--mi-tabular-q-table is required when evaluating MI tabular methods")
+ValueError: --mi-tabular-q-table is required when evaluating MI tabular methods

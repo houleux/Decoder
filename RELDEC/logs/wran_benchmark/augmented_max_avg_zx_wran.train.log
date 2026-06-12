@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 554, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/train_reldec.py", line 457, in _main
+    episode_reward, _ = deep_trainer.train_episode(llr, rng)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 512, in train_episode
+    episode_loss += self._train_step(rng)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 432, in _train_step
+    q_values = self.online_net(states_t).gather(1, a_t.unsqueeze(1)).squeeze(1)
+KeyboardInterrupt
+[train] run_id=train_eb2c16661674 auto_resume=False
+[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[train] H shape=(128, 384) nnz=1296 rate=0.666667
+[train] episodes=15000 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=deep_zx cluster_size=1
+[train] episode=100/15000 mean_reward=0.961405 updates=5000

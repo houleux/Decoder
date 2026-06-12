@@ -1,0 +1,33 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 288, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 209, in _main
+    stats = evaluate_method_with_dispatcher(
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluation_router.py", line 89, in evaluate_method_with_dispatcher
+    return decoder.evaluate(
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 830, in evaluate
+    decoded = self.decode(llr, i_max=i_max, rng=rng)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 792, in decode
+    current_state = self._cluster_mi_state(llr_post)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 755, in _cluster_mi_state
+    return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 250, in _cluster_mutual_information_vector
+    mi[idx] = _mutual_information_from_llrs(llr_post[neighbors]) if neighbors.size else 0.0
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 236, in _mutual_information_from_llrs
+    sigma = _sigma_from_llrs(llrs)
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_deep.py", line 232, in _sigma_from_llrs
+    return float(np.sqrt(max(sigma2, 0.0)))
+KeyboardInterrupt
+[eval] run_id=eval_092bd06adefe
+[eval] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=5
+[eval] methods=['mi_naive_zx']
+[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=200000
+[eval] snr=0.50 dB
+  - mi_naive_zx frames=    300 FER=1.000000e+00 BER=1.013194e-01 avg_msgs=6480.00
+[eval] snr=1.00 dB

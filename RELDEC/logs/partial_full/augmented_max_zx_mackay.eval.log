@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 288, in <module>
+    _main()
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluate_reldec.py", line 209, in _main
+    stats = evaluate_method_with_dispatcher(
+  File "/home2/harshitlalwani/Decoder/RELDEC/evaluation_router.py", line 56, in evaluate_method_with_dispatcher
+    decoder = dispatcher.get_decoder(method)
+  File "/home2/harshitlalwani/Decoder/RELDEC/method_dispatcher.py", line 80, in get_decoder
+    return self._load_deep_decoder(method, "augmented_max_zx")
+  File "/home2/harshitlalwani/Decoder/RELDEC/method_dispatcher.py", line 46, in _load_deep_decoder
+    decoder = load_augmented_deep_decoder_from_checkpoint(
+  File "/home2/harshitlalwani/Decoder/RELDEC/algorithms/reldec_augmented.py", line 208, in load_augmented_deep_decoder_from_checkpoint
+    raise ValueError(
+ValueError: Checkpoint policy label 'deep_zx' does not match expected 'augmented_max_zx'
+[eval] run_id=eval_a974dee2eef1
+[eval] code=mackay matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv
+[eval] H shape=(48, 96) nnz=288 rate=0.500000 i_max=50
+[eval] methods=['augmented_max_zx']
+[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=200000
+[eval] snr=0.50 dB

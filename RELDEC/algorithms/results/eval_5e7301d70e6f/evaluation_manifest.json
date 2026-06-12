@@ -1,0 +1,44 @@
+{
+  "run_id": "eval_5e7301d70e6f",
+  "created_at_utc": "2026-06-12T21:57:41.574940+00:00",
+  "experiment": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "methods": [
+      "tabular_augmented_max_avg_zx"
+    ],
+    "parameters": {
+      "z": 6,
+      "mi_bins": 21,
+      "i_max": 50,
+      "target_frame_errors": 300,
+      "max_frames": 1000,
+      "random_codewords": false
+    }
+  },
+  "evaluation_config": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "code_rate": 0.6666666666666667,
+    "methods": [
+      "tabular_augmented_max_avg_zx"
+    ],
+    "snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "i_max": 50,
+    "target_frame_errors": 300,
+    "max_frames": 1000,
+    "all_zero_only": true,
+    "seed": 42
+  },
+  "artifacts": {
+    "results_csv": "/home2/harshitlalwani/Decoder/RELDEC/algorithms/results/eval_5e7301d70e6f/results.csv",
+    "results_json": "/home2/harshitlalwani/Decoder/RELDEC/algorithms/results/eval_5e7301d70e6f/results.json",
+    "config_hash": "5e7301d70e6fda651aa35b22384ced11294f9a8282a1179341ff300daa5eec71"
+  }
+}

@@ -1,0 +1,16 @@
+[train] run_id=train_9236c6504bef auto_resume=True
+[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[train] H shape=(128, 384) nnz=1296 rate=0.666667
+[train] episodes=3000 start=2500 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=reldec_misq_global cluster_size=1
+[train] episode=2600/3000 mean_reward=0.000857 updates=130000
+[train] episode=2700/3000 mean_reward=0.000859 updates=135000
+[checkpoint] saved at episode 2750
+[train] episode=2800/3000 mean_reward=0.000860 updates=140000
+[train] episode=2900/3000 mean_reward=0.000860 updates=145000
+[checkpoint] saved at episode 3000
+[train] episode=3000/3000 mean_reward=0.000861 updates=150000
+[done] training complete
+[done] episodes_completed=3000
+[done] total_updates=150000
+[done] mean_reward=0.000861
+[done] artifacts: /home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_reldec_misq_global_wran_z6

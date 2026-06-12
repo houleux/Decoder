@@ -1,0 +1,5 @@
+z,matrix,method,policy,train_time_sec,eval_time_sec,train_rc,eval_rc,gpu_id
+6,wran,reldec_misq_global,reldec_misq_global,3.365,0.0,1,1,
+6,wran,round_robin,tabular,0.0,3.425,0,0,
+6,wran,reldec,tabular,3.507,0.0,1,1,
+6,wran,tabular_augmented_max_avg_zx,tabular_augmented_max_avg_zx,3.289,2.684,0,0,
