@@ -9,6 +9,7 @@ and writes per-method logs plus a timing CSV for tracking.
 from __future__ import annotations
 
 import csv
+import datetime
 import os
 import subprocess
 import sys
@@ -40,9 +41,7 @@ except Exception as e:
     print(f"[startup] torch import warning: {e}", flush=True)
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_PATH = ROOT / "configs" / "benchmark" / "wran_tabular_variants.yaml"
-RESULTS_CSV = ROOT / "results" / "wran_tabular_variants_benchmark_timings.csv"
-LOG_DIR = ROOT / "logs" / "wran_tabular_variants_benchmark"
+RESULTS_DIR = ROOT / "results"
 
 TRAINING_METHODS = {
     "reldec",
@@ -52,12 +51,34 @@ TRAINING_METHODS = {
     "augmented_max_avg_zx",
     "augmented_max_zx",
     "augmented_average_zx",
+    "tabular_augmented_max_avg_zx",
+    "tabular_augmented_max_zx",
+    "tabular_augmented_average_zx",
+    "reldec_misq_global",
+    "reldec_misq_local",
+    "rel_delta",
+}
+
+# All tabular-family policies (use tabular_eps, not deep_eps)
+TABULAR_POLICIES = {
+    "tabular",
+    "mi_tabular_zx",
+    "reldec_misq_global",
+    "reldec_misq_local",
+    "rel_delta",
+    "tabular_augmented_max_avg_zx",
+    "tabular_augmented_max_zx",
+    "tabular_augmented_average_zx",
 }
 
 
 def policy_for_method(method: str) -> str:
     if method == "reldec":
         return "tabular"
+    if method in ("reldec_misq_global", "reldec_misq_local", "rel_delta"):
+        return method
+    if method.startswith("tabular_augmented"):
+        return method
     if method.startswith("mi_tabular"):
         return "mi_tabular_zx"
     if method.endswith("_zx") or method.startswith("deep_") or method.startswith("mi_dqn") or method.startswith("augmented_"):
@@ -101,16 +122,26 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
     deep_eps = task["deep_eps"]
     snr_db = task["snr_db"]
     i_max = task["i_max"]
-    z_value = task.get("z", 6)
+    target_frame_errors = task.get("target_frame_errors", 300)
+    max_frames = task.get("max_frames", 200000)
+    z_value = task.get("z", 1)
+    run_tag = task["run_tag"]
 
     env = build_env(cuda_visible=str(gpu_id) if gpu_id is not None else None)
 
-    ckpt_dir = ROOT / "checkpoints" / f"{method}_{matrix_key}_wran"
+    # Isolate checkpoints and logs per-z and per-run so different z values
+    # don't share cached results and each run gets fresh names.
+    z_tag = f"z{z_value}"
+    ckpt_dir = ROOT / "checkpoints" / f"{run_tag}_{method}_{matrix_key}_{z_tag}"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    train_log_path = LOG_DIR / f"{method}_{matrix_key}.train.log"
-    eval_log_path = LOG_DIR / f"{method}_{matrix_key}.eval.log"
+    log_base_dir = ROOT / "logs" / f"wran_bench_{run_tag}"
+    log_dir = log_base_dir / z_tag
+    log_dir.mkdir(parents=True, exist_ok=True)
+    train_log_path = log_dir / f"{method}_{matrix_key}.train.log"
+    eval_log_path = log_dir / f"{method}_{matrix_key}.eval.log"
 
     result = {
+        "z": z_value,
         "matrix": matrix_key,
         "method": method,
         "policy": policy,
@@ -121,7 +152,7 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
         "gpu_id": gpu_id,
     }
 
-    eps = tabular_eps if policy in {"tabular", "mi_tabular_zx"} else deep_eps
+    eps = tabular_eps if policy in TABULAR_POLICIES else deep_eps
 
     if method in TRAINING_METHODS:
         train_cmd = [
@@ -159,12 +190,11 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
         result["train_time_sec"] = 0.0
         result["train_rc"] = 0
 
-    q_table = None
-    deep_ckpt = None
-    if (ckpt_dir / "q_table_final.npy").exists():
-        q_table = str(ckpt_dir / "q_table_final.npy")
-    if (ckpt_dir / "dqn_final.npz").exists():
-        deep_ckpt = str(ckpt_dir / "dqn_final.npz")
+    q_table_path = ckpt_dir / "q_table_final.npy"
+    deep_ckpt_path = ckpt_dir / "dqn_final.npz"
+
+    # Determine if this is a tabular-augmented method (needs separate flag)
+    is_tabular_augmented = method.startswith("tabular_augmented")
 
     eval_cmd = [
         sys.executable,
@@ -180,13 +210,20 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
     ] + [str(x) for x in snr_db] + [
         "--i-max",
         str(i_max),
+        "--target-frame-errors",
+        str(target_frame_errors),
+        "--max-frames",
+        str(max_frames),
         "--seed",
         str(task.get("seed", 42)),
     ]
-    if q_table:
-        eval_cmd += ["--q-table", q_table]
-    if deep_ckpt:
-        eval_cmd += ["--deep-checkpoint", deep_ckpt]
+    if q_table_path.exists():
+        if is_tabular_augmented:
+            eval_cmd += ["--tabular-augmented-q-table", str(q_table_path)]
+        else:
+            eval_cmd += ["--q-table", str(q_table_path)]
+    if deep_ckpt_path.exists():
+        eval_cmd += ["--deep-checkpoint", str(deep_ckpt_path)]
     eval_cmd += ["--z", str(z_value)]
 
     rc, elapsed = run_process(eval_cmd, env, eval_log_path)
@@ -196,30 +233,52 @@ def run_task(task: Dict[str, Any], gpu_id: int | None = None) -> Dict[str, Any]:
 
 
 def main() -> int:
-    print(f"[main] ROOT={ROOT}", flush=True)
-    print(f"[main] config={CONFIG_PATH}", flush=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
+    parser.add_argument("--z", type=int, default=None, help="Override z value from config")
+    args = parser.parse_args()
 
-    if not CONFIG_PATH.exists():
-        print(f"ERROR: Config not found: {CONFIG_PATH}", flush=True)
+    config_path = Path(args.config)
+    print(f"[main] ROOT={ROOT}", flush=True)
+    print(f"[main] config={config_path}", flush=True)
+
+    if not config_path.exists():
+        print(f"ERROR: Config not found: {config_path}", flush=True)
         return 1
 
-    cfg = yaml.safe_load(CONFIG_PATH.read_text())
+    cfg = yaml.safe_load(config_path.read_text())
     benchmarking = cfg["benchmarking"]
     methods = benchmarking["methods"]
     tabular_eps = benchmarking["train"]["tabular"]["episodes_per_snr"]
     deep_eps = benchmarking["train"]["deep"]["episodes_per_snr"]
     snr_db = benchmarking["evaluation"]["snr_db"]
     i_max = benchmarking["evaluation"].get("i_max", 50)
+    target_frame_errors = benchmarking["evaluation"].get("target_frame_errors", 300)
+    max_frames = benchmarking["evaluation"].get("max_frames", 200000)
     system = cfg.get("system", {})
     gpu_workers = int(system.get("gpu_workers", 4))
     cpu_workers = int(system.get("cpu_workers", 40))
-    z_value = int(cfg.get("parameters", {}).get("z", 6))
+    z_value = args.z if args.z is not None else int(cfg.get("parameters", {}).get("z", 6))
     mi_bins = int(cfg.get("parameters", {}).get("mi_bins", 21))
+    flooding_only_z1 = bool(benchmarking.get("flooding_only_z1", False))
+
+    # Generate a unique run tag so every invocation gets fresh checkpoints/logs
+    run_tag = datetime.datetime.now().strftime("%m%d_%H%M%S")
+    print(f"[main] run_tag={run_tag} z={z_value}", flush=True)
 
     matrix_csv = ROOT / "matrices" / "WRAN_irreg_384_256.csv"
     if not matrix_csv.exists():
         print(f"ERROR: Missing WRAN matrix: {matrix_csv}", flush=True)
         return 1
+
+    # Filter methods: skip flooding for z != 1 if flooding_only_z1 is set
+    active_methods = []
+    for method in methods:
+        if flooding_only_z1 and method == "flooding" and z_value != 1:
+            print(f"[main] Skipping flooding for z={z_value} (flooding_only_z1=True)", flush=True)
+            continue
+        active_methods.append(method)
 
     tasks = [
         {
@@ -231,14 +290,15 @@ def main() -> int:
             "deep_eps": deep_eps,
             "snr_db": snr_db,
             "i_max": i_max,
+            "target_frame_errors": target_frame_errors,
+            "max_frames": max_frames,
             "seed": int(system.get("seed", 42)),
             "z": z_value,
             "mi_bins": mi_bins,
+            "run_tag": run_tag,
         }
-        for method in methods
+        for method in active_methods
     ]
-
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     cpu_tasks = [task for task in tasks if not (task["policy"].startswith("deep") or task["policy"].startswith("mi_dqn") or task["policy"].startswith("augmented"))]
     gpu_tasks = [task for task in tasks if task not in cpu_tasks]
@@ -271,18 +331,17 @@ def main() -> int:
             for fut in as_completed(cpu_futures + gpu_futures):
                 r = fut.result()
                 results.append(r)
-                print(f"Completed: {r['matrix']}/{r['method']} train={r['train_time_sec']}s eval={r['eval_time_sec']}s gpu={r['gpu_id']}")
+                print(f"Completed: z={r['z']} {r['matrix']}/{r['method']} train={r['train_time_sec']}s eval={r['eval_time_sec']}s rc_train={r['train_rc']} rc_eval={r['eval_rc']} gpu={r['gpu_id']}")
 
     if results:
-        RESULTS_CSV.parent.mkdir(parents=True, exist_ok=True)
-        with open(RESULTS_CSV, "w", newline="", encoding="utf-8") as fh:
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        results_csv = RESULTS_DIR / f"wran_benchmark_timings_z{z_value}.csv"
+        with open(results_csv, "w", newline="", encoding="utf-8") as fh:
             writer = csv.DictWriter(fh, fieldnames=list(results[0].keys()))
             writer.writeheader()
             writer.writerows(results)
-
-    print(f"Wrote results to {RESULTS_CSV}")
+        print(f"Wrote results to {results_csv}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

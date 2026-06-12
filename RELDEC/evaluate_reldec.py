@@ -207,7 +207,8 @@ def _main() -> None:
 
     rows: list[dict] = []
     suite = ReldecDecoderSuite(h)
-    if "reldec" in methods:
+    q_table_methods = {"reldec", "reldec_misq_global", "reldec_misq_local", "rel_delta"}
+    if q_table_methods & set(methods) and dispatcher.q_table is not None:
         suite.set_q_table(dispatcher.q_table)
     
     for snr_db in snr_db_values:
