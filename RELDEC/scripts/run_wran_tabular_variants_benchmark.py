@@ -95,6 +95,7 @@ def build_env(cuda_visible: str | None = None) -> Dict[str, str]:
     if existing:
         paths.append(existing)
     env["PYTHONPATH"] = ":".join(paths)
+    env["PYTHONUNBUFFERED"] = "1"
     # Only pin to a specific GPU if it's within the actual allocated count.
     # Slurm may have already set CUDA_VISIBLE_DEVICES; don't override with an
     # out-of-range index (e.g. config has gpu_workers=4 but job has 2 GPUs).
