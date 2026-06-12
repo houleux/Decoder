@@ -57,21 +57,18 @@ class TrainerFactory:
                 
             return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn)
         elif policy_type.startswith("mi_tabular"):
-            # Extract cluster size from policy spec
-            spec = training_policy_spec(policy_type)
-            cluster_size = int(spec.parameters.get("z", 2))
+            # Use config.cluster_size which is already resolved from --z arg
             return MiTabularQTrainer(
                 h_csr=h_csr,
                 alpha=config.hyperparams.alpha,
                 beta=config.hyperparams.beta,
                 epsilon=config.hyperparams.epsilon,
                 l_max=config.hyperparams.l_max,
-                cluster_size=cluster_size,
+                cluster_size=config.cluster_size,
                 mi_bins=int(mi_bins),
             )
         elif policy_type.startswith("tabular_augmented_"):
-            spec = training_policy_spec(policy_type)
-            cluster_size = int(spec.parameters.get("z", 2))
+            # Use config.cluster_size which is already resolved from --z arg
             return TabularAugmentedQTrainer(
                 h_csr=h_csr,
                 alpha=config.hyperparams.alpha,
@@ -79,7 +76,7 @@ class TrainerFactory:
                 epsilon=config.hyperparams.epsilon,
                 l_max=config.hyperparams.l_max,
                 policy_label=policy_type,
-                cluster_size=cluster_size,
+                cluster_size=config.cluster_size,
                 mi_bins=int(mi_bins),
             )
         else:

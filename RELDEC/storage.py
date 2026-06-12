@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from .spec import RunManifest, EvaluationManifest
+from .experiments import RunManifest, EvaluationManifest
 
 
 def _normalize_config_value(value: Any) -> Any:

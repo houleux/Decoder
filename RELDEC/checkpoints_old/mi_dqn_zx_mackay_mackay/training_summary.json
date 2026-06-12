@@ -1,0 +1,87 @@
+{
+  "run_id": "train_c885ce6f9c7f",
+  "config_hash": "c885ce6f9c7f7b600fedd7244525d7d6bd63e66892d497ed278c5df16a2839ed",
+  "run_identity": {
+    "kind": "training",
+    "policy_type": "mi_dqn_zx",
+    "training_config": {
+      "code": "mackay",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+      "train_snr_db": [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        2.5
+      ],
+      "episodes_per_snr": 250,
+      "code_rate": 0.5,
+      "seed": 42,
+      "hyperparams": {
+        "alpha": 0.1,
+        "beta": 0.9,
+        "epsilon": 0.6,
+        "l_max": 50
+      },
+      "cluster_size": 6
+    },
+    "cluster_size": 6,
+    "mi_bins": 21,
+    "device": "cpu",
+    "deep_config": {
+      "policy_label": "mi_dqn_zx",
+      "cluster_size": 6,
+      "hidden_dim": 128,
+      "learning_rate": 0.001,
+      "replay_capacity": 20000,
+      "replay_warmup": 1000,
+      "batch_size": 128,
+      "target_sync_steps": 200,
+      "train_every_steps": 1,
+      "epsilon_start": 0.6,
+      "epsilon_end": 0.05,
+      "epsilon_decay_steps": 10000,
+      "gamma": 0.9
+    }
+  },
+  "config": {
+    "code": "mackay",
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "episodes_per_snr": 250,
+    "code_rate": 0.5,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 6
+  },
+  "h_shape": [
+    48,
+    96
+  ],
+  "h_nnz": 288,
+  "policy_type": "mi_dqn_zx",
+  "progress": {
+    "episodes_completed": 1250,
+    "total_updates": 62500,
+    "mean_reward": 0.0048645959677696225,
+    "elapsed_sec": 0.0
+  },
+  "artifacts": {
+    "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_dqn_zx_mackay_mackay/checkpoint_latest.npz",
+    "checkpoint_final": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_dqn_zx_mackay_mackay/checkpoint_final.npz",
+    "run_manifest": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_dqn_zx_mackay_mackay/run_manifest.json",
+    "config_hash": "c885ce6f9c7f7b600fedd7244525d7d6bd63e66892d497ed278c5df16a2839ed",
+    "dqn_checkpoint": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_dqn_zx_mackay_mackay/dqn_final.npz"
+  }
+}

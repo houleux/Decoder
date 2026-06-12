@@ -1,0 +1,73 @@
+{
+  "run_id": "train_12ad53851da1",
+  "config_hash": "12ad53851da15a5af2764b9ed8203516de7efa30c3c54ed29a1dd0fc07237eb3",
+  "run_identity": {
+    "kind": "training",
+    "policy_type": "mi_tabular_zx",
+    "training_config": {
+      "code": "mackay",
+      "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+      "train_snr_db": [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        2.5
+      ],
+      "episodes_per_snr": 250,
+      "code_rate": 0.5,
+      "seed": 42,
+      "hyperparams": {
+        "alpha": 0.1,
+        "beta": 0.9,
+        "epsilon": 0.6,
+        "l_max": 50
+      },
+      "cluster_size": 6
+    },
+    "cluster_size": 6,
+    "mi_bins": 4,
+    "device": "cpu",
+    "deep_config": null
+  },
+  "config": {
+    "code": "mackay",
+    "matrix_csv": "/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/H_Mackay_96_48.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5
+    ],
+    "episodes_per_snr": 250,
+    "code_rate": 0.5,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 6
+  },
+  "h_shape": [
+    48,
+    96
+  ],
+  "h_nnz": 288,
+  "policy_type": "mi_tabular_zx",
+  "progress": {
+    "episodes_completed": 1250,
+    "total_updates": 62500,
+    "mean_reward": 0.009691827995300294,
+    "elapsed_sec": 78.81438374519348
+  },
+  "artifacts": {
+    "checkpoint_latest": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_tabular_zx_mackay_mackay/checkpoint_latest.npz",
+    "checkpoint_final": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_tabular_zx_mackay_mackay/checkpoint_final.npz",
+    "run_manifest": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_tabular_zx_mackay_mackay/run_manifest.json",
+    "config_hash": "12ad53851da15a5af2764b9ed8203516de7efa30c3c54ed29a1dd0fc07237eb3",
+    "q_table_npy": "/root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/mi_tabular_zx_mackay_mackay/q_table_final.npy"
+  }
+}

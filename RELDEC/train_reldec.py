@@ -164,13 +164,22 @@ def _validate_checkpoint_config(config: TrainingConfig, args: argparse.Namespace
         raise ValueError("--matrix-csv does not match resumed checkpoint config")
 
 
+_TABULAR_POLICY_SET = {"tabular", "mi_tabular_z2", "mi_tabular_zx",
+                       "reldec_misq_global", "reldec_misq_local", "rel_delta"}
+
+def _is_tabular_policy(policy_type: str) -> bool:
+    """Return True if the policy type is tabular (Q-table-based, not deep)."""
+    return (policy_type in _TABULAR_POLICY_SET
+            or policy_type.startswith("tabular_augmented_"))
+
+
 def _main() -> None:
     args = _parse_args()
     cluster_size = _cluster_size_for_policy(args.policy_type, args.z)
 
     run_store = RunStore(THIS_DIR / "runs")
 
-    if args.resume and (args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_")):
+    if args.resume and _is_tabular_policy(args.policy_type):
         resume_path = Path(args.resume)
         checkpoint = load_training_checkpoint(resume_path)
         _validate_checkpoint_config(checkpoint.config, args)
@@ -196,7 +205,7 @@ def _main() -> None:
 
         print(f"[resume] loaded checkpoint: {resume_path}")
         print(f"[resume] episodes_completed={progress.episodes_completed}")
-    elif args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
+    elif _is_tabular_policy(args.policy_type):
         config = _build_config_from_args(args)
         config = TrainingConfig(
             code=config.code,
@@ -210,7 +219,7 @@ def _main() -> None:
         )
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
         
-        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} or args.policy_type.startswith("tabular_augmented_"):
+        if _is_tabular_policy(args.policy_type):
             trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
                 config=config,
@@ -295,7 +304,7 @@ def _main() -> None:
         "cluster_size": int(cluster_size),
         "mi_bins": int(args.mi_bins),
         "device": str(args.device),
-        "deep_config": deep_config.to_dict() if args.policy_type not in {"tabular", "mi_tabular_z2", "mi_tabular_zx"} else None,
+        "deep_config": deep_config.to_dict() if not _is_tabular_policy(args.policy_type) else None,
     }
     run_hash = compute_config_hash(run_identity)
     run_id = f"train_{run_hash[:12]}"
@@ -317,7 +326,7 @@ def _main() -> None:
     auto_resume = False
     if args.resume is None and latest_path.exists():
         auto_resume = True
-        if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+        if _is_tabular_policy(args.policy_type):
             checkpoint = load_training_checkpoint(latest_path)
             config = checkpoint.config
             progress = checkpoint.progress
@@ -430,7 +439,7 @@ def _main() -> None:
         print("[train] run already complete; reusing existing results")
         return
 
-    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+    if _is_tabular_policy(args.policy_type):
         progress = train_reldec(
             trainer=trainer,
             snr_schedule_db=active_snr_schedule_db,
@@ -465,7 +474,7 @@ def _main() -> None:
                     f"mean_reward={progress.mean_reward():.6f} updates={progress.total_updates}"
                 )
 
-    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+    if _is_tabular_policy(args.policy_type):
         final_checkpoint = TrainingCheckpoint(
             q_table=trainer.q_table,
             config=config,
@@ -514,7 +523,7 @@ def _main() -> None:
             "config_hash": run_hash,
         },
     }
-    if args.policy_type in {"tabular", "mi_tabular_z2", "mi_tabular_zx"}:
+    if _is_tabular_policy(args.policy_type):
         summary["artifacts"]["q_table_npy"] = str(q_table_path)
     else:
         summary["artifacts"]["dqn_checkpoint"] = str(dqn_final_path)

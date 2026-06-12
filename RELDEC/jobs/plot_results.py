@@ -1,29 +1,36 @@
 from __future__ import annotations
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-def _load_latest(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return list(payload.get("results", []))
+from RELDEC.data_catalog import DataCatalog, ResultQuery
 
 
-def _collect(run_root: Path, kind: str) -> list[dict]:
-    rows: list[dict] = []
-    manifest = json.loads((run_root / "manifest.json").read_text(encoding="utf-8"))
-    for code in manifest.get("codes", []):
-        file_name = "latest_berfer.json" if kind == "berfer" else "latest_messages.json"
-        for row in _load_latest(run_root / code / "results" / file_name):
-            row = dict(row)
-            row["code"] = code
-            rows.append(row)
-    return rows
+def _query_rows(
+    *,
+    code: str | None = None,
+    method: str | None = None,
+    run_id: str | None = None,
+    config_hash: str | None = None,
+    snr_min: float | None = None,
+    snr_max: float | None = None,
+) -> list[dict]:
+    catalog = DataCatalog()
+    query = ResultQuery(
+        code=code,
+        method=method,
+        run_id=run_id,
+        config_hash=config_hash,
+        snr_min=snr_min,
+        snr_max=snr_max,
+    )
+    return catalog.query_evaluation_rows(query)
 
 
 def _plot_berfer(rows: list[dict], out_dir: Path) -> list[Path]:
@@ -89,24 +96,42 @@ def _plot_messages(rows: list[dict], out_dir: Path) -> list[Path]:
     return saved
 
 
-def _main() -> None:
-    ap = argparse.ArgumentParser(description="Generate plots from latest stored eval tables")
-    ap.add_argument("--run-root", required=True)
-    args = ap.parse_args()
+def _parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(description="Generate plots from stored RELDEC evaluation results")
+    ap.add_argument("--code", type=str, default=None)
+    ap.add_argument("--method", type=str, default=None)
+    ap.add_argument("--run-id", type=str, default=None)
+    ap.add_argument("--config-hash", type=str, default=None)
+    ap.add_argument("--snr-min", type=float, default=None)
+    ap.add_argument("--snr-max", type=float, default=None)
+    ap.add_argument("--kind", choices=["berfer", "messages", "both"], default="both")
+    ap.add_argument("--output-dir", type=str, default=None)
+    return ap.parse_args()
 
-    run_root = Path(args.run_root)
-    out_dir = run_root / "plots"
+
+def _main() -> None:
+    args = _parse_args()
+
+    rows = _query_rows(
+        code=args.code,
+        method=args.method,
+        run_id=args.run_id,
+        config_hash=args.config_hash,
+        snr_min=args.snr_min,
+        snr_max=args.snr_max,
+    )
+
+    out_dir = Path(args.output_dir) if args.output_dir else Path(__file__).resolve().parents[1] / "plots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    berfer_rows = _collect(run_root, kind="berfer")
-    msg_rows = _collect(run_root, kind="messages")
-
     saved = []
-    saved.extend(_plot_berfer(berfer_rows, out_dir))
-    saved.extend(_plot_messages(msg_rows, out_dir))
+    if args.kind in {"berfer", "both"}:
+        saved.extend(_plot_berfer(rows, out_dir))
+    if args.kind in {"messages", "both"}:
+        saved.extend(_plot_messages(rows, out_dir))
 
     if not saved:
-        print("No latest eval tables found. Run eval jobs first.")
+        print("No matching evaluation rows found. Run eval jobs or relax the filters.")
         return
 
     print("Saved plots:")

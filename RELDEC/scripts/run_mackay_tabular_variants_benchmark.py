@@ -56,7 +56,13 @@ TRAINING_METHODS = {
 
 
 def policy_for_method(method: str) -> str:
-    return method
+    if method == "reldec":
+        return "tabular"
+    if method.startswith("mi_tabular"):
+        return "mi_tabular_zx"
+    if method.endswith("_zx") or method.startswith("deep_") or method.startswith("mi_dqn") or method.startswith("augmented_"):
+        return "deep_zx"
+    return "tabular"
 
 
 def build_env(cuda_visible: str | None = None) -> Dict[str, str]:

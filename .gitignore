@@ -174,3 +174,26 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# RELDEC generated artifacts
+RELDEC/checkpoints/
+RELDEC/algorithms/checkpoints/
+RELDEC/results/
+RELDEC/algorithms/results/
+RELDEC/runs/
+RELDEC/algorithms/runs/
+RELDEC/logs/
+RELDEC/plots/
+RELDEC/notebook_runs/
+RELDEC/tmp_parity/
+
+# Other local artifacts
+chat.json
+tmp_exports/
+scratch/
+smoke_variants_plot.png
+*.png
+*.csv
+*.npz
+*.npy
+*.log
