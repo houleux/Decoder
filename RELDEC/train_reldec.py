@@ -189,16 +189,13 @@ def _main() -> None:
         snr_schedule_db = checkpoint.snr_schedule_db
 
         h = load_parity_check_from_sparse_csv(config.matrix_csv)
-        if args.policy_type == "tabular":
-            trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
-        else:
-            trainer = TrainerFactory.create_tabular_trainer(
-                h_csr=h,
-                config=config,
-                policy_type=args.policy_type,
-                mi_bins=int(args.mi_bins),
-            )
-            trainer.q_table = checkpoint.q_table
+        trainer = TrainerFactory.create_tabular_trainer(
+            h_csr=h,
+            config=config,
+            policy_type=args.policy_type,
+            mi_bins=int(args.mi_bins),
+            q_table=checkpoint.q_table,
+        )
 
         rng = np.random.default_rng()
         rng.bit_generator.state = checkpoint.rng_state
@@ -332,19 +329,13 @@ def _main() -> None:
             progress = checkpoint.progress
             snr_schedule_db = checkpoint.snr_schedule_db
             h = load_parity_check_from_sparse_csv(config.matrix_csv)
-            if args.policy_type == "tabular":
-                trainer = ReldecTrainer(h, config.hyperparams, q_table=checkpoint.q_table)
-            else:
-                trainer = MiTabularQTrainer(
-                    h_csr=h,
-                    alpha=config.hyperparams.alpha,
-                    beta=config.hyperparams.beta,
-                    epsilon=config.hyperparams.epsilon,
-                    l_max=config.hyperparams.l_max,
-                    cluster_size=cluster_size,
-                    mi_bins=int(args.mi_bins),
-                    q_table=checkpoint.q_table,
-                )
+            trainer = TrainerFactory.create_tabular_trainer(
+                h_csr=h,
+                config=config,
+                policy_type=args.policy_type,
+                mi_bins=int(args.mi_bins),
+                q_table=checkpoint.q_table,
+            )
             rng = np.random.default_rng()
             rng.bit_generator.state = checkpoint.rng_state
         else:

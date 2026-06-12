@@ -28,6 +28,7 @@ class TrainerFactory:
         config: TrainingConfig,
         policy_type: str,
         mi_bins: int = 21,
+        q_table: Optional[np.ndarray] = None,
     ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer:
         """Create a tabular trainer (ReldecTrainer, MiTabularQTrainer, or TabularAugmentedQTrainer).
         
@@ -36,6 +37,7 @@ class TrainerFactory:
             config: Training configuration
             policy_type: "tabular" or "mi_tabular_z*"
             mi_bins: Number of MI bins for MI tabular trainer
+            q_table: Optional pre-trained Q-table to resume from
             
         Returns:
             Initialized tabular trainer
@@ -55,7 +57,7 @@ class TrainerFactory:
             else:
                 raise ValueError(f"Unknown or missing reward type '{reward_type}' for tabular trainer")
                 
-            return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn)
+            return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn, q_table=q_table)
         elif policy_type.startswith("mi_tabular"):
             # Use config.cluster_size which is already resolved from --z arg
             return MiTabularQTrainer(
@@ -66,6 +68,7 @@ class TrainerFactory:
                 l_max=config.hyperparams.l_max,
                 cluster_size=config.cluster_size,
                 mi_bins=int(mi_bins),
+                q_table=q_table,
             )
         elif policy_type.startswith("tabular_augmented_"):
             # Use config.cluster_size which is already resolved from --z arg
@@ -78,6 +81,7 @@ class TrainerFactory:
                 policy_label=policy_type,
                 cluster_size=config.cluster_size,
                 mi_bins=int(mi_bins),
+                q_table=q_table,
             )
         else:
             raise ValueError(f"Unexpected tabular policy type: {policy_type}")
