@@ -1,5 +1,11 @@
-[train] run_id=train_2f63839315da auto_resume=True
-[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
-[train] H shape=(128, 384) nnz=1296 rate=0.666667
-[train] episodes=3000 start=3000 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=tabular_augmented_max_avg_zx cluster_size=6
-[train] run already complete; reusing existing results
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/train_reldec.py", line 551, in <module>
+    _main()
+    ~~~~~^^
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/train_reldec.py", line 331, in _main
+    h = load_parity_check_from_sparse_csv(config.matrix_csv)
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_core.py", line 186, in load_parity_check_from_sparse_csv
+    raise FileNotFoundError(f"Matrix CSV not found: {csv_path}")
+FileNotFoundError: Matrix CSV not found: /home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv

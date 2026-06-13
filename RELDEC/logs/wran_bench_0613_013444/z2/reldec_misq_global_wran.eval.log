@@ -1,0 +1,35 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluate_reldec.py", line 297, in <module>
+    _main()
+    ~~~~~^^
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluate_reldec.py", line 218, in _main
+    stats = evaluate_method_with_dispatcher(
+        dispatcher=dispatcher,
+    ...<8 lines>...
+        suite=suite,
+    )
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluation_router.py", line 41, in evaluate_method_with_dispatcher
+    return evaluate_single_method(
+        suite=suite,
+    ...<7 lines>...
+        all_zero_only=bool(all_zero_only),
+    )
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_core.py", line 702, in evaluate_single_method
+    res = suite.decode_reldec(llr, i_max, rng)
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_core.py", line 639, in decode_reldec
+    state = _state_from_llr_subset(llr_post, self.check_neighbors[action])
+  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_core.py", line 319, in _state_from_llr_subset
+    state = (state << 1) | int(llr_post[int(idx)] < 0.0)
+                           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+[eval] run_id=eval_0f51c357cf80
+[eval] code=wran matrix=/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=50
+[eval] methods=['reldec_misq_global']
+[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
+[eval] stop criteria: target_frame_errors=300 max_frames=100000
+[eval] snr=0.50 dB
+  - reldec_misq_global frames=    301 FER=9.966777e-01 BER=9.958991e-02 avg_msgs=64632.08
+[eval] snr=1.00 dB

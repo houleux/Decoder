@@ -160,8 +160,8 @@ def _build_deep_config(args: argparse.Namespace, cluster_size: int) -> DeepDqnCo
 def _validate_checkpoint_config(config: TrainingConfig, args: argparse.Namespace) -> None:
     if args.code != config.code:
         raise ValueError(f"Resume checkpoint code={config.code} but --code={args.code}")
-    if args.matrix_csv is not None and str(Path(args.matrix_csv)) != config.matrix_csv:
-        raise ValueError("--matrix-csv does not match resumed checkpoint config")
+    if args.matrix_csv is not None and Path(args.matrix_csv).name != Path(config.matrix_csv).name:
+        raise ValueError(f"--matrix-csv does not match resumed checkpoint config: {Path(args.matrix_csv).name} != {Path(config.matrix_csv).name}")
 
 
 _TABULAR_POLICY_SET = {"tabular", "mi_tabular_z2", "mi_tabular_zx",
@@ -188,7 +188,7 @@ def _main() -> None:
         progress = checkpoint.progress
         snr_schedule_db = checkpoint.snr_schedule_db
 
-        h = load_parity_check_from_sparse_csv(config.matrix_csv)
+        h = load_parity_check_from_sparse_csv(args.matrix_csv if args.matrix_csv else config.matrix_csv)
         trainer = TrainerFactory.create_tabular_trainer(
             h_csr=h,
             config=config,
@@ -244,7 +244,7 @@ def _main() -> None:
             raise ValueError(
                 f"Resume checkpoint cluster_size={config.cluster_size} but policy requires cluster_size={cluster_size}"
             )
-        h = load_parity_check_from_sparse_csv(config.matrix_csv)
+        h = load_parity_check_from_sparse_csv(args.matrix_csv if args.matrix_csv else config.matrix_csv)
         deep_config = checkpoint.dqn_config
         deep_trainer = TrainerFactory.create_trainer_from_checkpoint(
             checkpoint=checkpoint,
@@ -328,7 +328,7 @@ def _main() -> None:
             config = checkpoint.config
             progress = checkpoint.progress
             snr_schedule_db = checkpoint.snr_schedule_db
-            h = load_parity_check_from_sparse_csv(config.matrix_csv)
+            h = load_parity_check_from_sparse_csv(args.matrix_csv if args.matrix_csv else config.matrix_csv)
             trainer = TrainerFactory.create_tabular_trainer(
                 h_csr=h,
                 config=config,
@@ -344,7 +344,7 @@ def _main() -> None:
             deep_config = checkpoint.dqn_config
             progress = checkpoint.progress
             snr_schedule_db = checkpoint.snr_schedule_db
-            h = load_parity_check_from_sparse_csv(config.matrix_csv)
+            h = load_parity_check_from_sparse_csv(args.matrix_csv if args.matrix_csv else config.matrix_csv)
             deep_trainer = TrainerFactory.create_trainer_from_checkpoint(
                 checkpoint=checkpoint,
                 h_csr=h,

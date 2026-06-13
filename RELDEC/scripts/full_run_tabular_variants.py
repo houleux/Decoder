@@ -38,9 +38,9 @@ def main() -> None:
 
     q_tables = {}
 
-    # Full train (reduced for <5 min execution)
+    # Full train
     train_config = {
-        "snr_schedule_db": np.array([2.0, 2.5] * 250, dtype=np.float64),
+        "snr_schedule_db": np.array([0.5,1.0,1.5,2.0,2.5] * 1000, dtype=np.float64),
         "code_rate": 0.5,
         "seed": 42,
     }
@@ -50,8 +50,8 @@ def main() -> None:
         config = TrainingConfig(
             code="mackay",
             matrix_csv=matrix_csv,
-            train_snr_db=[2.0, 2.5],
-            episodes_per_snr=250,
+            train_snr_db=[0.5,1.0,1.5,2.0,2.5],
+            episodes_per_snr=1000,
             code_rate=0.5,
             seed=42,
             hyperparams=hyper,
@@ -82,8 +82,8 @@ def main() -> None:
                 method=method,
                 snr_db=snr,
                 code_rate=0.5,
-                i_max=20,
-                target_frame_errors=50,
+                i_max=5,
+                target_frame_errors=300,
                 max_frames=10000,
                 rng=rng,
                 all_zero_only=True,

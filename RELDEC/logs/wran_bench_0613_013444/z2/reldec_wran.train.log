@@ -1,5 +1,9 @@
-[train] run_id=train_931c2196e8b3 auto_resume=True
-[train] code=wran matrix=/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
+[train] run_id=train_9f2ea49cdc29 auto_resume=False
+[train] code=wran matrix=/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
 [train] H shape=(128, 384) nnz=1296 rate=0.666667
-[train] episodes=3000 start=3000 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=tabular cluster_size=1
-[train] run already complete; reusing existing results
+[train] episodes=12 start=0 l_max=50 alpha=0.1 beta=0.9 epsilon=0.6 policy_type=tabular cluster_size=1
+[done] training complete
+[done] episodes_completed=12
+[done] total_updates=600
+[done] mean_reward=0.974136
+[done] artifacts: /root/Research/RithvikDecoder/Decoder/RELDEC/checkpoints/0613_013444_reldec_wran_z2
