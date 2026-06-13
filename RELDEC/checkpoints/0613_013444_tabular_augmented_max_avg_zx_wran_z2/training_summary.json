@@ -1,0 +1,75 @@
+{
+  "run_id": "train_011b30f97f39",
+  "config_hash": "011b30f97f3997967ecc9f3547dd8daee774140f44f7fbab39f730af97158afd",
+  "run_identity": {
+    "kind": "training",
+    "policy_type": "tabular_augmented_max_avg_zx",
+    "training_config": {
+      "code": "wran",
+      "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "train_snr_db": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        5.5
+      ],
+      "episodes_per_snr": 500,
+      "code_rate": 0.6666666666666667,
+      "seed": 42,
+      "hyperparams": {
+        "alpha": 0.1,
+        "beta": 0.9,
+        "epsilon": 0.6,
+        "l_max": 50
+      },
+      "cluster_size": 2
+    },
+    "cluster_size": 2,
+    "mi_bins": 21,
+    "device": "cpu",
+    "deep_config": null
+  },
+  "config": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "train_snr_db": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      5.5
+    ],
+    "episodes_per_snr": 500,
+    "code_rate": 0.6666666666666667,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 2
+  },
+  "h_shape": [
+    128,
+    384
+  ],
+  "h_nnz": 1296,
+  "policy_type": "tabular_augmented_max_avg_zx",
+  "progress": {
+    "episodes_completed": 3000,
+    "total_updates": 150000,
+    "mean_reward": 15.443597969697052,
+    "elapsed_sec": 1656.4348707199097
+  },
+  "artifacts": {
+    "checkpoint_latest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_tabular_augmented_max_avg_zx_wran_z2/checkpoint_latest.npz",
+    "checkpoint_final": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_tabular_augmented_max_avg_zx_wran_z2/checkpoint_final.npz",
+    "run_manifest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_tabular_augmented_max_avg_zx_wran_z2/run_manifest.json",
+    "config_hash": "011b30f97f3997967ecc9f3547dd8daee774140f44f7fbab39f730af97158afd",
+    "q_table_npy": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_tabular_augmented_max_avg_zx_wran_z2/q_table_final.npy"
+  }
+}

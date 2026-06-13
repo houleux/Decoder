@@ -1,0 +1,44 @@
+{
+  "run_id": "train_9236c6504bef",
+  "created_at_utc": "2026-06-12T22:03:34.577898+00:00",
+  "experiment": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "policy_type": "reldec_misq_global",
+    "parameters": {
+      "z": 4,
+      "mi_bins": 21,
+      "device": "cpu",
+      "checkpoint_every_episodes": 250
+    }
+  },
+  "training_config": {
+    "code": "wran",
+    "matrix_csv": "/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "train_snr_db": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      5.5
+    ],
+    "episodes_per_snr": 500,
+    "code_rate": 0.6666666666666667,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 1
+  },
+  "artifacts": {
+    "checkpoint_latest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_reldec_misq_global_wran_z4/checkpoint_latest.npz",
+    "checkpoint_final": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_reldec_misq_global_wran_z4/checkpoint_final.npz",
+    "run_manifest": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_reldec_misq_global_wran_z4/run_manifest.json",
+    "config_hash": "9236c6504befde835de47cc3616b7723f321159641af734eabee2881a4a735ab",
+    "q_table_npy": "/home2/harshitlalwani/Decoder/RELDEC/checkpoints/0613_013444_reldec_misq_global_wran_z4/q_table_final.npy"
+  }
+}
