@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any
 import numpy as np
 
-from RELDEC.algorithms.reldec_core import ReldecDecoderSuite, evaluate_single_method
+from RELDEC.algorithms.reldec_core import (
+    ReldecDecoderSuite,
+    evaluate_single_method,
+    evaluate_single_method_parallel,
+)
 from RELDEC.algorithms.reldec_deep import evaluate_deep_method, evaluate_mi_tabular_method, MiReldecBaselineDecoder
 from RELDEC.algorithms.reldec_deep import MiTabularQDecoder
 
@@ -21,6 +25,7 @@ def evaluate_method_with_dispatcher(
     rng: np.random.Generator,
     all_zero_only: bool,
     suite: ReldecDecoderSuite | None = None,
+    n_workers: int = 1,
 ) -> Any:
     """Evaluate a method using the appropriate evaluation function.
     
@@ -34,11 +39,12 @@ def evaluate_method_with_dispatcher(
         DecodingStats object from the evaluation function
     """
     
-    if method in {"flooding", "random", "round_robin", "reldec", "reldec_misq_local", "reldec_misq_global", "rel_delta"}:
+    if method in {"flooding", "random", "round_robin", "reldec", "reldec_misq_local", "reldec_misq_global", "rel_delta", "dyna"}:
         # These use the suite and evaluate_single_method
         if suite is None:
             raise ValueError(f"suite is required for method {method}")
-        return evaluate_single_method(
+        _eval_fn = evaluate_single_method_parallel if n_workers > 1 else evaluate_single_method
+        kwargs = dict(
             suite=suite,
             method=method,
             snr_db=float(snr_db),
@@ -49,6 +55,9 @@ def evaluate_method_with_dispatcher(
             rng=rng,
             all_zero_only=bool(all_zero_only),
         )
+        if n_workers > 1:
+            kwargs["n_workers"] = n_workers
+        return _eval_fn(**kwargs)
     
     elif method in {"deep_reldec_z1", "deep_reldec_zx", "mi_dqn_zx",
                     "augmented_max_avg_zx", "augmented_max_zx", "augmented_average_zx"}:

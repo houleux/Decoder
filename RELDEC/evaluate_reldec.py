@@ -68,6 +68,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--tabular-augmented-q-table", type=str, default=None)
     parser.add_argument("--output-csv", type=str, default=None)
     parser.add_argument("--output-json", type=str, default=None)
+    parser.add_argument(
+        "--workers", type=int, default=1,
+        help="Number of parallel worker processes for frame evaluation (default: 1 = sequential)."
+    )
     
     args = parser.parse_args()
     
@@ -207,13 +211,16 @@ def _main() -> None:
 
     rows: list[dict] = []
     suite = ReldecDecoderSuite(h)
-    q_table_methods = {"reldec", "reldec_misq_global", "reldec_misq_local", "rel_delta"}
+    q_table_methods = {"reldec", "reldec_misq_global", "reldec_misq_local", "rel_delta", "dyna"}
     if q_table_methods & set(methods) and dispatcher.q_table is not None:
         suite.set_q_table(dispatcher.q_table)
     
     for snr_db in snr_db_values:
         print(f"[eval] snr={snr_db:.2f} dB")
         for method in methods:
+            import time
+            start_time = time.time()
+            
             # Use evaluation router to dispatch to the right evaluation function
             stats = evaluate_method_with_dispatcher(
                 dispatcher=dispatcher,
@@ -226,7 +233,11 @@ def _main() -> None:
                 rng=rng,
                 all_zero_only=all_zero_only,
                 suite=suite,
+                n_workers=int(args.workers),
             )
+            
+            total_time = time.time() - start_time
+            time_per_frame = total_time / stats.frames if stats.frames > 0 else 0
 
             row = stats.summary(snr_db=float(snr_db))
             row["code"] = args.code
@@ -236,12 +247,16 @@ def _main() -> None:
             row["target_frame_errors"] = int(args.target_frame_errors)
             row["max_frames"] = int(args.max_frames)
             row["all_zero_only"] = bool(all_zero_only)
+            row["total_time_sec"] = total_time
+            row["time_per_frame_ms"] = time_per_frame * 1000.0
             rows.append(row)
 
             print(
                 f"  - {method:11s} frames={row['frames']:7d} "
                 f"FER={row['fer']:.6e} BER={row['ber']:.6e} "
-                f"avg_msgs={row['avg_messages']:.2f}"
+                f"avg_msgs={row['avg_messages']:.2f} "
+                f"time={total_time:.2f}s "
+                f"({time_per_frame*1000.0:.2f}ms/frame)"
             )
 
     _write_csv(rows, output_csv)

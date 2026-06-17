@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Sequence
@@ -63,6 +65,10 @@ class ReldecHyperParams:
     beta: float = 0.9
     epsilon: float = 0.6
     l_max: int = 50
+
+@dataclass(frozen=True)
+class DynaHyperParams(ReldecHyperParams):
+    n_planning_steps: int = 10
 
 
 @dataclass(frozen=True)
@@ -450,6 +456,83 @@ class ReldecTrainer(Trainer):
 
 	def checkpoint(self) -> dict[str, Any]:
 		"""Return checkpoint data (interfaces.Trainer implementation)."""
+		from dataclasses import asdict
+		return {
+			"q_table": self.q_table.tolist() if self.q_table is not None else None,
+			"hyperparams": asdict(self.hyperparams),
+			"cluster_size": getattr(self, 'cluster_size', 1),
+		}
+
+class DynaTrainer(ReldecTrainer):
+	"""Tabular Dyna-Q trainer for z=1 cluster scheduling."""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		hyperparams: DynaHyperParams,
+		reward_fn: RewardFn,
+		q_table: Optional[np.ndarray] = None,
+		cluster_size: int = 1,
+	):
+		super().__init__(h_csr, hyperparams, reward_fn, q_table, cluster_size)
+		self.hyperparams = hyperparams
+		# model[(state, action)] = (reward, next_state)
+		self.model: dict[tuple[int, int], tuple[float, int]] = {}
+		self.model_keys: list[tuple[int, int]] = []
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> float:
+		self.decoder.reset()
+		self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		states = self._initialize_states(llr_post)
+		episode_reward = 0.0
+
+		alpha = self.hyperparams.alpha
+		beta = self.hyperparams.beta
+
+		for _ in range(self.hyperparams.l_max):
+			action = self._select_action_train(states, rng)
+			prev_state = int(states[action])
+
+			llr_post_before = llr_post.copy()
+			llr_post = self.decoder.decode_cluster(self._singleton_actions[action])
+			neighbors = self.check_neighbors[action]
+			new_state = _state_from_llr_subset(llr_post, neighbors)
+			
+			before_dict = {"llr": llr_post_before}
+			after_dict = {"llr_post": llr_post}
+			info_dict = {"neighbors": neighbors}
+			reward = self.reward_fn.compute(before_dict, after_dict, info_dict)
+
+			old_q = self.q_table[prev_state, action]
+			next_best_q = float(np.max(self.q_table[new_state, :]))
+			self.q_table[prev_state, action] = (1.0 - alpha) * old_q + alpha * (reward + beta * next_best_q)
+
+			# Update model
+			if (prev_state, action) not in self.model:
+				self.model_keys.append((prev_state, action))
+			self.model[(prev_state, action)] = (reward, new_state)
+
+			# Planning phase
+			if len(self.model_keys) > 0:
+				for _ in range(self.hyperparams.n_planning_steps):
+					sim_idx = rng.integers(0, len(self.model_keys))
+					sim_s, sim_a = self.model_keys[sim_idx]
+					sim_r, sim_next_s = self.model[(sim_s, sim_a)]
+					
+					sim_old_q = self.q_table[sim_s, sim_a]
+					sim_next_best_q = float(np.max(self.q_table[sim_next_s, :]))
+					self.q_table[sim_s, sim_a] = (1.0 - alpha) * sim_old_q + alpha * (sim_r + beta * sim_next_best_q)
+
+			states[action] = new_state
+			episode_reward += reward
+
+		return episode_reward
+
+
+	def checkpoint(self) -> dict[str, Any]:
+		"""Return checkpoint data (interfaces.Trainer implementation)."""
 		return {
 			"q_table": self.q_table.tolist(),
 			"hyperparams": asdict(self.hyperparams),
@@ -676,6 +759,7 @@ def evaluate_single_method(
 		"reldec_misq_local",
 		"reldec_misq_global",
 		"rel_delta",
+		"dyna",
 	}
 	if method not in valid_methods:
 		supported = ", ".join(sorted(valid_methods))
@@ -704,3 +788,126 @@ def evaluate_single_method(
 		stats.update(tx_bits, res)
 
 	return stats
+
+
+# ---------------------------------------------------------------------------
+# Parallel frame evaluation
+# ---------------------------------------------------------------------------
+
+def _parallel_chunk_worker(
+	args: tuple,
+) -> MethodStats:
+	"""Top-level worker so it is picklable by multiprocessing.
+
+	Each worker creates its own decoder instance to avoid sharing
+	C-extension objects across processes.
+	"""
+	(
+		h_data, h_indices, h_indptr, h_shape,
+		q_table,
+		method,
+		snr_db, code_rate, i_max,
+		n_frames, target_frame_errors,
+		seed,
+	) = args
+
+	h_csr = sp.csr_matrix(
+		(h_data, h_indices, h_indptr), shape=h_shape, dtype=np.uint8
+	)
+	suite = ReldecDecoderSuite(h_csr, q_table)
+	rng	= np.random.default_rng(seed)
+	stats = MethodStats(method=method, n=h_shape[1])
+
+	while stats.frames < n_frames and stats.frame_errors < target_frame_errors:
+		tx_bits = np.zeros(h_shape[1], dtype=np.uint8)
+		llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+
+		if method == "flooding":
+			res = suite.decode_flooding(llr, i_max)
+		elif method == "random":
+			res = suite.decode_random_sequential(llr, i_max, rng)
+		elif method == "round_robin":
+			res = suite.decode_round_robin(llr, i_max)
+		else:
+			res = suite.decode_reldec(llr, i_max, rng)
+
+		stats.update(tx_bits, res)
+
+	return stats
+
+
+def merge_method_stats(partial_stats: list[MethodStats]) -> MethodStats:
+	"""Combine a list of partial MethodStats into one."""
+	base = partial_stats[0]
+	merged = MethodStats(method=base.method, n=base.n)
+	for s in partial_stats:
+		merged.frames		  += s.frames
+		merged.bit_errors	  += s.bit_errors
+		merged.frame_errors	  += s.frame_errors
+		merged.converged_frames += s.converged_frames
+		merged.messages		  += s.messages
+		merged.iterations	  += s.iterations
+	return merged
+
+
+def evaluate_single_method_parallel(
+	suite: ReldecDecoderSuite,
+	method: str,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	n_workers: int | None = None,
+) -> MethodStats:
+	"""Parallel version of evaluate_single_method.
+
+	Splits *max_frames* evenly across *n_workers* subprocesses.  Each worker
+	gets an independent RNG seed so results are statistically independent.
+	The partial MethodStats objects are merged in the main process.
+
+	The final merged stats are equivalent (in expectation) to running
+	``evaluate_single_method`` sequentially with the same total frame count.
+	"""
+	if n_workers is None:
+		n_workers = min(os.cpu_count() or 1, max_frames)
+
+	frames_per_worker = max(1, max_frames // n_workers)
+	# Give leftover frames to the last worker
+	frames_last_worker = max_frames - frames_per_worker * (n_workers - 1)
+	
+	errors_per_worker = max(1, target_frame_errors // n_workers)
+	errors_last_worker = target_frame_errors - errors_per_worker * (n_workers - 1)
+
+	# Derive per-worker seeds from the caller's RNG (reproducible, uncorrelated)
+	base_seed = int(rng.integers(0, 2**31))
+	worker_seeds = [base_seed + i for i in range(n_workers)]
+
+	# Extract raw CSR components so each worker can rebuild without pickling BpDecoder
+	h = suite.h
+	h_args = (h.data, h.indices, h.indptr, h.shape)
+
+	job_frames = [frames_per_worker] * (n_workers - 1) + [frames_last_worker]
+	job_errors = [errors_per_worker] * (n_workers - 1) + [errors_last_worker]
+
+	worker_args = [
+		(
+			*h_args,
+			suite.q_table,
+			method,
+			snr_db, code_rate, i_max,
+			job_frames[i], job_errors[i],
+			worker_seeds[i],
+		)
+		for i in range(n_workers)
+	]
+
+	partial: list[MethodStats] = []
+	with ProcessPoolExecutor(max_workers=n_workers) as pool:
+		futures = {pool.submit(_parallel_chunk_worker, a): i for i, a in enumerate(worker_args)}
+		for fut in as_completed(futures):
+			partial.append(fut.result())
+
+	return merge_method_stats(partial)
