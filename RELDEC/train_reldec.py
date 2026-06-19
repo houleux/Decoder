@@ -165,7 +165,7 @@ def _validate_checkpoint_config(config: TrainingConfig, args: argparse.Namespace
 
 
 _TABULAR_POLICY_SET = {"tabular", "mi_tabular_z2", "mi_tabular_zx",
-                       "reldec_misq_global", "reldec_misq_local", "rel_delta", "dyna"}
+                       "reldec_misq_global", "reldec_misq_local", "rel_delta"}
 
 def _is_tabular_policy(policy_type: str) -> bool:
     """Return True if the policy type is tabular (Q-table-based, not deep)."""

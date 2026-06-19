@@ -7,7 +7,7 @@ from typing import Any
 
 import scipy.sparse as sp
 
-from RELDEC.algorithms.reldec_core import ReldecTrainer, TrainingConfig, DynaTrainer, DynaHyperParams
+from RELDEC.algorithms.reldec_core import ReldecTrainer, TrainingConfig
 from RELDEC.algorithms.reldec_deep import (
     DeepReldecTrainer,
     DeepTrainingCheckpoint,
@@ -29,7 +29,7 @@ class TrainerFactory:
         policy_type: str,
         mi_bins: int = 21,
         q_table: Optional[np.ndarray] = None,
-    ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer | DynaTrainer:
+    ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer:
         """Create a tabular trainer (ReldecTrainer, MiTabularQTrainer, or TabularAugmentedQTrainer).
         
         Args:
@@ -42,7 +42,7 @@ class TrainerFactory:
         Returns:
             Initialized tabular trainer
         """
-        if policy_type == "tabular" or policy_type in {"reldec_misq_local", "reldec_misq_global", "rel_delta", "dyna"}:
+        if policy_type == "tabular" or policy_type in {"reldec_misq_local", "reldec_misq_global", "rel_delta"}:
             spec = training_policy_spec(policy_type)
             reward_type = spec.parameters.get("reward")
             
@@ -57,18 +57,6 @@ class TrainerFactory:
             else:
                 raise ValueError(f"Unknown or missing reward type '{reward_type}' for tabular trainer")
                 
-            if policy_type == "dyna":
-                if isinstance(config.hyperparams, DynaHyperParams):
-                    dyna_hp = config.hyperparams
-                else:
-                    dyna_hp = DynaHyperParams(
-                        alpha=config.hyperparams.alpha,
-                        beta=config.hyperparams.beta,
-                        epsilon=config.hyperparams.epsilon,
-                        l_max=config.hyperparams.l_max,
-                        n_planning_steps=10
-                    )
-                return DynaTrainer(h_csr, dyna_hp, reward_fn=reward_fn, q_table=q_table)
             return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn, q_table=q_table)
         elif policy_type.startswith("mi_tabular"):
             # Use config.cluster_size which is already resolved from --z arg

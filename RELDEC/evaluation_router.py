@@ -39,7 +39,7 @@ def evaluate_method_with_dispatcher(
         DecodingStats object from the evaluation function
     """
     
-    if method in {"flooding", "random", "round_robin", "reldec", "reldec_misq_local", "reldec_misq_global", "rel_delta", "dyna"}:
+    if method in {"flooding", "random", "round_robin", "reldec", "reldec_misq_local", "reldec_misq_global", "rel_delta"}:
         # These use the suite and evaluate_single_method
         if suite is None:
             raise ValueError(f"suite is required for method {method}")

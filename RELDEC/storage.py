@@ -65,7 +65,7 @@ class RunStore:
         
         # Create symlink to artifacts directory for easy access
         artifacts_link = run_dir / "artifacts"
-        if artifacts_link.exists():
+        if artifacts_link.is_symlink() or artifacts_link.exists():
             artifacts_link.unlink()
         artifacts_link.symlink_to(Path(artifacts_dir).resolve(), target_is_directory=True)
         
@@ -89,7 +89,7 @@ class RunStore:
         
         # Create symlink to artifacts directory for easy access
         artifacts_link = run_dir / "artifacts"
-        if artifacts_link.exists():
+        if artifacts_link.is_symlink() or artifacts_link.exists():
             artifacts_link.unlink()
         artifacts_link.symlink_to(Path(artifacts_dir).resolve(), target_is_directory=True)
         

@@ -1,47 +1,19 @@
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluate_reldec.py", line 297, in <module>
-    _main()
-    ~~~~~^^
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluate_reldec.py", line 218, in _main
-    stats = evaluate_method_with_dispatcher(
-        dispatcher=dispatcher,
-    ...<8 lines>...
-        suite=suite,
-    )
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/evaluation_router.py", line 72, in evaluate_method_with_dispatcher
-    return evaluate_mi_tabular_method(
-        decoder=decoder,
-    ...<7 lines>...
-        method_name=method,
-    )
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_deep.py", line 1041, in evaluate_mi_tabular_method
-    decoded = decoder.decode(llr, i_max=i_max, rng=rng)
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_tabular_augmented.py", line 201, in decode
-    state_bin = self._get_binned_state(llr_post)
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_tabular_augmented.py", line 167, in _get_binned_state
-    feature = get_augmented_feature(llr_post, self.mode, self.map.cluster_neighbors)
-  File "/root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/reldec_augmented.py", line 39, in get_augmented_feature
-    avg = float(np.mean(abs_llr[neighbors]))
-                ~~~~~~~^^^^^^^^^^^^^^^^^^^^
-  File "/root/Research/RithvikDecoder/Decoder/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py", line 3824, in mean
-    return _methods._mean(a, axis=axis, dtype=dtype,
-           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                          out=out, **kwargs)
-                          ^^^^^^^^^^^^^^^^^^
-  File "/root/Research/RithvikDecoder/Decoder/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py", line 138, in _mean
-    elif hasattr(ret, 'dtype'):
-         ~~~~~~~^^^^^^^^^^^^^^
-KeyboardInterrupt
-[eval] run_id=eval_3b9e093b86a0
+[eval] run_id=eval_4021dd9c96fa
 [eval] code=wran matrix=/root/Research/RithvikDecoder/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv
 [eval] H shape=(128, 384) nnz=1296 rate=0.666667 i_max=50
 [eval] methods=['tabular_augmented_max_avg_zx']
-[eval] SNR points=[0.5, 1.0, 1.5, 2.0, 2.5]
-[eval] stop criteria: target_frame_errors=300 max_frames=100000
-[eval] snr=0.50 dB
-  - tabular_augmented_max_avg_zx frames=    302 FER=9.933775e-01 BER=1.002690e-01 avg_msgs=64503.89
+[eval] SNR points=[1.0, 1.5, 2.0, 2.5, 3.0]
+[eval] stop criteria: target_frame_errors=300 max_frames=100
 [eval] snr=1.00 dB
-  - tabular_augmented_max_avg_zx frames=    316 FER=9.493671e-01 BER=7.811676e-02 avg_msgs=62113.67
+  - tabular_augmented_max_avg_zx frames=    100 FER=9.200000e-01 BER=7.343750e-02 avg_msgs=60613.92
 [eval] snr=1.50 dB
+  - tabular_augmented_max_avg_zx frames=    100 FER=7.800000e-01 BER=5.484375e-02 avg_msgs=52513.92
+[eval] snr=2.00 dB
+  - tabular_augmented_max_avg_zx frames=    100 FER=4.200000e-01 BER=2.408854e-02 avg_msgs=31829.76
+[eval] snr=2.50 dB
+  - tabular_augmented_max_avg_zx frames=    100 FER=1.000000e-01 BER=4.244792e-03 avg_msgs=12791.52
+[eval] snr=3.00 dB
+  - tabular_augmented_max_avg_zx frames=    100 FER=1.000000e-02 BER=6.770833e-04 avg_msgs=4769.28
+[done] wrote CSV: /root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/results/eval_4021dd9c96fa/results.csv
+[done] wrote JSON: /root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/results/eval_4021dd9c96fa/results.json
+[done] wrote manifest: /root/Research/RithvikDecoder/Decoder/RELDEC/algorithms/results/eval_4021dd9c96fa/evaluation_manifest.json

@@ -59,6 +59,27 @@ class DeepDqnConfig:
 	def to_dict(self) -> dict:
 		return asdict(self)
 
+
+@dataclass(frozen=True)
+class DeepDynaConfig:
+	"""Configuration for Deep Dyna-Q (Dyna with NN approximate Q)."""
+	policy_label: str
+	cluster_size: int
+	n_planning_steps: int = 10
+	hidden_dim: int = 128
+	learning_rate: float = 1e-3
+	replay_capacity: int = 20000
+	replay_warmup: int = 1000
+	batch_size: int = 128
+	target_sync_steps: int = 200
+	epsilon_start: float = 0.6
+	epsilon_end: float = 0.05
+	epsilon_decay_steps: int = 10000
+	gamma: float = 0.9
+
+	def to_dict(self) -> dict:
+		return asdict(self)
+
 	@staticmethod
 	def from_dict(payload: dict) -> "DeepDqnConfig":
 		return DeepDqnConfig(
@@ -1107,3 +1128,711 @@ def load_deep_decoder_from_checkpoint(
 		device=device,
 	)
 
+
+
+class DeepDynaTrainer(Trainer):
+	"""Deep Dyna-Q trainer using global continuous state (tanh(llr/2)) and an Experience Replay model."""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		config: DeepDynaConfig,
+		beta_discount: float,
+		l_max: int,
+		device: str = "cpu",
+	):
+		if torch is None or nn is None:
+			raise RuntimeError("PyTorch is required for Deep Dyna")
+
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, config.cluster_size)
+		self.num_actions = len(self.map.clusters)
+		
+		self.state_dim = self.n
+
+		self.gamma = float(beta_discount)
+		self.l_max = int(l_max)
+		self.config = config
+
+		self.device = torch.device(device)
+		self.online_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net.load_state_dict(self.online_net.state_dict())
+		self.target_net.eval()
+
+		self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=config.learning_rate)
+		self.replay = ReplayBuffer(config.replay_capacity, self.state_dim)
+
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+		self.global_step = 0
+
+	def _epsilon(self) -> float:
+		cfg = self.config
+		if cfg.epsilon_decay_steps <= 0:
+			return float(cfg.epsilon_end)
+		frac = min(float(self.global_step) / float(cfg.epsilon_decay_steps), 1.0)
+		return float(cfg.epsilon_start + frac * (cfg.epsilon_end - cfg.epsilon_start))
+
+	def _choose_action(
+		self,
+		state: np.ndarray,
+		rng: np.random.Generator,
+		training: bool,
+	) -> int:
+		eps = self._epsilon() if training else 0.0
+		if training and rng.random() < eps:
+			return int(rng.integers(0, self.num_actions))
+
+		with torch.no_grad():
+			states_t = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+			q_vals = self.online_net(states_t).squeeze(0)
+			best_val = torch.max(q_vals)
+			ties = torch.where(q_vals == best_val)[0].cpu().numpy()
+
+		tie_pick = int(ties[rng.integers(0, ties.size)])
+		return tie_pick
+
+	def _train_planning_step(self, rng: np.random.Generator) -> float:
+		cfg = self.config
+		if self.replay.size < cfg.replay_warmup:
+			return 0.0
+
+		states, actions, rewards, next_states, dones = self.replay.sample(rng, cfg.batch_size)
+
+		states_t = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+		ns_t = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+		a_t = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+		r_t = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+		done_t = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
+
+		q_values = self.online_net(states_t).gather(1, a_t.unsqueeze(1)).squeeze(1)
+		with torch.no_grad():
+			next_q = self.target_net(ns_t).max(1)[0]
+			target = r_t + self.gamma * next_q * (1.0 - done_t)
+		loss = nn.functional.mse_loss(q_values, target)
+
+		self.optimizer.zero_grad()
+		loss.backward()
+		self.optimizer.step()
+
+		if self.global_step % max(cfg.target_sync_steps, 1) == 0:
+			self.target_net.load_state_dict(self.online_net.state_dict())
+
+		return float(loss.detach().cpu().item())
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+		self.decoder.reset()
+		try:
+			self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		state = np.tanh(llr_post / 2.0).astype(np.float32)
+
+		episode_reward = 0.0
+		episode_loss = 0.0
+
+		for _ in range(self.l_max):
+			action = self._choose_action(state, rng=rng, training=True)
+			prev_state = state.copy()
+
+			llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+			state = np.tanh(llr_post / 2.0).astype(np.float32)
+
+			neighbors = self.map.cluster_neighbors[action]
+			if neighbors.size == 0:
+				reward = 1.0
+			else:
+				reward = float(np.mean(llr_post[neighbors] >= 0.0))
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			done = bool(syndrome_is_zero(self.h, x_hat))
+			
+			if done:
+				reward += 10.0
+
+			self.replay.add(prev_state, action, reward, state, float(done))
+			self.global_step += 1
+
+			step_loss = 0.0
+			if self.replay.size >= self.config.replay_warmup:
+				for _ in range(self.config.n_planning_steps):
+					step_loss += self._train_planning_step(rng)
+			
+			episode_loss += step_loss
+			episode_reward += reward
+
+			if done:
+				break
+
+		return episode_reward, episode_loss
+
+	def train(self, run_config: dict[str, Any]) -> Any:
+		snr_schedule_db = np.asarray(run_config.get("snr_schedule_db", []), dtype=np.float64)
+		code_rate = float(run_config.get("code_rate", 0.5))
+		seed = int(run_config.get("seed", 42))
+		
+		rng = np.random.default_rng(seed)
+		progress = TrainProgress()
+		
+		import time
+		st = time.time()
+		for snr_db in snr_schedule_db:
+			tx_bits = np.zeros(self.n, dtype=np.uint8)
+			llr_channel = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+			
+			ep_reward, _ = self.train_episode(llr_channel, rng)
+			
+			progress.episodes_completed += 1
+			progress.reward_sum += ep_reward
+			progress.reward_count += 1
+			progress.elapsed_sec = time.time() - st
+			
+		return progress
+
+	def checkpoint(self, path: str, metadata: Optional[dict[str, Any]] = None) -> None:
+		pass
+
+class DeepDynaDecoder:
+	def __init__(self, h_csr: sp.csr_matrix, q_network: torch.nn.Module, cluster_size: int, device: str = "cpu"):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.device = torch.device(device)
+		self.net = q_network.to(self.device)
+		self.net.eval()
+		self.cluster_decoder = BpDecoder(
+			self.h, max_iter=1, schedule="cluster", input_vector_type="received_vector"
+		)
+
+	def decode(self, llr_channel: np.ndarray, i_max: int) -> tuple[np.ndarray, bool, int, int]:
+		self.cluster_decoder.reset()
+		try:
+			self.cluster_decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.cluster_decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = (llr_post < 0).astype(np.uint8)
+		if syndrome_is_zero(self.h, x_hat):
+			return x_hat, True, 0, 0
+
+		messages = 0
+		for i in range(i_max):
+			state = np.tanh(llr_post / 2.0).astype(np.float32)
+			
+			with torch.no_grad():
+				states_t = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+				q_vals = self.net(states_t).squeeze(0)
+				action = int(torch.argmax(q_vals).cpu().item())
+
+			llr_post = self.cluster_decoder.decode_cluster(self.map.clusters[action])
+			messages += sum(len(self.map.cluster_neighbors[action]) for _ in self.map.clusters[action])
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			if syndrome_is_zero(self.h, x_hat):
+				return x_hat, True, i + 1, messages
+
+		return x_hat, False, i_max, messages
+
+def evaluate_deep_dyna_method(
+	decoder: DeepDynaDecoder,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	method_name: str = "deep_dyna",
+) -> Any:
+	from RELDEC.algorithms.reldec_core import MethodStats, bpsk_awgn_llr, DecodeResult
+	
+	stats = MethodStats(method=method_name, n=decoder.n)
+	while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+		if all_zero_only:
+			tx_bits = np.zeros(decoder.n, dtype=np.uint8)
+		else:
+			tx_bits = rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+		
+		llr = bpsk_awgn_llr(tx_bits, snr_db, code_rate, rng)
+		x_hat, converged, iters, msgs = decoder.decode(llr, i_max)
+		
+		res = DecodeResult(bits=x_hat, converged=converged, iterations=iters, messages=msgs)
+		stats.update(tx_bits, res)
+	return stats
+
+
+# ---------------------------------------------------------------------------
+# DeepDynaMI: Dyna-Q with MI-vector state  (compact: num_clusters floats)
+# ---------------------------------------------------------------------------
+
+class DeepDynaMITrainer(Trainer):
+	"""Deep Dyna-Q using the MI-vector state (one float per cluster).
+
+	State: _cluster_mutual_information_vector -> shape (num_clusters,) in [0,1]
+	Action: schedule a single cluster (same as RELDEC)
+	Model: ReplayBuffer with n_planning_steps Q-updates per env step
+	"""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		config: "DeepDynaConfig",
+		beta_discount: float,
+		l_max: int,
+		device: str = "cpu",
+	):
+		if torch is None or nn is None:
+			raise RuntimeError("PyTorch is required for DeepDynaMI")
+
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, config.cluster_size)
+		self.num_actions = len(self.map.clusters)
+
+		# State = MI-vector: one scalar per cluster
+		self.state_dim = self.num_actions  # compact!
+
+		self.gamma = float(beta_discount)
+		self.l_max = int(l_max)
+		self.config = config
+
+		self.device = torch.device(device)
+		self.online_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net.load_state_dict(self.online_net.state_dict())
+		self.target_net.eval()
+
+		self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=config.learning_rate)
+		self.replay = ReplayBuffer(config.replay_capacity, self.state_dim)
+
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+
+		self.global_step = 0
+
+	def _mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+		return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+
+	def _epsilon(self) -> float:
+		cfg = self.config
+		if cfg.epsilon_decay_steps <= 0:
+			return float(cfg.epsilon_end)
+		frac = min(float(self.global_step) / float(cfg.epsilon_decay_steps), 1.0)
+		return float(cfg.epsilon_start + frac * (cfg.epsilon_end - cfg.epsilon_start))
+
+	def _choose_action(self, state: np.ndarray, rng: np.random.Generator, training: bool) -> int:
+		eps = self._epsilon() if training else 0.0
+		if training and rng.random() < eps:
+			return int(rng.integers(0, self.num_actions))
+		with torch.no_grad():
+			st = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+			q_vals = self.online_net(st).squeeze(0)
+			best_val = torch.max(q_vals)
+			ties = torch.where(q_vals == best_val)[0].cpu().numpy()
+		return int(ties[rng.integers(0, ties.size)])
+
+	def _planning_step(self, rng: np.random.Generator) -> float:
+		cfg = self.config
+		if self.replay.size < cfg.replay_warmup:
+			return 0.0
+		states, actions, rewards, next_states, dones = self.replay.sample(rng, cfg.batch_size)
+		st = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+		ns = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+		at = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+		rt = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+		dt = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
+		q_vals = self.online_net(st).gather(1, at.unsqueeze(1)).squeeze(1)
+		with torch.no_grad():
+			next_q = self.target_net(ns).max(1)[0]
+			target = rt + self.gamma * next_q * (1.0 - dt)
+		loss = nn.functional.mse_loss(q_vals, target)
+		self.optimizer.zero_grad()
+		loss.backward()
+		self.optimizer.step()
+		if self.global_step % max(self.config.target_sync_steps, 1) == 0:
+			self.target_net.load_state_dict(self.online_net.state_dict())
+		return float(loss.detach().cpu().item())
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+		self.decoder.reset()
+		try:
+			self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		state = self._mi_state(llr_post)
+
+		episode_reward = 0.0
+		episode_loss = 0.0
+
+		for _ in range(self.l_max):
+			action = self._choose_action(state, rng=rng, training=True)
+			prev_state = state.copy()
+
+			llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+			state = self._mi_state(llr_post)
+
+			neighbors = self.map.cluster_neighbors[action]
+			reward = float(np.mean(llr_post[neighbors] >= 0.0)) if neighbors.size else 1.0
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			from RELDEC.algorithms.reldec_core import syndrome_is_zero as _syn_zero
+			done = bool(_syn_zero(self.h, x_hat))
+			if done:
+				reward += 10.0
+
+			self.replay.add(prev_state, action, reward, state, float(done))
+			self.global_step += 1
+
+			step_loss = 0.0
+			if self.replay.size >= self.config.replay_warmup:
+				for _ in range(self.config.n_planning_steps):
+					step_loss += self._planning_step(rng)
+			episode_loss += step_loss
+			episode_reward += reward
+			if done:
+				break
+
+		return episode_reward, episode_loss
+
+	def train(self, run_config: dict) -> Any:
+		from RELDEC.algorithms.reldec_core import bpsk_awgn_llr
+		snr_schedule_db = np.asarray(run_config.get("snr_schedule_db", []), dtype=np.float64)
+		code_rate = float(run_config.get("code_rate", 0.5))
+		seed = int(run_config.get("seed", 42))
+		rng = np.random.default_rng(seed)
+		progress = TrainProgress()
+		import time; st = time.time()
+		for snr_db in snr_schedule_db:
+			tx = np.zeros(self.n, dtype=np.uint8)
+			llr = bpsk_awgn_llr(tx, snr_db, code_rate, rng)
+			ep_r, _ = self.train_episode(llr, rng)
+			progress.episodes_completed += 1
+			progress.reward_sum += ep_r
+			progress.reward_count += 1
+			progress.elapsed_sec = time.time() - st
+		return progress
+
+	def checkpoint(self, path: str, metadata: Optional[dict[str, Any]] = None) -> None:
+		pass
+
+
+class DeepDynaMIDecoder:
+	"""Greedy decoder using a trained DeepDynaMI Q-network."""
+
+	def __init__(self, h_csr: sp.csr_matrix, q_network: "torch.nn.Module", cluster_size: int, device: str = "cpu"):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.device = torch.device(device)
+		self.net = q_network.to(self.device)
+		self.net.eval()
+		self.cluster_decoder = BpDecoder(
+			self.h, max_iter=1, schedule="cluster", input_vector_type="received_vector"
+		)
+
+	def _mi_state(self, llr_post: np.ndarray) -> np.ndarray:
+		return _cluster_mutual_information_vector(llr_post, self.map.cluster_neighbors)
+
+	def decode(self, llr_channel: np.ndarray, i_max: int) -> tuple[np.ndarray, bool, int, int]:
+		self.cluster_decoder.reset()
+		try:
+			self.cluster_decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.cluster_decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = (llr_post < 0).astype(np.uint8)
+		from RELDEC.algorithms.reldec_core import syndrome_is_zero as _syn_zero
+		if _syn_zero(self.h, x_hat):
+			return x_hat, True, 0, 0
+
+		messages = 0
+		for i in range(i_max):
+			state = self._mi_state(llr_post)
+			with torch.no_grad():
+				st = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+				q_vals = self.net(st).squeeze(0)
+				action = int(torch.argmax(q_vals).cpu().item())
+
+			llr_post = self.cluster_decoder.decode_cluster(self.map.clusters[action])
+			messages += len(self.map.cluster_neighbors[action])
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			if _syn_zero(self.h, x_hat):
+				return x_hat, True, i + 1, messages
+
+		return x_hat, False, i_max, messages
+
+
+def evaluate_deep_dyna_mi_method(
+	decoder: DeepDynaMIDecoder,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	method_name: str = "deep_dyna_mi",
+) -> Any:
+	from RELDEC.algorithms.reldec_core import MethodStats, bpsk_awgn_llr, DecodeResult
+	stats = MethodStats(method=method_name, n=decoder.n)
+	while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+		tx = np.zeros(decoder.n, dtype=np.uint8) if all_zero_only else rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+		llr = bpsk_awgn_llr(tx, snr_db, code_rate, rng)
+		x_hat, converged, iters, msgs = decoder.decode(llr, i_max)
+		stats.update(tx, DecodeResult(bits=x_hat, converged=converged, iterations=iters, messages=msgs))
+	return stats
+
+# ---------------------------------------------------------------------------
+# DeepDynaDiscrete: Dyna-Q with Global Discretized State Vector
+# ---------------------------------------------------------------------------
+
+class DeepDynaDiscreteTrainer(Trainer):
+	"""Deep Dyna-Q using the global discretized state (same bins as RELDEC).
+
+	State: [s_0, s_1, ..., s_m] where s_a = _state_from_llr_subset / 63.0
+	Action: schedule a single cluster
+	Model: ReplayBuffer with n_planning_steps Q-updates per env step
+	"""
+
+	def __init__(
+		self,
+		h_csr: sp.csr_matrix,
+		config: "DeepDynaConfig",
+		beta_discount: float,
+		l_max: int,
+		device: str = "cpu",
+	):
+		if torch is None or nn is None:
+			raise RuntimeError("PyTorch is required for DeepDynaDiscrete")
+
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, config.cluster_size)
+		self.num_actions = len(self.map.clusters)
+
+		# State = Discretized MI scalar per cluster
+		self.state_dim = self.num_actions
+
+		self.gamma = float(beta_discount)
+		self.l_max = int(l_max)
+		self.config = config
+
+		self.device = torch.device(device)
+		self.online_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net = QNetwork(self.state_dim, self.num_actions, config.hidden_dim).to(self.device)
+		self.target_net.load_state_dict(self.online_net.state_dict())
+		self.target_net.eval()
+
+		self.optimizer = torch.optim.Adam(self.online_net.parameters(), lr=config.learning_rate)
+		self.replay = ReplayBuffer(config.replay_capacity, self.state_dim)
+
+		self.decoder = BpDecoder(
+			self.h,
+			max_iter=1,
+			schedule="cluster",
+			input_vector_type="received_vector",
+		)
+		self.global_step = 0
+
+	def _discrete_state(self, llr_post: np.ndarray) -> np.ndarray:
+		from RELDEC.algorithms.reldec_core import _state_from_llr_subset
+		state = np.zeros(self.num_actions, dtype=np.float32)
+		for a in range(self.num_actions):
+			state[a] = _state_from_llr_subset(llr_post, self.map.cluster_neighbors[a]) / 63.0
+		return state
+
+	def _epsilon(self) -> float:
+		cfg = self.config
+		if cfg.epsilon_decay_steps <= 0:
+			return float(cfg.epsilon_end)
+		frac = min(float(self.global_step) / float(cfg.epsilon_decay_steps), 1.0)
+		return float(cfg.epsilon_start + frac * (cfg.epsilon_end - cfg.epsilon_start))
+
+	def _choose_action(self, state: np.ndarray, rng: np.random.Generator, training: bool) -> int:
+		eps = self._epsilon() if training else 0.0
+		if training and rng.random() < eps:
+			return int(rng.integers(0, self.num_actions))
+		with torch.no_grad():
+			st = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+			q_vals = self.online_net(st).squeeze(0)
+			best_val = torch.max(q_vals)
+			ties = torch.where(q_vals == best_val)[0].cpu().numpy()
+		return int(ties[rng.integers(0, ties.size)])
+
+	def _planning_step(self, rng: np.random.Generator) -> float:
+		cfg = self.config
+		if self.replay.size < cfg.replay_warmup:
+			return 0.0
+		states, actions, rewards, next_states, dones = self.replay.sample(rng, cfg.batch_size)
+		st = torch.as_tensor(states, dtype=torch.float32, device=self.device)
+		ns = torch.as_tensor(next_states, dtype=torch.float32, device=self.device)
+		at = torch.as_tensor(actions, dtype=torch.int64, device=self.device)
+		rt = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+		dt = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
+		q_vals = self.online_net(st).gather(1, at.unsqueeze(1)).squeeze(1)
+		with torch.no_grad():
+			next_q = self.target_net(ns).max(1)[0]
+			target = rt + self.gamma * next_q * (1.0 - dt)
+		loss = nn.functional.mse_loss(q_vals, target)
+		self.optimizer.zero_grad()
+		loss.backward()
+		self.optimizer.step()
+		if self.global_step % max(self.config.target_sync_steps, 1) == 0:
+			self.target_net.load_state_dict(self.online_net.state_dict())
+		return float(loss.detach().cpu().item())
+
+	def train_episode(self, llr_channel: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+		self.decoder.reset()
+		try:
+			self.decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.decoder.log_prob_ratios, dtype=np.float64)
+		state = self._discrete_state(llr_post)
+
+		episode_reward = 0.0
+		episode_loss = 0.0
+
+		for _ in range(self.l_max):
+			action = self._choose_action(state, rng=rng, training=True)
+			prev_state = state.copy()
+
+			llr_post = self.decoder.decode_cluster(self.map.clusters[action])
+			state = self._discrete_state(llr_post)
+
+			neighbors = self.map.cluster_neighbors[action]
+			reward = float(np.mean(llr_post[neighbors] >= 0.0)) if neighbors.size else 1.0
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			from RELDEC.algorithms.reldec_core import syndrome_is_zero as _syn_zero
+			done = bool(_syn_zero(self.h, x_hat))
+			if done:
+				reward += 10.0
+
+			self.replay.add(prev_state, action, reward, state, float(done))
+			self.global_step += 1
+
+			step_loss = 0.0
+			if self.replay.size >= self.config.replay_warmup:
+				for _ in range(self.config.n_planning_steps):
+					step_loss += self._planning_step(rng)
+			episode_loss += step_loss
+			episode_reward += reward
+			if done:
+				break
+
+		return episode_reward, episode_loss
+
+	def train(self, run_config: dict) -> Any:
+		from RELDEC.algorithms.reldec_core import bpsk_awgn_llr
+		snr_schedule_db = np.asarray(run_config.get("snr_schedule_db", []), dtype=np.float64)
+		code_rate = float(run_config.get("code_rate", 0.5))
+		seed = int(run_config.get("seed", 42))
+		rng = np.random.default_rng(seed)
+		progress = TrainProgress()
+		import time; st = time.time()
+		for snr_db in snr_schedule_db:
+			tx = np.zeros(self.n, dtype=np.uint8)
+			llr = bpsk_awgn_llr(tx, snr_db, code_rate, rng)
+			ep_r, _ = self.train_episode(llr, rng)
+			progress.episodes_completed += 1
+			progress.reward_sum += ep_r
+			progress.reward_count += 1
+			progress.elapsed_sec = time.time() - st
+		return progress
+
+	def checkpoint(self, path: str, metadata: Optional[dict[str, Any]] = None) -> None:
+		pass
+
+
+class DeepDynaDiscreteDecoder:
+	def __init__(self, h_csr: sp.csr_matrix, q_network: "torch.nn.Module", cluster_size: int, device: str = "cpu"):
+		self.h = h_csr.tocsr().astype(np.uint8)
+		self.m, self.n = self.h.shape
+		self.map = build_cn_clusters(self.h, cluster_size)
+		self.num_actions = len(self.map.clusters)
+		self.device = torch.device(device)
+		self.net = q_network.to(self.device)
+		self.net.eval()
+		self.cluster_decoder = BpDecoder(
+			self.h, max_iter=1, schedule="cluster", input_vector_type="received_vector"
+		)
+
+	def _discrete_state(self, llr_post: np.ndarray) -> np.ndarray:
+		from RELDEC.algorithms.reldec_core import _state_from_llr_subset
+		state = np.zeros(self.num_actions, dtype=np.float32)
+		for a in range(self.num_actions):
+			state[a] = _state_from_llr_subset(llr_post, self.map.cluster_neighbors[a]) / 63.0
+		return state
+
+	def decode(self, llr_channel: np.ndarray, i_max: int) -> tuple[np.ndarray, bool, int, int]:
+		self.cluster_decoder.reset()
+		try:
+			self.cluster_decoder.initialise_log_domain_bp(np.asarray(llr_channel, dtype=np.float64))
+		except Exception:
+			pass
+
+		llr_post = np.asarray(self.cluster_decoder.log_prob_ratios, dtype=np.float64)
+		x_hat = (llr_post < 0).astype(np.uint8)
+		from RELDEC.algorithms.reldec_core import syndrome_is_zero as _syn_zero
+		if _syn_zero(self.h, x_hat):
+			return x_hat, True, 0, 0
+
+		messages = 0
+		for i in range(i_max):
+			state = self._discrete_state(llr_post)
+			with torch.no_grad():
+				st = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+				q_vals = self.net(st).squeeze(0)
+				action = int(torch.argmax(q_vals).cpu().item())
+
+			llr_post = self.cluster_decoder.decode_cluster(self.map.clusters[action])
+			messages += len(self.map.cluster_neighbors[action])
+
+			x_hat = (llr_post < 0).astype(np.uint8)
+			if _syn_zero(self.h, x_hat):
+				return x_hat, True, i + 1, messages
+
+		return x_hat, False, i_max, messages
+
+
+def evaluate_deep_dyna_discrete_method(
+	decoder: DeepDynaDiscreteDecoder,
+	snr_db: float,
+	code_rate: float,
+	i_max: int,
+	target_frame_errors: int,
+	max_frames: int,
+	rng: np.random.Generator,
+	all_zero_only: bool = True,
+	method_name: str = "deep_dyna_discrete",
+) -> Any:
+	from RELDEC.algorithms.reldec_core import MethodStats, bpsk_awgn_llr, DecodeResult
+	stats = MethodStats(method=method_name, n=decoder.n)
+	while stats.frame_errors < target_frame_errors and stats.frames < max_frames:
+		tx = np.zeros(decoder.n, dtype=np.uint8) if all_zero_only else rng.integers(0, 2, size=decoder.n, dtype=np.uint8)
+		llr = bpsk_awgn_llr(tx, snr_db, code_rate, rng)
+		x_hat, converged, iters, msgs = decoder.decode(llr, i_max)
+		stats.update(tx, DecodeResult(bits=x_hat, converged=converged, iterations=iters, messages=msgs))
+	return stats

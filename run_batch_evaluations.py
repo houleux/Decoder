@@ -85,7 +85,10 @@ def run_evaluation_with_progress(suite, method, snr_db, code_rate, i_max, target
 
 def run_sweep():
     config = load_config()
-    matrices = glob.glob(os.path.join(config["matrices_dir"], "*.csv"))
+    if os.path.isfile(config["matrices_dir"]):
+        matrices = [config["matrices_dir"]]
+    else:
+        matrices = glob.glob(os.path.join(config["matrices_dir"], "*.csv"))
     z_values = config["z_values"]
     snrs = config["snrs"]
     workers = config["workers"]

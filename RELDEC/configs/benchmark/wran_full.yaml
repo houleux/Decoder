@@ -12,10 +12,10 @@ benchmarking:
     deep:
       episodes_per_snr: 0
   evaluation:
-    snr_db: [0.5, 1.0, 1.5, 2.0, 2.5]
-    i_max: 50
+    snr_db: [1.0, 1.5, 2.0, 2.5, 3.0]
+    episodes_per_snr: 2
     target_frame_errors: 300
-    max_frames: 100000
+    max_frames: 100
 parameters:
   mi_bins: 4
 system:

@@ -105,3 +105,42 @@ class ReldecDeltaReward(RewardFn):
 
     def serialize_config(self) -> dict[str, Any]:
         return {"type": "reldec_delta"}
+
+
+class MILocalReward(RewardFn):
+    """Reward = Mean Mutual Information of all VNs neighboring the cluster"""
+
+    def compute(self, before: dict[str, Any], after: dict[str, Any], info: dict[str, Any]) -> float:
+        neighbors = np.asarray(info.get("neighbors", np.zeros((0,), dtype=np.int32)), dtype=np.int32)
+        if neighbors.size == 0:
+            return 1.0
+        llr_after = np.asarray(after.get("llr_post", after.get("llr", np.zeros((0,)))))
+        mis = np.array([_mi_for_llr(x) for x in llr_after[neighbors]], dtype=np.float64)
+        return float(np.mean(mis))
+
+    def name(self) -> str:
+        return "mi_local"
+
+    def serialize_config(self) -> dict[str, Any]:
+        return {"type": "mi_local"}
+
+
+class MIDeltaLocalReward(RewardFn):
+    """Change in the metric: (Mean Mutual Information of all VNs neighboring the cluster)"""
+
+    def compute(self, before: dict[str, Any], after: dict[str, Any], info: dict[str, Any]) -> float:
+        neighbors = np.asarray(info.get("neighbors", np.zeros((0,), dtype=np.int32)), dtype=np.int32)
+        if neighbors.size == 0:
+            return 0.0
+        llr_before = np.asarray(before.get("llr", np.zeros((0,))))
+        llr_after = np.asarray(after.get("llr_post", after.get("llr", np.zeros((0,)))))
+        
+        mi_before = np.array([_mi_for_llr(x) for x in llr_before[neighbors]], dtype=np.float64)
+        mi_after = np.array([_mi_for_llr(x) for x in llr_after[neighbors]], dtype=np.float64)
+        return float(np.mean(mi_after)) - float(np.mean(mi_before))
+
+    def name(self) -> str:
+        return "mi_delta_local"
+
+    def serialize_config(self) -> dict[str, Any]:
+        return {"type": "mi_delta_local"}
