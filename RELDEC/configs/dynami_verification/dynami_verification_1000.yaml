@@ -1,0 +1,52 @@
+benchmark:
+  name: dynami_verification1000
+  description: Full benchmark plan covering all existing methods and benchmark matrices.
+
+benchmarking:
+  matrices:
+    - ab
+    - mackay
+    - wran
+  methods:
+    - flooding
+    - random
+    - round_robin
+    - reldec
+    - mi_naive_zx
+    - mi_tabular_zx
+    - augmented_max_avg_zx
+    - augmented_max_zx
+    - augmented_average_zx
+    - dyna_reldelta
+    - dyna_reldec
+    - dyna_mi
+    - dyna_midelta
+    
+  train:
+    snr_db: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+    tabular:
+      episodes_per_snr: 2500
+      max_episodes: null
+      checkpoint_every_episodes: 250
+      no_history: false
+  evaluation:
+    snr_db: [-1.0, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+    i_max: 10
+    target_frame_errors: 100
+    max_frames: 100000
+
+parameters:
+  z: [1, 2, 4, 8]
+  mi_bins: 21
+
+checkpoints:
+  q_table: null
+  mi_tabular_q_table: null
+  deep_checkpoint: null
+
+system:
+  seed: 42
+  random_codewords: false
+  cpu_workers: 40
+  gpu_workers: 4
+  device_policy: pinned
