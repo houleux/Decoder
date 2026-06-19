@@ -20,12 +20,11 @@ from RELDEC.algorithms.reldec_core import (
     ReldecDecoderSuite,
     _parallel_chunk_worker,
     merge_method_stats,
-    MethodStats,
-    CODE_PRESETS
+    MethodStats
 )
 from RELDEC.mdp.reward import ReldecDeltaReward, MILocalReward, MIDeltaLocalReward, MeanNeighborSignReward
 
-def load_config(yaml_file="RELDEC/configs/dynami_verification_1000.yaml"):
+def load_config(yaml_file="sweep_config.yaml"):
     with open(yaml_file, "r") as f:
         return yaml.safe_load(f)
 
@@ -86,26 +85,20 @@ def run_evaluation_with_progress(suite, method, snr_db, code_rate, i_max, target
 
 def run_sweep():
     config = load_config()
-    matrix_names = config["benchmarking"]["matrices"]
-    matrices = []
-    for m in matrix_names:
-        if m in CODE_PRESETS:
-            matrices.append(str(CODE_PRESETS[m].matrix_csv))
-        else:
-            print(f"Warning: Matrix {m} not found in CODE_PRESETS")
-            
-    z_values = config["parameters"]["z"]
-    train_snrs = config["benchmarking"]["train"]["snr_db"]
-    eval_snrs = config["benchmarking"]["evaluation"]["snr_db"]
-    workers = config["system"]["cpu_workers"]
-    
-    eval_frames = config["benchmarking"]["evaluation"]["max_frames"]
-    train_episodes = config["benchmarking"]["train"]["tabular"]["episodes_per_snr"]
-    
-    eval_target_errors = config["benchmarking"]["evaluation"]["target_frame_errors"]
-    i_max = config["benchmarking"]["evaluation"]["i_max"]
-    seed = config["system"]["seed"]
-    results_csv = "dynami_results.csv"
+    if os.path.isfile(config["matrices_dir"]):
+        matrices = [config["matrices_dir"]]
+    else:
+        matrices = glob.glob(os.path.join(config["matrices_dir"], "*.csv"))
+    z_values = config["z_values"]
+    snrs = config["snrs"]
+    workers = config["workers"]
+    eval_frames = config["eval_frames"]
+    train_episodes = config["train_episodes"]
+    eval_target_errors = config["eval_target_errors"]
+    code_rate = config["code_rate"]
+    i_max = config["i_max"]
+    seed = config["seed"]
+    results_csv = config["results_csv"]
 
     all_results = []
     
@@ -119,20 +112,19 @@ def run_sweep():
     for matrix_csv in matrices:
         print(f"\\n--- Processing Matrix: {matrix_csv} ---")
         h_csr = load_parity_check_from_sparse_csv(matrix_csv)
-        code_rate = 1.0 - (h_csr.shape[0] / h_csr.shape[1])
 
         for z in z_values:
             print(f"\\n>>> Matrix: {matrix_csv} | z = {z} <<<")
             
-            for snr_db in eval_snrs:
+            for snr_db in snrs:
                 print(f"\\nEvaluating SNR: {snr_db} dB")
                 rng = np.random.default_rng(seed)
-                snr_schedule_db = build_training_snr_schedule(train_snrs, train_episodes, rng)
+                snr_schedule_db = build_training_snr_schedule([snr_db], train_episodes, rng)
                 
-                methods_to_run = config["benchmarking"]["methods"]
+                methods_to_run = config["methods"]
 
-                # 1. FLOODING (Only for z=1)
-                if "flooding" in methods_to_run and z == 1:
+                # 1. FLOODING
+                if "flooding" in methods_to_run:
                     suite = ReldecDecoderSuite(h_csr)
                     suite.set_q_table(np.zeros((suite.max_states, h_csr.shape[0])))
                     stats = run_evaluation_with_progress(
