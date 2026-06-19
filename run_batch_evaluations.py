@@ -99,9 +99,8 @@ def run_sweep():
     eval_snrs = config["benchmarking"]["evaluation"]["snr_db"]
     workers = config["system"]["cpu_workers"]
     
-    # OVERRIDE FOR TESTING AS PER USER INSTRUCTION
-    eval_frames = 2 # config["benchmarking"]["evaluation"]["max_frames"]
-    train_episodes = 2 # config["benchmarking"]["train"]["tabular"]["episodes_per_snr"]
+    eval_frames = config["benchmarking"]["evaluation"]["max_frames"]
+    train_episodes = config["benchmarking"]["train"]["tabular"]["episodes_per_snr"]
     
     eval_target_errors = config["benchmarking"]["evaluation"]["target_frame_errors"]
     i_max = config["benchmarking"]["evaluation"]["i_max"]
