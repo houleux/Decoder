@@ -348,8 +348,6 @@ class ReldecTrainer(Trainer):
 	):
 		if reward_fn is None:
 			raise ValueError("reward_fn must be provided to ReldecTrainer.")
-		if cluster_size != 1:
-			raise ValueError("Only z=1 (single-CN clusters) is supported in RELDEC core.")
 
 		self.h = h_csr.tocsr().astype(np.uint8)
 		self.hyperparams = hyperparams
@@ -357,25 +355,25 @@ class ReldecTrainer(Trainer):
 		self.cluster_size = cluster_size
 		self.m, self.n = self.h.shape
 
-		self.check_neighbors = [
-			self.h.indices[self.h.indptr[i] : self.h.indptr[i + 1]].astype(np.int32, copy=True)
-			for i in range(self.m)
-		]
+		from RELDEC.algorithms.reldec_deep import build_cn_clusters
+		self.map = build_cn_clusters(self.h, self.cluster_size)
+		self.num_actions = len(self.map.clusters)
+
+		self.check_neighbors = self.map.cluster_neighbors
 		self.degrees = np.array([len(nei) for nei in self.check_neighbors], dtype=np.int32)
-		self.max_degree = int(self.degrees.max()) if self.m else 0
+		self.max_degree = int(self.degrees.max()) if self.num_actions else 0
+		# Note: if max_degree is large, 1 << max_degree may raise MemoryError
 		self.max_states = 1 << self.max_degree
 
 		if q_table is None:
-			self.q_table = np.zeros((self.max_states, self.m), dtype=np.float64)
+			self.q_table = np.zeros((self.max_states, self.num_actions), dtype=np.float64)
 		else:
-			q_table = np.asarray(q_table, dtype=np.float64)
-			expected_shape = (self.max_states, self.m)
-			if q_table.shape != expected_shape:
-				raise ValueError(f"Q-table shape {q_table.shape} does not match expected {expected_shape}")
-			self.q_table = q_table
+			self.q_table = np.asarray(q_table, dtype=np.float64)
+			if self.q_table.shape != (self.max_states, self.num_actions):
+				raise ValueError("q_table shape mismatch")
 
-		self._action_indices = np.arange(self.m, dtype=np.int32)
-		self._singleton_actions = [np.array([a], dtype=np.int32) for a in range(self.m)]
+		self._action_indices = np.arange(self.num_actions, dtype=np.int64)
+
 		self.decoder = BpDecoder(
 			self.h,
 			max_iter=1,
@@ -384,14 +382,14 @@ class ReldecTrainer(Trainer):
 		)
 
 	def _initialize_states(self, llr_post: np.ndarray) -> np.ndarray:
-		states = np.zeros(self.m, dtype=np.int64)
-		for a in range(self.m):
+		states = np.zeros(self.num_actions, dtype=np.int64)
+		for a in range(self.num_actions):
 			states[a] = _state_from_llr_subset(llr_post, self.check_neighbors[a])
 		return states
 
 	def _select_action_train(self, states: np.ndarray, rng: np.random.Generator) -> int:
 		if rng.random() < self.hyperparams.epsilon:
-			return int(rng.integers(0, self.m))
+			return int(rng.integers(0, self.num_actions))
 
 		values = self.q_table[states, self._action_indices]
 		best = float(np.max(values))
@@ -415,7 +413,7 @@ class ReldecTrainer(Trainer):
 
 			llr_post_before = llr_post.copy()
 
-			llr_post = self.decoder.decode_cluster(self._singleton_actions[action])
+			llr_post = self.decoder.decode_cluster(self.map.clusters[action])
 			neighbors = self.check_neighbors[action]
 
 			new_state = _state_from_llr_subset(llr_post, neighbors)
@@ -588,20 +586,30 @@ def train_reldec(
 class ReldecDecoderSuite:
 	"""Inference runners for flooding, random sequential, round-robin, and RELDEC."""
 
-	def __init__(self, h_csr: sp.csr_matrix, q_table: Optional[np.ndarray] = None):
+	def __init__(self, h_csr: sp.csr_matrix, q_table: Optional[np.ndarray] = None, cluster_size: int = 1):
 		self.h = h_csr.tocsr().astype(np.uint8)
 		self.m, self.n = self.h.shape
 		self.nnz = int(self.h.nnz)
+		self.cluster_size = cluster_size
 
-		self.check_neighbors = [
-			self.h.indices[self.h.indptr[i] : self.h.indptr[i + 1]].astype(np.int32, copy=True)
-			for i in range(self.m)
-		]
+		from RELDEC.algorithms.reldec_deep import build_cn_clusters
+		self.map = build_cn_clusters(self.h, self.cluster_size)
+		self.num_actions = len(self.map.clusters)
+
+		self.check_neighbors = self.map.cluster_neighbors
 		self.degrees = np.array([len(nei) for nei in self.check_neighbors], dtype=np.int32)
-		self.max_degree = int(self.degrees.max()) if self.m else 0
+		self.max_degree = int(self.degrees.max()) if self.num_actions else 0
+		# Note: if max_degree is large, 1 << max_degree may raise MemoryError
 		self.max_states = 1 << self.max_degree
 
-		self._singleton_actions = [np.array([a], dtype=np.int32) for a in range(self.m)]
+		if q_table is not None:
+			self.q_table = np.asarray(q_table, dtype=np.float64)
+			if self.q_table.shape != (self.max_states, self.num_actions):
+				raise ValueError("q_table shape mismatch")
+		else:
+			self.q_table = None
+
+		self._action_indices = np.arange(self.num_actions, dtype=np.int32)
 
 		self.cluster_decoder = BpDecoder(
 			self.h,
@@ -640,7 +648,7 @@ class ReldecDecoderSuite:
 		llr_post: np.ndarray,
 		x_hat: np.ndarray,
 	) -> np.ndarray:
-		llr_post = self.cluster_decoder.decode_cluster(self._singleton_actions[action])
+		llr_post = self.cluster_decoder.decode_cluster(self.map.clusters[action])
 		neighbors = self.check_neighbors[action]
 		if neighbors.size:
 			x_hat[neighbors] = _hard_decision(llr_post[neighbors])
@@ -666,7 +674,7 @@ class ReldecDecoderSuite:
 		messages = 0
 
 		for iter_idx in range(1, int(i_max) + 1):
-			for action in range(self.m):
+			for action in range(self.num_actions):
 				llr_post = self._apply_cluster_action(action, llr_post, x_hat)
 				messages += int(self.degrees[action])
 
@@ -685,7 +693,7 @@ class ReldecDecoderSuite:
 		messages = 0
 
 		for iter_idx in range(1, int(i_max) + 1):
-			order = rng.permutation(self.m)
+			order = rng.permutation(self.num_actions)
 			for action in order:
 				action_i = int(action)
 				llr_post = self._apply_cluster_action(action_i, llr_post, x_hat)
@@ -709,13 +717,13 @@ class ReldecDecoderSuite:
 		messages = 0
 
 		for iter_idx in range(1, int(i_max) + 1):
-			scheduled = np.zeros(self.m, dtype=bool)
+			scheduled = np.zeros(self.num_actions, dtype=bool)
 
-			for _ in range(self.m):
+			for _ in range(self.num_actions):
 				best_value = -np.inf
 				best_actions: list[int] = []
 
-				for action in range(self.m):
+				for action in range(self.num_actions):
 					if scheduled[action]:
 						continue
 
@@ -759,7 +767,6 @@ def evaluate_single_method(
 		"reldec_misq_local",
 		"reldec_misq_global",
 		"rel_delta",
-		"dyna",
 	}
 	if method not in valid_methods:
 		supported = ", ".join(sorted(valid_methods))
