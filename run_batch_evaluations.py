@@ -20,11 +20,12 @@ from RELDEC.algorithms.reldec_core import (
     ReldecDecoderSuite,
     _parallel_chunk_worker,
     merge_method_stats,
-    MethodStats
+    MethodStats,
+    CODE_PRESETS
 )
-from RELDEC.mdp.reward import ReldecDeltaReward, MILocalReward, MIDeltaLocalReward
+from RELDEC.mdp.reward import ReldecDeltaReward, MILocalReward, MIDeltaLocalReward, MeanNeighborSignReward
 
-def load_config(yaml_file="sweep_config.yaml"):
+def load_config(yaml_file="RELDEC/configs/dynami_verification_1000.yaml"):
     with open(yaml_file, "r") as f:
         return yaml.safe_load(f)
 
@@ -85,20 +86,27 @@ def run_evaluation_with_progress(suite, method, snr_db, code_rate, i_max, target
 
 def run_sweep():
     config = load_config()
-    if os.path.isfile(config["matrices_dir"]):
-        matrices = [config["matrices_dir"]]
-    else:
-        matrices = glob.glob(os.path.join(config["matrices_dir"], "*.csv"))
-    z_values = config["z_values"]
-    snrs = config["snrs"]
-    workers = config["workers"]
-    eval_frames = config["eval_frames"]
-    train_episodes = config["train_episodes"]
-    eval_target_errors = config["eval_target_errors"]
-    code_rate = config["code_rate"]
-    i_max = config["i_max"]
-    seed = config["seed"]
-    results_csv = config["results_csv"]
+    matrix_names = config["benchmarking"]["matrices"]
+    matrices = []
+    for m in matrix_names:
+        if m in CODE_PRESETS:
+            matrices.append(str(CODE_PRESETS[m].matrix_csv))
+        else:
+            print(f"Warning: Matrix {m} not found in CODE_PRESETS")
+            
+    z_values = config["parameters"]["z"]
+    train_snrs = config["benchmarking"]["train"]["snr_db"]
+    eval_snrs = config["benchmarking"]["evaluation"]["snr_db"]
+    workers = config["system"]["cpu_workers"]
+    
+    # OVERRIDE FOR TESTING AS PER USER INSTRUCTION
+    eval_frames = 2 # config["benchmarking"]["evaluation"]["max_frames"]
+    train_episodes = 2 # config["benchmarking"]["train"]["tabular"]["episodes_per_snr"]
+    
+    eval_target_errors = config["benchmarking"]["evaluation"]["target_frame_errors"]
+    i_max = config["benchmarking"]["evaluation"]["i_max"]
+    seed = config["system"]["seed"]
+    results_csv = "dynami_results.csv"
 
     all_results = []
     
@@ -112,19 +120,20 @@ def run_sweep():
     for matrix_csv in matrices:
         print(f"\\n--- Processing Matrix: {matrix_csv} ---")
         h_csr = load_parity_check_from_sparse_csv(matrix_csv)
+        code_rate = 1.0 - (h_csr.shape[0] / h_csr.shape[1])
 
         for z in z_values:
             print(f"\\n>>> Matrix: {matrix_csv} | z = {z} <<<")
             
-            for snr_db in snrs:
+            for snr_db in eval_snrs:
                 print(f"\\nEvaluating SNR: {snr_db} dB")
                 rng = np.random.default_rng(seed)
-                snr_schedule_db = build_training_snr_schedule([snr_db], train_episodes, rng)
+                snr_schedule_db = build_training_snr_schedule(train_snrs, train_episodes, rng)
                 
-                methods_to_run = config["methods"]
+                methods_to_run = config["benchmarking"]["methods"]
 
-                # 1. FLOODING
-                if "flooding" in methods_to_run:
+                # 1. FLOODING (Only for z=1)
+                if "flooding" in methods_to_run and z == 1:
                     suite = ReldecDecoderSuite(h_csr)
                     suite.set_q_table(np.zeros((suite.max_states, h_csr.shape[0])))
                     stats = run_evaluation_with_progress(
@@ -150,21 +159,35 @@ def run_sweep():
                     pd.DataFrame([all_results[-1]]).to_csv(results_csv, mode='a', header=False, index=False)
                     pbar_idx += 1
 
-                # 3. DYNA
-                if "dyna" in methods_to_run:
-                    dyna_trainer = DynaTrainer(h_csr, DynaHyperParams(), ReldecDeltaReward(), cluster_size=z)
-                    dyna_trainer.train({"snr_schedule_db": snr_schedule_db, "code_rate": code_rate, "seed": seed})
-                    suite = ReldecDecoderSuite(h_csr, dyna_trainer.q_table)
+                # 3. DYNA RELDELTA
+                if "dyna_reldelta" in methods_to_run:
+                    dyna_reldelta_trainer = DynaTrainer(h_csr, DynaHyperParams(), ReldecDeltaReward(), cluster_size=z)
+                    dyna_reldelta_trainer.train({"snr_schedule_db": snr_schedule_db, "code_rate": code_rate, "seed": seed})
+                    suite = ReldecDecoderSuite(h_csr, dyna_reldelta_trainer.q_table)
                     stats = run_evaluation_with_progress(
-                        suite, "reldec", snr_db, code_rate, i_max, eval_target_errors, eval_frames,
-                        np.random.default_rng(seed + 300), workers, pbar_idx
+                        suite, "dyna_reldelta", snr_db, code_rate, i_max, eval_target_errors, eval_frames,
+                        np.random.default_rng(seed + 102), workers, pbar_idx
                     )
                     row = stats.summary(snr_db)
-                    all_results.append({"matrix": matrix_csv, "z": z, "method": "dyna", "snr": snr_db, "ber": row["ber"], "fer": row["fer"], "avg_messages": row["avg_messages"]})
+                    all_results.append({"matrix": matrix_csv, "z": z, "method": "dyna_reldelta", "snr": snr_db, "ber": row["ber"], "fer": row["fer"], "avg_messages": row["avg_messages"]})
                     pd.DataFrame([all_results[-1]]).to_csv(results_csv, mode='a', header=False, index=False)
                     pbar_idx += 1
 
-                # 4. DYNA MI
+                # 4. DYNA RELDEC
+                if "dyna_reldec" in methods_to_run:
+                    dyna_reldec_trainer = DynaTrainer(h_csr, DynaHyperParams(), MeanNeighborSignReward(), cluster_size=z)
+                    dyna_reldec_trainer.train({"snr_schedule_db": snr_schedule_db, "code_rate": code_rate, "seed": seed})
+                    suite = ReldecDecoderSuite(h_csr, dyna_reldec_trainer.q_table)
+                    stats = run_evaluation_with_progress(
+                        suite, "dyna_reldec", snr_db, code_rate, i_max, eval_target_errors, eval_frames,
+                        np.random.default_rng(seed + 106), workers, pbar_idx
+                    )
+                    row = stats.summary(snr_db)
+                    all_results.append({"matrix": matrix_csv, "z": z, "method": "dyna_reldec", "snr": snr_db, "ber": row["ber"], "fer": row["fer"], "avg_messages": row["avg_messages"]})
+                    pd.DataFrame([all_results[-1]]).to_csv(results_csv, mode='a', header=False, index=False)
+                    pbar_idx += 1
+
+                # 5. DYNA MI
                 if "dyna_mi" in methods_to_run:
                     dyna_mi_trainer = DynaTrainer(h_csr, DynaHyperParams(), MILocalReward(), cluster_size=z)
                     dyna_mi_trainer.train({"snr_schedule_db": snr_schedule_db, "code_rate": code_rate, "seed": seed})

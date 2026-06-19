@@ -61,12 +61,16 @@ def list_methods() -> list[str]:
 
 METHOD_CATALOG: tuple[MethodSpec, ...] = (
     MethodSpec(name="flooding", family="baseline"),
-    MethodSpec(name="random", family="baseline"),
-    MethodSpec(name="round_robin", family="baseline"),
-    MethodSpec(name="reldec", family="tabular", parameters={"reward": "mean_neighbor_sign"}),
-    MethodSpec(name="reldec_misq_local", family="tabular", parameters={"reward": "misq_local"}),
-    MethodSpec(name="reldec_misq_global", family="tabular", parameters={"reward": "misq_global"}),
-    MethodSpec(name="rel_delta", family="tabular", parameters={"reward": "reldec_delta"}),
+    MethodSpec(name="random", family="baseline", parameters={"z": "dynamic"}),
+    MethodSpec(name="round_robin", family="baseline", parameters={"z": "dynamic"}),
+    MethodSpec(name="reldec", family="tabular", parameters={"reward": "mean_neighbor_sign", "z": "dynamic"}),
+    MethodSpec(name="reldec_misq_local", family="tabular", parameters={"reward": "misq_local", "z": "dynamic"}),
+    MethodSpec(name="reldec_misq_global", family="tabular", parameters={"reward": "misq_global", "z": "dynamic"}),
+    MethodSpec(name="rel_delta", family="tabular", parameters={"reward": "reldec_delta", "z": "dynamic"}),
+    MethodSpec(name="dyna_reldelta", family="tabular", parameters={"reward": "reldec_delta", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_reldec", family="tabular", parameters={"reward": "mean_neighbor_sign", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_mi", family="tabular", parameters={"reward": "mi_local", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_midelta", family="tabular", parameters={"reward": "mi_delta_local", "z": "dynamic", "dyna": True}),
     MethodSpec(name="deep_reldec_z1", family="deep", parameters={"z": 1}),
     MethodSpec(name="deep_reldec_zx", family="deep", parameters={"z": "dynamic"}),
     MethodSpec(name="mi_naive_zx", family="mi_naive", parameters={"z": "dynamic"}),
@@ -82,10 +86,14 @@ METHOD_CATALOG: tuple[MethodSpec, ...] = (
 
 
 TRAINING_POLICY_CATALOG: tuple[MethodSpec, ...] = (
-    MethodSpec(name="tabular", family="tabular", parameters={"reward": "mean_neighbor_sign"}),
-    MethodSpec(name="reldec_misq_local", family="tabular", parameters={"reward": "misq_local"}),
-    MethodSpec(name="reldec_misq_global", family="tabular", parameters={"reward": "misq_global"}),
-    MethodSpec(name="rel_delta", family="tabular", parameters={"reward": "reldec_delta"}),
+    MethodSpec(name="tabular", family="tabular", parameters={"reward": "mean_neighbor_sign", "z": "dynamic"}),
+    MethodSpec(name="reldec_misq_local", family="tabular", parameters={"reward": "misq_local", "z": "dynamic"}),
+    MethodSpec(name="reldec_misq_global", family="tabular", parameters={"reward": "misq_global", "z": "dynamic"}),
+    MethodSpec(name="rel_delta", family="tabular", parameters={"reward": "reldec_delta", "z": "dynamic"}),
+    MethodSpec(name="dyna_reldelta", family="tabular", parameters={"reward": "reldec_delta", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_reldec", family="tabular", parameters={"reward": "mean_neighbor_sign", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_mi", family="tabular", parameters={"reward": "mi_local", "z": "dynamic", "dyna": True}),
+    MethodSpec(name="dyna_midelta", family="tabular", parameters={"reward": "mi_delta_local", "z": "dynamic", "dyna": True}),
     MethodSpec(name="deep_z1", family="deep", parameters={"z": 1}),
     MethodSpec(name="mi_tabular_zx", family="mi_tabular", parameters={"z": "dynamic"}),
     MethodSpec(name="deep_zx", family="deep", parameters={"z": "dynamic"}),
@@ -131,6 +139,10 @@ def methods_requiring_q_table(methods: list[str]) -> list[str]:
         "reldec_misq_local",
         "reldec_misq_global",
         "rel_delta",
+        "dyna_reldelta",
+        "dyna_reldec",
+        "dyna_mi",
+        "dyna_midelta",
     }
     return [m for m in methods if m in q_table_methods]
 

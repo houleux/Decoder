@@ -7,7 +7,7 @@ from typing import Any
 
 import scipy.sparse as sp
 
-from RELDEC.algorithms.reldec_core import ReldecTrainer, TrainingConfig
+from RELDEC.algorithms.reldec_core import ReldecTrainer, DynaTrainer, DynaHyperParams, TrainingConfig
 from RELDEC.algorithms.reldec_deep import (
     DeepReldecTrainer,
     DeepTrainingCheckpoint,
@@ -16,7 +16,7 @@ from RELDEC.algorithms.reldec_deep import (
 from RELDEC.algorithms.reldec_augmented import AugmentedDeepReldecTrainer
 from RELDEC.algorithms.reldec_tabular_augmented import TabularAugmentedQTrainer
 from RELDEC.registry import training_policy_spec
-from RELDEC.mdp import MISQLocalReward, MISQGlobalReward, ReldecDeltaReward, MeanNeighborSignReward
+from RELDEC.mdp import MISQLocalReward, MISQGlobalReward, ReldecDeltaReward, MeanNeighborSignReward, MILocalReward, MIDeltaLocalReward
 
 
 class TrainerFactory:
@@ -29,7 +29,7 @@ class TrainerFactory:
         policy_type: str,
         mi_bins: int = 21,
         q_table: Optional[np.ndarray] = None,
-    ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer:
+    ) -> ReldecTrainer | MiTabularQTrainer | TabularAugmentedQTrainer | DynaTrainer:
         """Create a tabular trainer (ReldecTrainer, MiTabularQTrainer, or TabularAugmentedQTrainer).
         
         Args:
@@ -42,7 +42,7 @@ class TrainerFactory:
         Returns:
             Initialized tabular trainer
         """
-        if policy_type == "tabular" or policy_type in {"reldec_misq_local", "reldec_misq_global", "rel_delta"}:
+        if policy_type == "tabular" or policy_type in {"reldec_misq_local", "reldec_misq_global", "rel_delta", "dyna_reldelta", "dyna_reldec", "dyna_mi", "dyna_midelta"}:
             spec = training_policy_spec(policy_type)
             reward_type = spec.parameters.get("reward")
             
@@ -54,10 +54,16 @@ class TrainerFactory:
                 reward_fn = MISQGlobalReward()
             elif reward_type == "reldec_delta":
                 reward_fn = ReldecDeltaReward()
+            elif reward_type == "mi_local":
+                reward_fn = MILocalReward()
+            elif reward_type == "mi_delta_local":
+                reward_fn = MIDeltaLocalReward()
             else:
                 raise ValueError(f"Unknown or missing reward type '{reward_type}' for tabular trainer")
                 
-            return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn, q_table=q_table)
+            if spec.parameters.get("dyna"):
+                return DynaTrainer(h_csr, DynaHyperParams(), reward_fn=reward_fn, cluster_size=config.cluster_size, q_table=q_table)
+            return ReldecTrainer(h_csr, config.hyperparams, reward_fn=reward_fn, cluster_size=config.cluster_size, q_table=q_table)
         elif policy_type.startswith("mi_tabular"):
             # Use config.cluster_size which is already resolved from --z arg
             return MiTabularQTrainer(
