@@ -1,0 +1,75 @@
+{
+  "run_id": "train_8d9e73cd8534",
+  "config_hash": "8d9e73cd8534dd89d449c660b1efe067d0d806a4e176bb26148b902a434862e4",
+  "run_identity": {
+    "kind": "training",
+    "policy_type": "tabular",
+    "training_config": {
+      "code": "ab",
+      "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+      "train_snr_db": [
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        2.5,
+        3.0
+      ],
+      "episodes_per_snr": 2500,
+      "code_rate": 0.6666666666666667,
+      "seed": 42,
+      "hyperparams": {
+        "alpha": 0.1,
+        "beta": 0.9,
+        "epsilon": 0.6,
+        "l_max": 50
+      },
+      "cluster_size": 1
+    },
+    "cluster_size": 1,
+    "mi_bins": 21,
+    "device": "cpu",
+    "deep_config": null
+  },
+  "config": {
+    "code": "ab",
+    "matrix_csv": "RELDEC/matrices/WRAN_irreg_384_256.csv",
+    "train_snr_db": [
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5,
+      3.0
+    ],
+    "episodes_per_snr": 2500,
+    "code_rate": 0.6666666666666667,
+    "seed": 42,
+    "hyperparams": {
+      "alpha": 0.1,
+      "beta": 0.9,
+      "epsilon": 0.6,
+      "l_max": 50
+    },
+    "cluster_size": 1
+  },
+  "h_shape": [
+    128,
+    384
+  ],
+  "h_nnz": 1296,
+  "policy_type": "tabular",
+  "progress": {
+    "episodes_completed": 15000,
+    "total_updates": 750000,
+    "mean_reward": 0.9562521454545408,
+    "elapsed_sec": 75.96437549591064
+  },
+  "artifacts": {
+    "checkpoint_latest": "RELDEC/results/dynami_verification_1000/checkpoints/wran_reldec_z1/checkpoint_latest.npz",
+    "checkpoint_final": "RELDEC/results/dynami_verification_1000/checkpoints/wran_reldec_z1/checkpoint_final.npz",
+    "run_manifest": "RELDEC/results/dynami_verification_1000/checkpoints/wran_reldec_z1/run_manifest.json",
+    "config_hash": "8d9e73cd8534dd89d449c660b1efe067d0d806a4e176bb26148b902a434862e4",
+    "q_table_npy": "RELDEC/results/dynami_verification_1000/checkpoints/wran_reldec_z1/q_table_final.npy"
+  }
+}
