@@ -2,7 +2,7 @@
 # =============================================================================
 # dynami_verification_1000.sh
 # Experiment: dynami_verification1000
-# Matrices: ab, mackay, wran
+# Matrices: mackay, wran
 # Methods: flooding (z=1 only)
 #          reldec, dyna_reldec, dyna_reldelta, dyna_mi, dyna_midelta (z=1,2,4,8)
 # Training SNR: 0.5 1.0 1.5 2.0 2.5 3.0
@@ -20,12 +20,12 @@ TRAIN_SNR="0.5 1.0 1.5 2.0 2.5 3.0"
 EVAL_SNR="-1.0 0.0 0.5 1.0 1.5 2.0 2.5 3.0"
 EPISODES=2500
 I_MAX=10
-TARGET_ERRORS=100
-MAX_FRAMES=100000
+TARGET_ERRORS=10
+MAX_FRAMES=100
 MI_BINS=21
 WORKERS=40
 SEED=42
-CHKPT_EVERY=250
+CHKPT_EVERY=2500
 RESULTS_DIR="RELDEC/results/dynami_verification_1000"
 
 TRAIN="python3 RELDEC/train_reldec.py"
@@ -46,14 +46,19 @@ run_train() {
     out_dir=$(chkpt_dir "$matrix_name" "$method" "$z")
     mkdir -p "$out_dir"
 
+    local policy_type="$method"
+    if [ "$method" == "reldec" ]; then
+        policy_type="tabular"
+    fi
+
     echo ""
     echo "============================================================"
-    echo "TRAINING | matrix=${matrix_name}  method=${method}  z=${z}"
+    echo "TRAINING | matrix=${matrix_name}  method=${method} (policy=${policy_type}) z=${z}"
     echo "============================================================"
 
     $TRAIN \
         --matrix-csv "$matrix_csv" \
-        --policy-type "$method" \
+        --policy-type "$policy_type" \
         --z "$z" \
         --snr-db $TRAIN_SNR \
         --episodes-per-snr "$EPISODES" \
@@ -68,7 +73,7 @@ run_eval() {
     local matrix_csv="$1" matrix_name="$2" method="$3" z="$4"
     local out_dir
     out_dir=$(chkpt_dir "$matrix_name" "$method" "$z")
-    local q_table="${out_dir}/q_table.npy"
+    local q_table="${out_dir}/q_table_final.npy"
     local out_csv="${RESULTS_DIR}/${matrix_name}_${method}_z${z}.csv"
     local out_json="${RESULTS_DIR}/${matrix_name}_${method}_z${z}.json"
 
@@ -121,7 +126,6 @@ run_eval_flooding() {
 # MATRICES
 # =============================================================================
 declare -A MATRICES
-MATRICES["ab"]="RELDEC/matrices/H_AB_LDPC_500.csv"
 MATRICES["mackay"]="RELDEC/matrices/H_Mackay_96_48.csv"
 MATRICES["wran"]="RELDEC/matrices/WRAN_irreg_384_256.csv"
 
