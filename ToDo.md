@@ -1,3 +1,3 @@
 [NOT TO BE ACTED UPON BY LLM AGENTS UNLESS EXPLICITLY ASKED TO]
 
-1. Fix how MI is calculated
+1. Look at how MI is calculated
