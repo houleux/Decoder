@@ -1,4 +1,0 @@
-method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
-deep_reldec_zx,0.5,398,3794,300,0.09929857621440535,0.7537688442211056,5783.879396984925,20.082914572864322,98,ab,matrices/H_Mackay_96_48.csv,0.5,25,300,100000,True
-deep_reldec_zx,1.5,763,3261,300,0.044519986893840104,0.3931847968545216,3448.8283093053738,11.975098296199214,473,ab,matrices/H_Mackay_96_48.csv,0.5,25,300,100000,True
-deep_reldec_zx,2.5,2958,2975,300,0.010476532567049808,0.10141987829614604,1451.683569979716,5.040567951318458,2672,ab,matrices/H_Mackay_96_48.csv,0.5,25,300,100000,True

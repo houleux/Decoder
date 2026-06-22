@@ -1,7 +1,0 @@
-method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
-full_binary_state_deep_z,1.0,67,1938,60,0.07532649253731344,0.8955223880597015,12553.791044776119,9.686567164179104,7,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True
-full_binary_state_deep_z,2.0,123,1210,60,0.02561822493224932,0.4878048780487805,9630.439024390244,7.430894308943089,63,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True
-full_binary_state_deep_z,3.0,1604,852,60,0.0013832605985037406,0.03740648379052369,3997.077306733167,3.084164588528678,1544,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True
-full_binary_state_deep_z,4.0,3000,4,2,3.4722222222222224e-06,0.0006666666666666666,2216.592,1.7103333333333333,2998,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True
-full_binary_state_deep_z,5.0,3000,0,0,0.0,0.0,1546.56,1.1933333333333334,3000,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True
-full_binary_state_deep_z,5.5,3000,0,0,0.0,0.0,1394.064,1.0756666666666668,3000,wran,/home2/harshitlalwani/Decoder/RELDEC/matrices/WRAN_irreg_384_256.csv,0.6666666666666666,10,60,3000,True

@@ -1,6 +1,0 @@
-method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
-augmented_max_avg_zx,0.5,84,721,60,0.08940972222222222,0.7142857142857143,2317.714285714286,8.047619047619047,24,mackay,/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv,0.5,10,60,3000,True
-augmented_max_avg_zx,1.0,99,737,60,0.0775462962962963,0.6060606060606061,2080.0,7.222222222222222,39,mackay,/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv,0.5,10,60,3000,True
-augmented_max_avg_zx,1.5,183,647,60,0.03682832422586521,0.32786885245901637,1545.4426229508197,5.366120218579235,124,mackay,/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv,0.5,10,60,3000,True
-augmented_max_avg_zx,2.0,285,652,60,0.023830409356725146,0.21052631578947367,1117.6421052631579,3.880701754385965,227,mackay,/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv,0.5,10,60,3000,True
-augmented_max_avg_zx,2.5,768,590,60,0.008002387152777778,0.078125,732.0,2.5416666666666665,712,mackay,/home2/harshitlalwani/Decoder/RELDEC/matrices/H_Mackay_96_48.csv,0.5,10,60,3000,True

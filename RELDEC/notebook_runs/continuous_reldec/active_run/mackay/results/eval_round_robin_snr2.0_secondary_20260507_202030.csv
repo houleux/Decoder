@@ -1,2 +1,0 @@
-method,snr_db,frames,bit_errors,frame_errors,ber,fer,avg_messages,avg_iterations,converged_frames,code,matrix_csv,code_rate,i_max,target_frame_errors,max_frames,all_zero_only
-round_robin,2.0,1434,3168,300,0.02301255230125523,0.20920502092050208,3661.857740585774,12.714783821478383,1146,ab,RELDEC/matrices/H_Mackay_96_48.csv,0.5,50,300,10000,True
