@@ -1,13 +1,26 @@
 import argparse
 import numpy as np
-from train import load_matrix
+import pandas as pd
+import scipy.sparse as sp
+
+def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
+    df = pd.read_csv(csv_path)
+    m = int(df["row"].max() + 1)
+    n = int(df["col"].max() + 1)
+    h_csr = sp.csr_matrix(
+        (np.ones(len(df), dtype=np.uint8), (df["row"], df["col"])),
+        shape=(m, n),
+        dtype=np.uint8
+    )
+    code_rate = 1.0 - (m / n)
+    return h_csr, code_rate
 from rl.decoder.engine import evaluate_snr_point, write_csv
 
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate an LDPC decoder over an SNR sweep.")
     parser.add_argument("--matrix-csv",         required=True, help="Path to parity check matrix CSV")
-    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec"])
+    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec", "rbl", "ave_rbl", "max_rbl"])
     parser.add_argument("--z",                  type=int, default=1, help="Cluster size (required for reldec)")
     parser.add_argument("--checkpoint",         default=None, help="Path to agent checkpoint JSON (required for reldec)")
     parser.add_argument("--snr-db",             required=True, nargs="+", type=float, help="Eb/N0 values in dB to evaluate")

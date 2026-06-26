@@ -86,8 +86,8 @@ class DynaReldecAgent(ReldecAgent):
             "m": self.m,
             "n": self.n,
             "epsilon": self.epsilon,
-            "alpha": self.alpha,
-            "gamma": self.gamma,
+            "alpha": self.algorithms[0].alpha,
+            "gamma": self.algorithms[0].gamma,
             "planning_steps": self.planning_steps,
             "sub_mdps": []
         }

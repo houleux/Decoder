@@ -73,6 +73,15 @@ def _worker(args: tuple) -> MethodStats:
     elif method == "random":
         from rl.decoder.sequential import RandomDecoder
         decoder = RandomDecoder(h_csr, rng)
+    elif method == "rbl":
+        from rl.decoder.rbl import ResidualDecoder
+        decoder = ResidualDecoder(h_csr)
+    elif method == "ave_rbl":
+        from rl.decoder.ave_rbl import AveRBLDecoder
+        decoder = AveRBLDecoder(h_csr, z)
+    elif method == "max_rbl":
+        from rl.decoder.max_rbl import MaxRBLDecoder
+        decoder = MaxRBLDecoder(h_csr, z)
     elif method == "reldec":
         from rl.agents.reldec import ReldecAgent
         agent = ReldecAgent.load(checkpoint_path, h_csr)

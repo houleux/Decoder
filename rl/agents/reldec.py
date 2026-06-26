@@ -93,10 +93,11 @@ class ReldecAgent(SequentialDecoderBase):
         state_before: tuple,
         llr_post_after: np.ndarray,
         reward: float,
+        **kwargs
     ) -> None:
         """
-        Q-table update for sub-MDP `cluster_idx`.
-        next_state is derived from llr_post_after.
+        Updates the Q-table for the specified sub-MDP using the local state transition.
+        Accepts **kwargs to maintain a uniform training interface with DynaReldecAgent (which needs rng).
         """
         next_state = self.state_encoders[cluster_idx].encode(llr_post_after)
         self.algorithms[cluster_idx].update(state_before, reward, next_state)
