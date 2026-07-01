@@ -15,9 +15,10 @@ class LocalFractionReward:
     def __init__(self, neighborhood: np.ndarray):
         self.neighborhood = np.asarray(neighborhood, dtype=np.int32)
 
-    def compute(self, llr_post: np.ndarray) -> float:
+    def compute(self, llr_before: np.ndarray, llr_post: np.ndarray) -> float:
         """
         Args:
+            llr_before: Posterior LLR vector before update (ignored).
             llr_post: Current posterior LLR vector, shape (n,), float64.
 
         Returns:

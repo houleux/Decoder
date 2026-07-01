@@ -6,17 +6,19 @@ csv_files = {
     'Flooding': 'results/rbl_eval/flooding_1k.csv',
     'Round Robin': 'results/rbl_eval/round_robin_1k.csv',
     'Random': 'results/rbl_eval/random_1k.csv',
+    'RBL': 'results/rbl_eval/rbl_1k.csv',
+    'AveRBL (z=1)': 'results/rbl_eval/ave_rbl_z4_1k.csv',
+    'MaxRBL (z=1)': 'results/rbl_eval/max_rbl_z4_1k.csv',
     'Reldec': 'results/rbl_eval/reldec_1k.csv',
     'Dyna (5)': 'results/rbl_eval/dyna_5_1k.csv',
-    'RBL (Unclustered)': 'results/rbl_eval/rbl_1k.csv',
-    'Ave RBL (z=4)': 'results/rbl_eval/ave_rbl_z4_1k.csv',
-    'Max RBL (z=4)': 'results/rbl_eval/max_rbl_z4_1k.csv',
+    'Ave Res Q': 'results/rbl_eval/ave_res_q_1k.csv',
+    'Max Res Q': 'results/rbl_eval/max_res_q_1k.csv'
 }
 
-plt.figure(figsize=(12, 8))
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'cyan', 'magenta', 'lime']
+markers = ['o', 's', '^', 'D', 'v', 'p', '*', 'h', 'X', 'P']
 
-colors = ['black', 'blue', 'green', 'cyan', 'magenta', 'red', 'purple', 'orange']
-markers = ['o', 's', '^', '*', 'X', 'D', 'v', 'p']
+plt.figure(figsize=(12, 8))
 
 for (name, path), color, marker in zip(csv_files.items(), colors, markers):
     if not os.path.exists(path):

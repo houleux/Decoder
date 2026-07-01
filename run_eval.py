@@ -20,7 +20,7 @@ from rl.decoder.engine import evaluate_snr_point, write_csv
 def main():
     parser = argparse.ArgumentParser(description="Evaluate an LDPC decoder over an SNR sweep.")
     parser.add_argument("--matrix-csv",         required=True, help="Path to parity check matrix CSV")
-    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec", "rbl", "ave_rbl", "max_rbl"])
+    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec", "dyna_reldec", "ave_res_q", "max_res_q", "factored_dqn", "rbl", "ave_rbl", "max_rbl", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi"])
     parser.add_argument("--z",                  type=int, default=1, help="Cluster size (required for reldec)")
     parser.add_argument("--checkpoint",         default=None, help="Path to agent checkpoint JSON (required for reldec)")
     parser.add_argument("--snr-db",             required=True, nargs="+", type=float, help="Eb/N0 values in dB to evaluate")

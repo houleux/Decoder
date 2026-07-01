@@ -42,12 +42,13 @@ def train_episode(
             state_before = agent.state_encoders[k].encode(llr_post)
             available.remove(k)
 
+            llr_pre_cluster = llr_post.copy()
             for cn in agent.clusters[k]:
                 llr_post = agent._schedule_cn(cn, llr_post, x_hat)
 
-            reward = agent.reward_fns[k].compute(llr_post)
+            reward = agent.reward_fns[k].compute(llr_pre_cluster, llr_post)
             episode_reward += reward
-            agent.update(k, state_before, llr_post, reward, rng=rng)
+            agent.update(k, state_before, llr_pre_cluster, llr_post, reward, rng=rng)
 
         if syndrome_is_zero(h_csr, x_hat):
             break

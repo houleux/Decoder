@@ -9,6 +9,16 @@ from rl.channel import awgn_llr
 from rl.trainer import train_episode
 from rl.agents.reldec import ReldecAgent
 from rl.agents.dyna_reldec import DynaReldecAgent
+from rl.agents.ave_res_q import AveResQAgent
+from rl.agents.max_res_q import MaxResQAgent
+from rl.agents.llr_vec_ave_res_agent import LLRVecAveResAgent
+from rl.agents.llr_vec_ave_mi_agent import LLRVecAveMIAgent
+from rl.agents.ave_llr_ave_res_agent import AveLLRAveResAgent
+from rl.agents.ave_llr_ave_mi_agent import AveLLRAveMIAgent
+from rl.agents.tanh_vec_ave_res_agent import TanhVecAveResAgent
+from rl.agents.tanh_vec_ave_mi_agent import TanhVecAveMIAgent
+from rl.agents.ave_tanh_ave_res_agent import AveTanhAveResAgent
+from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
 
 def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
     """Load a sparse parity check matrix from CSV (columns: row, col)."""
@@ -26,7 +36,7 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
 
 def main():
     parser = argparse.ArgumentParser(description="Train a RELDEC/Dyna-RELDEC agent.")
-    parser.add_argument("--method",           required=True, choices=["reldec", "dyna_reldec"])
+    parser.add_argument("--method",           required=True, choices=["reldec", "dyna_reldec", "ave_res_q", "max_res_q", "factored_dqn", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi"])
     parser.add_argument("--matrix-csv",       required=True, help="Path to parity check matrix CSV")
     parser.add_argument("--z",                type=int, default=1, help="Cluster size (CNs per cluster)")
     parser.add_argument("--planning-steps",   type=int, default=10, help="Planning steps (only used if dyna_reldec)")
@@ -37,8 +47,9 @@ def main():
     parser.add_argument("--gamma",            type=float, default=0.99, help="Discount factor")
     parser.add_argument("--epsilon",          type=float, default=0.1, help="Exploration probability")
     parser.add_argument("--seed",             type=int, default=42, help="RNG seed")
-    parser.add_argument("--checkpoint-path",  required=True, help="Path to save checkpoint JSON")
-    parser.add_argument("--log-every",        type=int, default=100, help="Log progress every N episodes")
+    parser.add_argument("--checkpoint-path",  required=True, help="Path to save checkpoint")
+    parser.add_argument("--log-every",        type=int, default=10, help="Log progress every N episodes")
+    parser.add_argument("--rewards-csv",      default=None, help="Path to save episode rewards CSV")
     args = parser.parse_args()
 
     h_csr, code_rate = load_matrix(args.matrix_csv)
@@ -56,6 +67,39 @@ def main():
             epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma,
             planning_steps=args.planning_steps
         )
+    elif args.method == "ave_res_q":
+        agent = AveResQAgent(
+            h_csr=h_csr, z=args.z, 
+            epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma
+        )
+    elif args.method == "max_res_q":
+        agent = MaxResQAgent(
+            h_csr=h_csr, z=args.z, 
+            epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma
+        )
+    elif args.method == "factored_dqn":
+        from rl.agents.factored_dqn_agent import FactoredDQNAgent
+        alpha = args.alpha if args.alpha < 0.01 else 0.001
+        agent = FactoredDQNAgent(
+            h_csr=h_csr, z=args.z, 
+            epsilon=args.epsilon, alpha=alpha, gamma=args.gamma
+        )
+    elif args.method == "llr_vec_ave_res":
+        agent = LLRVecAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "llr_vec_ave_mi":
+        agent = LLRVecAveMIAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "ave_llr_ave_res":
+        agent = AveLLRAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "ave_llr_ave_mi":
+        agent = AveLLRAveMIAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "tanh_vec_ave_res":
+        agent = TanhVecAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "tanh_vec_ave_mi":
+        agent = TanhVecAveMIAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "ave_tanh_ave_res":
+        agent = AveTanhAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "ave_tanh_ave_mi":
+        agent = AveTanhAveMIAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
 
     # Build SNR schedule
     snr_schedule = []
@@ -69,14 +113,23 @@ def main():
     for ep_idx, snr_db in enumerate(snr_schedule):
         llr = awgn_llr(n, snr_db, code_rate, rng)
         reward = train_episode(agent, h_csr, llr, args.l_max, rng)
-        episode_rewards.append(reward)
+        episode_rewards.append((ep_idx + 1, snr_db, reward))
 
         if args.log_every > 0 and (ep_idx + 1) % args.log_every == 0:
-            window = episode_rewards[-args.log_every:]
+            window = [r for _, _, r in episode_rewards[-args.log_every:]]
             print(f"[train] ep={ep_idx+1}/{total}  snr={snr_db:.1f}dB  reward={reward:.4f}  mean={sum(window)/len(window):.4f}")
 
     agent.save(args.checkpoint_path)
     print(f"Saved {args.checkpoint_path}")
+
+    if args.rewards_csv:
+        import csv
+        os.makedirs(os.path.dirname(os.path.abspath(args.rewards_csv)), exist_ok=True)
+        with open(args.rewards_csv, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["episode", "snr_db", "reward"])
+            writer.writerows(episode_rewards)
+        print(f"Saved rewards to {args.rewards_csv}")
 
 if __name__ == "__main__":
     main()

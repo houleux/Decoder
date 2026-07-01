@@ -86,6 +86,54 @@ def _worker(args: tuple) -> MethodStats:
         from rl.agents.reldec import ReldecAgent
         agent = ReldecAgent.load(checkpoint_path, h_csr)
         decoder = agent  # ReldecAgent implements decode()
+    elif method == "dyna_reldec":
+        from rl.agents.dyna_reldec import DynaReldecAgent
+        agent = DynaReldecAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "ave_res_q":
+        from rl.agents.ave_res_q import AveResQAgent
+        agent = AveResQAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "max_res_q":
+        from rl.agents.max_res_q import MaxResQAgent
+        agent = MaxResQAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "llr_vec_ave_res":
+        from rl.agents.llr_vec_ave_res_agent import LLRVecAveResAgent
+        agent = LLRVecAveResAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "llr_vec_ave_mi":
+        from rl.agents.llr_vec_ave_mi_agent import LLRVecAveMIAgent
+        agent = LLRVecAveMIAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "ave_llr_ave_res":
+        from rl.agents.ave_llr_ave_res_agent import AveLLRAveResAgent
+        agent = AveLLRAveResAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "ave_llr_ave_mi":
+        from rl.agents.ave_llr_ave_mi_agent import AveLLRAveMIAgent
+        agent = AveLLRAveMIAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "tanh_vec_ave_res":
+        from rl.agents.tanh_vec_ave_res_agent import TanhVecAveResAgent
+        agent = TanhVecAveResAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "tanh_vec_ave_mi":
+        from rl.agents.tanh_vec_ave_mi_agent import TanhVecAveMIAgent
+        agent = TanhVecAveMIAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "ave_tanh_ave_res":
+        from rl.agents.ave_tanh_ave_res_agent import AveTanhAveResAgent
+        agent = AveTanhAveResAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "ave_tanh_ave_mi":
+        from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
+        agent = AveTanhAveMIAgent.load(checkpoint_path, h_csr)
+        decoder = agent
+    elif method == "factored_dqn":
+        from rl.agents.factored_dqn_agent import FactoredDQNAgent
+        agent = FactoredDQNAgent.load(checkpoint_path, h_csr)
+        decoder = agent
     else:
         raise ValueError(f"Unknown method: {method!r}")
 

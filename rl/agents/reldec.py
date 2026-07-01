@@ -91,6 +91,7 @@ class ReldecAgent(SequentialDecoderBase):
         self,
         cluster_idx: int,
         state_before: tuple,
+        llr_pre_cluster: np.ndarray,
         llr_post_after: np.ndarray,
         reward: float,
         **kwargs
