@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'ldpc
 
 import argparse
 import time
+import multiprocessing as mp
 import numpy as np
 import scipy.sparse as sp
 import pandas as pd
@@ -125,92 +126,96 @@ def main():
             method_z_pbars[(method, z)] = pbar
             pos += 1
             
-    # Round-robin evaluation loop
-    while total_chunks > 0:
-        for method in METHODS:
-            for z in Z_VALS:
-                
-                ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json") if method != "flooding" else None
+    # Round-robin evaluation loop — single persistent pool
+    ctx = mp.get_context("forkserver")
+    with ctx.Pool(processes=WORKERS) as pool:
+        while total_chunks > 0:
+            for method in METHODS:
+                for z in Z_VALS:
                     
-                for snr in EVAL_SNR_VALS:
-                    frames_done = state[(method, z, snr)]
-                    if frames_done >= MAX_FRAMES:
-                        continue
+                    ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json") if method != "flooding" else None
                         
-                    frames_to_run = min(CHUNK_SIZE, MAX_FRAMES - frames_done)
-                    
-                    t0 = time.time()
-                    
-                    # Evaluate
-                    eval_rng = np.random.default_rng(42 + frames_done)
-                    new_stats = evaluate_snr_point(
-                        h_csr=h_csr,
-                        method=method,
-                        z=z,
-                        checkpoint_path=ckpt_path,
-                        ebn0_db=snr,
-                        code_rate=code_rate,
-                        i_max=L_MAX,
-                        target_frame_errors=100000,
-                        max_frames=frames_to_run,
-                        rng=eval_rng,
-                        n_workers=WORKERS
-                    )
-                    
-                    dt = time.time() - t0
-                    time_spent[(method, z)] += dt
-                    
-                    # Read existing csv to update
-                    csv_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_eval.csv")
-                    if os.path.exists(csv_path):
-                        df = pd.read_csv(csv_path)
-                    else:
-                        df = pd.DataFrame(columns=["method", "ebn0_db", "frames", "bit_errors", "frame_errors", "ber", "fer", "avg_iterations", "avg_messages", "converged_frames", "eval_time"])
+                    for snr in EVAL_SNR_VALS:
+                        frames_done = state[(method, z, snr)]
+                        if frames_done >= MAX_FRAMES:
+                            continue
+                            
+                        frames_to_run = min(CHUNK_SIZE, MAX_FRAMES - frames_done)
                         
-                    row_idx = df.index[np.isclose(df["ebn0_db"], snr)].tolist()
-                    if row_idx:
-                        idx = row_idx[0]
-                        df.at[idx, "frames"] += new_stats.frames
-                        df.at[idx, "bit_errors"] += new_stats.bit_errors
-                        df.at[idx, "frame_errors"] += new_stats.frame_errors
-                        df.at[idx, "ber"] = df.at[idx, "bit_errors"] / (df.at[idx, "frames"] * n)
-                        df.at[idx, "fer"] = df.at[idx, "frame_errors"] / df.at[idx, "frames"]
+                        t0 = time.time()
                         
-                        # Weighted averages
-                        old_frames = df.at[idx, "frames"] - new_stats.frames
-                        new_frames = df.at[idx, "frames"]
-                        df.at[idx, "avg_iterations"] = ((df.at[idx, "avg_iterations"] * old_frames) + (new_stats.iterations)) / new_frames
-                        df.at[idx, "avg_messages"] = ((df.at[idx, "avg_messages"] * old_frames) + (new_stats.messages)) / new_frames
-                        df.at[idx, "converged_frames"] += new_stats.converged_frames
-                        if "eval_time" not in df.columns:
-                            df["eval_time"] = 0.0
-                        df.at[idx, "eval_time"] += dt
-                    else:
-                        new_row = {
-                            "method": method,
-                            "ebn0_db": snr,
-                            "frames": new_stats.frames,
-                            "bit_errors": new_stats.bit_errors,
-                            "frame_errors": new_stats.frame_errors,
-                            "ber": new_stats.ber,
-                            "fer": new_stats.fer,
-                            "avg_iterations": new_stats.iterations / new_stats.frames if new_stats.frames > 0 else 0,
-                            "avg_messages": new_stats.messages / new_stats.frames if new_stats.frames > 0 else 0,
-                            "converged_frames": new_stats.converged_frames,
-                            "eval_time": dt
-                        }
-                        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                        # Evaluate
+                        eval_rng = np.random.default_rng(42 + frames_done)
+                        new_stats = evaluate_snr_point(
+                            h_csr=h_csr,
+                            method=method,
+                            z=z,
+                            checkpoint_path=ckpt_path,
+                            ebn0_db=snr,
+                            code_rate=code_rate,
+                            i_max=L_MAX,
+                            target_frame_errors=100000,
+                            max_frames=frames_to_run,
+                            rng=eval_rng,
+                            n_workers=WORKERS,
+                            pool=pool,
+                        )
                         
-                    df.to_csv(csv_path, index=False)
-                    
-                    state[(method, z, snr)] += frames_to_run
-                    total_chunks -= 1
-                    
-                    # Update progress bars
-                    master_pbar.update(1)
-                    mz_pbar = method_z_pbars[(method, z)]
-                    mz_pbar.update(frames_to_run)
-                    mz_pbar.set_postfix({"eval_time": f"{time_spent[(method, z)]:.2f}s"})
+                        dt = time.time() - t0
+                        time_spent[(method, z)] += dt
+                        
+                        # Read existing csv to update
+                        csv_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_eval.csv")
+                        if os.path.exists(csv_path):
+                            df = pd.read_csv(csv_path)
+                        else:
+                            df = pd.DataFrame(columns=["method", "ebn0_db", "frames", "bit_errors", "frame_errors", "ber", "fer", "avg_iterations", "avg_messages", "converged_frames", "eval_time"])
+                            
+                        row_idx = df.index[np.isclose(df["ebn0_db"], snr)].tolist()
+                        if row_idx:
+                            idx = row_idx[0]
+                            df.at[idx, "frames"] += new_stats.frames
+                            df.at[idx, "bit_errors"] += new_stats.bit_errors
+                            df.at[idx, "frame_errors"] += new_stats.frame_errors
+                            df.at[idx, "ber"] = df.at[idx, "bit_errors"] / (df.at[idx, "frames"] * n)
+                            df.at[idx, "fer"] = df.at[idx, "frame_errors"] / df.at[idx, "frames"]
+                            
+                            # Weighted averages
+                            old_frames = df.at[idx, "frames"] - new_stats.frames
+                            new_frames = df.at[idx, "frames"]
+                            df.at[idx, "avg_iterations"] = ((df.at[idx, "avg_iterations"] * old_frames) + (new_stats.iterations)) / new_frames
+                            df.at[idx, "avg_messages"] = ((df.at[idx, "avg_messages"] * old_frames) + (new_stats.messages)) / new_frames
+                            df.at[idx, "converged_frames"] += new_stats.converged_frames
+                            if "eval_time" not in df.columns:
+                                df["eval_time"] = 0.0
+                            df.at[idx, "eval_time"] += dt
+                        else:
+                            new_row = {
+                                "method": method,
+                                "ebn0_db": snr,
+                                "frames": new_stats.frames,
+                                "bit_errors": new_stats.bit_errors,
+                                "frame_errors": new_stats.frame_errors,
+                                "ber": new_stats.ber,
+                                "fer": new_stats.fer,
+                                "avg_iterations": new_stats.iterations / new_stats.frames if new_stats.frames > 0 else 0,
+                                "avg_messages": new_stats.messages / new_stats.frames if new_stats.frames > 0 else 0,
+                                "converged_frames": new_stats.converged_frames,
+                                "eval_time": dt
+                            }
+                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                            
+                        df.to_csv(csv_path, index=False)
+                        
+                        state[(method, z, snr)] += frames_to_run
+                        total_chunks -= 1
+                        
+                        # Update progress bars
+                        master_pbar.update(1)
+                        mz_pbar = method_z_pbars[(method, z)]
+                        mz_pbar.update(frames_to_run)
+                        mz_pbar.set_postfix({"eval_time": f"{time_spent[(method, z)]:.2f}s"})
 
 if __name__ == "__main__":
     main()
+

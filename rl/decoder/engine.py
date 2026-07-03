@@ -1,6 +1,6 @@
 import csv
 from dataclasses import dataclass
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing as _mp
 import numpy as np
 import scipy.sparse as sp
 from rl.channel import awgn_llr
@@ -169,6 +169,7 @@ def evaluate_snr_point(
     max_frames: int,
     rng: np.random.Generator,
     n_workers: int = 1,
+    pool=None,
 ) -> MethodStats:
     """
     Evaluate a single SNR point by running up to max_frames frames.
@@ -198,11 +199,14 @@ def evaluate_snr_point(
     if n_workers == 1:
         return _worker(worker_args[0])
 
-    partial = []
-    with ProcessPoolExecutor(max_workers=n_workers) as pool:
-        for fut in as_completed([pool.submit(_worker, a) for a in worker_args]):
-            partial.append(fut.result())
-    return _merge(partial)
+    if pool is not None:
+        results = pool.map(_worker, worker_args)
+    else:
+        import multiprocessing as mp
+        ctx = mp.get_context("forkserver")
+        with ctx.Pool(processes=n_workers) as p:
+            results = p.map(_worker, worker_args)
+    return _merge(results)
 
 
 def write_csv(results: list[tuple[float, MethodStats]], output_path: str) -> None:
