@@ -130,10 +130,7 @@ def _worker(args: tuple) -> MethodStats:
         from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
         agent = AveTanhAveMIAgent.load(checkpoint_path, h_csr)
         decoder = agent
-    elif method == "factored_dqn":
-        from rl.agents.factored_dqn_agent import FactoredDQNAgent
-        agent = FactoredDQNAgent.load(checkpoint_path, h_csr)
-        decoder = agent
+
     else:
         raise ValueError(f"Unknown method: {method!r}")
 

@@ -15,12 +15,13 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
     code_rate = 1.0 - (m / n)
     return h_csr, code_rate
 from rl.decoder.engine import evaluate_snr_point, write_csv
+import global_mdp.decoder.engine as gdqn_engine
 
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate an LDPC decoder over an SNR sweep.")
     parser.add_argument("--matrix-csv",         required=True, help="Path to parity check matrix CSV")
-    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec", "dyna_reldec", "ave_res_q", "max_res_q", "factored_dqn", "rbl", "ave_rbl", "max_rbl", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi"])
+    parser.add_argument("--method",             required=True, choices=["flooding", "round_robin", "random", "reldec", "dyna_reldec", "ave_res_q", "max_res_q", "rbl", "ave_rbl", "max_rbl", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi", "global_dqn"])
     parser.add_argument("--z",                  type=int, default=1, help="Cluster size (required for reldec)")
     parser.add_argument("--checkpoint",         default=None, help="Path to agent checkpoint JSON (required for reldec)")
     parser.add_argument("--snr-db",             required=True, nargs="+", type=float, help="Eb/N0 values in dB to evaluate")
@@ -41,19 +42,33 @@ def main():
     results = []
     for snr_db in args.snr_db:
         print(f"Evaluating {args.method} at {snr_db:.2f} dB...")
-        stats = evaluate_snr_point(
-            h_csr=h_csr,
-            method=args.method,
-            z=args.z,
-            checkpoint_path=args.checkpoint,
-            ebn0_db=snr_db,
-            code_rate=code_rate,
-            i_max=args.i_max,
-            target_frame_errors=args.target_frame_errors,
-            max_frames=args.max_frames,
-            rng=rng,
-            n_workers=args.workers,
-        )
+        if args.method == "global_dqn":
+            stats = gdqn_engine.evaluate_snr_point(
+                h_csr=h_csr,
+                checkpoint_path=args.checkpoint,
+                z=args.z,
+                ebn0_db=snr_db,
+                code_rate=code_rate,
+                i_max=args.i_max,
+                target_frame_errors=args.target_frame_errors,
+                max_frames=args.max_frames,
+                rng=rng,
+                n_workers=args.workers,
+            )
+        else:
+            stats = evaluate_snr_point(
+                h_csr=h_csr,
+                method=args.method,
+                z=args.z,
+                checkpoint_path=args.checkpoint,
+                ebn0_db=snr_db,
+                code_rate=code_rate,
+                i_max=args.i_max,
+                target_frame_errors=args.target_frame_errors,
+                max_frames=args.max_frames,
+                rng=rng,
+                n_workers=args.workers,
+            )
         results.append((snr_db, stats))
         print(f"  frames={stats.frames}  BER={stats.ber:.5f}  FER={stats.fer:.5f}")
 

@@ -4,9 +4,12 @@ import os
 import numpy as np
 import scipy.sparse as sp
 import pandas as pd
+from tqdm import tqdm
 
 from rl.channel import awgn_llr
 from rl.trainer import train_episode
+from global_mdp.trainer import train_episode_dqn
+from global_mdp.agents.global_dqn_agent import GlobalDQNAgent
 from rl.agents.reldec import ReldecAgent
 from rl.agents.dyna_reldec import DynaReldecAgent
 from rl.agents.ave_res_q import AveResQAgent
@@ -36,7 +39,7 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
 
 def main():
     parser = argparse.ArgumentParser(description="Train a RELDEC/Dyna-RELDEC agent.")
-    parser.add_argument("--method",           required=True, choices=["reldec", "dyna_reldec", "ave_res_q", "max_res_q", "factored_dqn", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi"])
+    parser.add_argument("--method",           required=True, choices=["reldec", "dyna_reldec", "ave_res_q", "max_res_q", "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi", "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi", "global_dqn"])
     parser.add_argument("--matrix-csv",       required=True, help="Path to parity check matrix CSV")
     parser.add_argument("--z",                type=int, default=1, help="Cluster size (CNs per cluster)")
     parser.add_argument("--planning-steps",   type=int, default=10, help="Planning steps (only used if dyna_reldec)")
@@ -46,6 +49,7 @@ def main():
     parser.add_argument("--alpha",            type=float, default=0.1, help="Learning rate")
     parser.add_argument("--gamma",            type=float, default=0.99, help="Discount factor")
     parser.add_argument("--epsilon",          type=float, default=0.1, help="Exploration probability")
+    parser.add_argument("--device",           type=str, default="cpu", help="Device (cpu/cuda) for global_dqn")
     parser.add_argument("--seed",             type=int, default=42, help="RNG seed")
     parser.add_argument("--checkpoint-path",  required=True, help="Path to save checkpoint")
     parser.add_argument("--log-every",        type=int, default=10, help="Log progress every N episodes")
@@ -77,13 +81,6 @@ def main():
             h_csr=h_csr, z=args.z, 
             epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma
         )
-    elif args.method == "factored_dqn":
-        from rl.agents.factored_dqn_agent import FactoredDQNAgent
-        alpha = args.alpha if args.alpha < 0.01 else 0.001
-        agent = FactoredDQNAgent(
-            h_csr=h_csr, z=args.z, 
-            epsilon=args.epsilon, alpha=alpha, gamma=args.gamma
-        )
     elif args.method == "llr_vec_ave_res":
         agent = LLRVecAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
     elif args.method == "llr_vec_ave_mi":
@@ -100,6 +97,11 @@ def main():
         agent = AveTanhAveResAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
     elif args.method == "ave_tanh_ave_mi":
         agent = AveTanhAveMIAgent(h_csr=h_csr, z=args.z, epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma)
+    elif args.method == "global_dqn":
+        agent = GlobalDQNAgent(
+            h_csr=h_csr, z=args.z,
+            epsilon=args.epsilon, alpha=args.alpha, gamma=args.gamma, device=args.device
+        )
 
     # Build SNR schedule
     snr_schedule = []
@@ -110,14 +112,19 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.checkpoint_path)), exist_ok=True)
 
     episode_rewards = []
-    for ep_idx, snr_db in enumerate(snr_schedule):
+    pbar = tqdm(enumerate(snr_schedule), total=total, desc="Training")
+    for ep_idx, snr_db in pbar:
         llr = awgn_llr(n, snr_db, code_rate, rng)
-        reward = train_episode(agent, h_csr, llr, args.l_max, rng)
+        if args.method == "global_dqn":
+            reward = train_episode_dqn(agent, h_csr, llr, args.l_max, rng)
+        else:
+            reward = train_episode(agent, h_csr, llr, args.l_max, rng)
         episode_rewards.append((ep_idx + 1, snr_db, reward))
 
         if args.log_every > 0 and (ep_idx + 1) % args.log_every == 0:
             window = [r for _, _, r in episode_rewards[-args.log_every:]]
-            print(f"[train] ep={ep_idx+1}/{total}  snr={snr_db:.1f}dB  reward={reward:.4f}  mean={sum(window)/len(window):.4f}")
+            mean_r = sum(window)/len(window)
+            pbar.set_postfix({"snr": f"{snr_db:.1f}dB", "reward": f"{reward:.4f}", "mean": f"{mean_r:.4f}"})
 
     agent.save(args.checkpoint_path)
     print(f"Saved {args.checkpoint_path}")

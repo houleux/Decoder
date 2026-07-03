@@ -6,7 +6,7 @@ export PYTHONPATH=".:ldpc/src_python"
 EPISODES=100
 # 1000 frames for evaluation
 FRAMES=1000
-WORKERS=40
+WORKERS=8
 MATRIX="matrices/H_Mackay_96_48.csv"
 SNR_VALS="1.0 1.5 2.0 2.5 3.0"
 
@@ -30,15 +30,15 @@ for z in 1 2 4 8; do
         ckpt="results/sweep/${method}_z${z}.json"
         csv_out="results/sweep/${method}_z${z}_eval.csv"
         
-        # Train
-        python3 run_train.py \
-            --method $method \
-            --matrix-csv $MATRIX \
-            --z $z \
-            --snr-db $SNR_VALS \
-            --episodes-per-snr $EPISODES \
-            --l-max 10 \
-            --checkpoint-path $ckpt
+        # Train (Skipped since models are already trained)
+        # python3 run_train.py \
+        #     --method $method \
+        #     --matrix-csv $MATRIX \
+        #     --z $z \
+        #     --snr-db $SNR_VALS \
+        #     --episodes-per-snr $EPISODES \
+        #     --l-max 10 \
+        #     --checkpoint-path $ckpt
         
         echo "Evaluating $method at z=$z..."
         # Evaluate with 40 workers
