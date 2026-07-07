@@ -16,6 +16,7 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
     return h_csr, code_rate
 from rl.decoder.engine import evaluate_snr_point, write_csv
 import global_mdp.decoder.engine as gdqn_engine
+from expdb import get_or_create_config, get_coverage, ensure_eval_row, commit_chunk
 
 
 def main():
@@ -39,9 +40,39 @@ def main():
     h_csr, code_rate = load_matrix(args.matrix_csv)
     rng = np.random.default_rng(args.seed)
 
+    # Build the config identity
+    config = {
+        "matrix": args.matrix_csv,
+        "method": args.method,
+        "z": args.z,
+        "seed": args.seed,
+        
+        # In a real setup, you'd pass train_episodes etc. to eval as well so the hash matches.
+        # For this script we assume it's just evaluating what we have.
+        
+        # Execution details to exclude from hash
+        "workers": args.workers,
+        "target_frame_errors": args.target_frame_errors,
+        "max_frames": args.max_frames,
+    }
+    config_id = get_or_create_config(config)
+    
+    # Get coverage
+    coverage = get_coverage(config_id, args.target_frame_errors, args.max_frames)
+
     results = []
     for snr_db in args.snr_db:
         print(f"Evaluating {args.method} at {snr_db:.2f} dB...")
+        ensure_eval_row(config_id, snr_db, args.target_frame_errors, args.max_frames)
+        
+        cov = coverage.get(snr_db, {"frames_done": 0, "completed": False})
+        if cov["completed"] or cov["frames_done"] >= args.max_frames:
+            print(f"  Skipping SNR {snr_db:.2f} dB (already completed {cov['frames_done']} frames)")
+            continue
+            
+        remaining_frames = args.max_frames - cov["frames_done"]
+        print(f"  Running remaining {remaining_frames} frames...")
+        
         if args.method == "global_dqn":
             stats = gdqn_engine.evaluate_snr_point(
                 h_csr=h_csr,
@@ -51,7 +82,7 @@ def main():
                 code_rate=code_rate,
                 i_max=args.i_max,
                 target_frame_errors=args.target_frame_errors,
-                max_frames=args.max_frames,
+                max_frames=remaining_frames,
                 rng=rng,
                 n_workers=args.workers,
             )
@@ -65,10 +96,21 @@ def main():
                 code_rate=code_rate,
                 i_max=args.i_max,
                 target_frame_errors=args.target_frame_errors,
-                max_frames=args.max_frames,
+                max_frames=remaining_frames,
                 rng=rng,
                 n_workers=args.workers,
             )
+            
+        # Commit the chunk to DB
+        stats_dict = {
+            "frames": stats.frames,
+            "bit_errors": stats.bit_errors,
+            "total_bits": stats.frames * h_csr.shape[1],
+            "frame_errors": stats.frame_errors,
+            "messages": stats.messages
+        }
+        commit_chunk(config_id, snr_db, args.target_frame_errors, args.max_frames, stats_dict)
+        
         results.append((snr_db, stats))
         print(f"  frames={stats.frames}  BER={stats.ber:.5f}  FER={stats.fer:.5f}")
 

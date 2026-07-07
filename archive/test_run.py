@@ -17,8 +17,6 @@ from rl.decoder.engine import evaluate_snr_point
 from rl.agents.reldec import ReldecAgent
 from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
 
-from expdb import get_or_create_config, create_run, update_run_status, set_checkpoint, ensure_eval_row, get_coverage, commit_chunk
-
 def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
     df = pd.read_csv(csv_path)
     m = int(df["row"].max() + 1)
@@ -33,19 +31,19 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
 
 def main():
     MATRIX_PATH = "matrices/WRAN_irreg_384_256.csv"
-    RESULTS_DIR = "results/wran_sweep"
+    RESULTS_DIR = "results/test_wran_sweep"
     os.makedirs(RESULTS_DIR, exist_ok=True)
     
-    Z_VALS = [1, 2, 4, 8]
-    TRAIN_SNR_VALS = [1.0, 1.5, 2.0, 2.5, 3.0]
-    EVAL_SNR_VALS = [1.0, 2.0, 3.0]
-    METHODS = ["flooding", "reldec", "ave_tanh_ave_mi"]
+    Z_VALS = [1]
+    TRAIN_SNR_VALS = [1.0]
+    EVAL_SNR_VALS = [1.0]
+    METHODS = ["reldec"]
     
-    TRAIN_EPISODES = 500
-    MAX_FRAMES = 10000
-    CHUNK_SIZE = 100
+    TRAIN_EPISODES = 2
+    MAX_FRAMES = 10
+    CHUNK_SIZE = 5
     L_MAX = 5
-    WORKERS = 40
+    WORKERS = 2
     
     h_csr, code_rate = load_matrix(MATRIX_PATH)
     n = h_csr.shape[1]
@@ -56,28 +54,11 @@ def main():
         if method == "flooding":
             continue
         for z in Z_VALS:
-            config = {
-                "matrix": MATRIX_PATH,
-                "method": method,
-                "z": z,
-                "alpha": 0.1,
-                "gamma": 0.99,
-                "epsilon": 0.1,
-                "l_max": L_MAX,
-                "train_episodes": TRAIN_EPISODES,
-                "train_snr_vals": TRAIN_SNR_VALS,
-                "seed": 42,
-                "workers": WORKERS,
-                "chunk_size": CHUNK_SIZE
-            }
-            config_id = get_or_create_config(config)
-            
             ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json")
             if os.path.exists(ckpt_path):
                 print(f"[{method} z={z}] Checkpoint already exists. Skipping training.")
                 continue
             
-            run_id = create_run(config_id, "train", config)
             print(f"[{method} z={z}] Training for {TRAIN_EPISODES} episodes...")
             if method == "reldec":
                 agent = ReldecAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
@@ -85,47 +66,40 @@ def main():
                 agent = AveTanhAveMIAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
             
             rng = np.random.default_rng(42)
+            # Train using a round-robin of TRAIN_SNR_VALS
             snr_schedule = [TRAIN_SNR_VALS[i % len(TRAIN_SNR_VALS)] for i in range(TRAIN_EPISODES)]
             for ep_idx, snr_db in enumerate(snr_schedule):
                 llr = awgn_llr(n, snr_db, code_rate, rng)
                 train_episode(agent, h_csr, llr, L_MAX, rng)
             
             agent.save(ckpt_path)
-            set_checkpoint(run_id, ckpt_path, TRAIN_EPISODES)
-            update_run_status(run_id, "completed")
             print(f"[{method} z={z}] Training complete. Saved to {ckpt_path}.")
 
     # 2. Evaluation Phase
     print("\n=== Evaluation Phase ===")
     
-    TARGET_FRAME_ERRORS = 100000
-    
-    # Initialize state tracking from DB
+    # Initialize state tracking from CSVs
+    # state[(method, z, snr)] = frames_done
     state = {}
+    time_spent = {} # Track evaluation time per method-z
     
     for method in METHODS:
         for z in Z_VALS:
-            config = {
-                "matrix": MATRIX_PATH,
-                "method": method,
-                "z": z,
-                "alpha": 0.1,
-                "gamma": 0.99,
-                "epsilon": 0.1,
-                "l_max": L_MAX,
-                "train_episodes": TRAIN_EPISODES,
-                "train_snr_vals": TRAIN_SNR_VALS,
-                "seed": 42,
-                "workers": WORKERS,
-                "chunk_size": CHUNK_SIZE
-            }
-            config_id = get_or_create_config(config)
-            coverage = get_coverage(config_id, TARGET_FRAME_ERRORS, MAX_FRAMES)
-            
-            for snr in EVAL_SNR_VALS:
-                ensure_eval_row(config_id, snr, TARGET_FRAME_ERRORS, MAX_FRAMES)
-                cov = coverage.get(snr, {"frames_done": 0, "completed": False})
-                state[(method, z, snr)] = cov["frames_done"]
+            time_spent[(method, z)] = 0.0
+            csv_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_eval.csv")
+            if os.path.exists(csv_path):
+                df = pd.read_csv(csv_path)
+                for snr in EVAL_SNR_VALS:
+                    row = df[np.isclose(df["ebn0_db"], snr)]
+                    if not row.empty:
+                        state[(method, z, snr)] = int(row.iloc[0]["frames"])
+                        if "eval_time" in row.columns:
+                            time_spent[(method, z)] += float(row.iloc[0]["eval_time"])
+                    else:
+                        state[(method, z, snr)] = 0
+            else:
+                for snr in EVAL_SNR_VALS:
+                    state[(method, z, snr)] = 0
     
     # Calculate total remaining chunks
     total_chunks = 0
@@ -152,27 +126,12 @@ def main():
             method_z_pbars[(method, z)] = pbar
             pos += 1
             
-    # Round-robin evaluation loop — single persistent pool shared across all chunks
+    # Round-robin evaluation loop — single persistent pool
     ctx = mp.get_context("forkserver")
     with ctx.Pool(processes=WORKERS) as pool:
         while total_chunks > 0:
             for method in METHODS:
                 for z in Z_VALS:
-                    config = {
-                        "matrix": MATRIX_PATH,
-                        "method": method,
-                        "z": z,
-                        "alpha": 0.1,
-                        "gamma": 0.99,
-                        "epsilon": 0.1,
-                        "l_max": L_MAX,
-                        "train_episodes": TRAIN_EPISODES,
-                        "train_snr_vals": TRAIN_SNR_VALS,
-                        "seed": 42,
-                        "workers": WORKERS,
-                        "chunk_size": CHUNK_SIZE
-                    }
-                    config_id = get_or_create_config(config)
                     
                     ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json") if method != "flooding" else None
                         
@@ -182,6 +141,8 @@ def main():
                             continue
                             
                         frames_to_run = min(CHUNK_SIZE, MAX_FRAMES - frames_done)
+                        
+                        t0 = time.time()
                         
                         # Evaluate
                         eval_rng = np.random.default_rng(42 + frames_done)
@@ -193,22 +154,58 @@ def main():
                             ebn0_db=snr,
                             code_rate=code_rate,
                             i_max=L_MAX,
-                            target_frame_errors=TARGET_FRAME_ERRORS,
+                            target_frame_errors=100000,
                             max_frames=frames_to_run,
                             rng=eval_rng,
                             n_workers=WORKERS,
                             pool=pool,
                         )
                         
-                        # Commit to DB
-                        stats_dict = {
-                            "frames": new_stats.frames,
-                            "bit_errors": new_stats.bit_errors,
-                            "total_bits": new_stats.frames * n,
-                            "frame_errors": new_stats.frame_errors,
-                            "messages": new_stats.messages
-                        }
-                        commit_chunk(config_id, snr, TARGET_FRAME_ERRORS, MAX_FRAMES, stats_dict)
+                        dt = time.time() - t0
+                        time_spent[(method, z)] += dt
+                        
+                        # Read existing csv to update
+                        csv_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_eval.csv")
+                        if os.path.exists(csv_path):
+                            df = pd.read_csv(csv_path)
+                        else:
+                            df = pd.DataFrame(columns=["method", "ebn0_db", "frames", "bit_errors", "frame_errors", "ber", "fer", "avg_iterations", "avg_messages", "converged_frames", "eval_time"])
+                            
+                        row_idx = df.index[np.isclose(df["ebn0_db"], snr)].tolist()
+                        if row_idx:
+                            idx = row_idx[0]
+                            df.at[idx, "frames"] += new_stats.frames
+                            df.at[idx, "bit_errors"] += new_stats.bit_errors
+                            df.at[idx, "frame_errors"] += new_stats.frame_errors
+                            df.at[idx, "ber"] = df.at[idx, "bit_errors"] / (df.at[idx, "frames"] * n)
+                            df.at[idx, "fer"] = df.at[idx, "frame_errors"] / df.at[idx, "frames"]
+                            
+                            # Weighted averages
+                            old_frames = df.at[idx, "frames"] - new_stats.frames
+                            new_frames = df.at[idx, "frames"]
+                            df.at[idx, "avg_iterations"] = ((df.at[idx, "avg_iterations"] * old_frames) + (new_stats.iterations)) / new_frames
+                            df.at[idx, "avg_messages"] = ((df.at[idx, "avg_messages"] * old_frames) + (new_stats.messages)) / new_frames
+                            df.at[idx, "converged_frames"] += new_stats.converged_frames
+                            if "eval_time" not in df.columns:
+                                df["eval_time"] = 0.0
+                            df.at[idx, "eval_time"] += dt
+                        else:
+                            new_row = {
+                                "method": method,
+                                "ebn0_db": snr,
+                                "frames": new_stats.frames,
+                                "bit_errors": new_stats.bit_errors,
+                                "frame_errors": new_stats.frame_errors,
+                                "ber": new_stats.ber,
+                                "fer": new_stats.fer,
+                                "avg_iterations": new_stats.iterations / new_stats.frames if new_stats.frames > 0 else 0,
+                                "avg_messages": new_stats.messages / new_stats.frames if new_stats.frames > 0 else 0,
+                                "converged_frames": new_stats.converged_frames,
+                                "eval_time": dt
+                            }
+                            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                            
+                        df.to_csv(csv_path, index=False)
                         
                         state[(method, z, snr)] += frames_to_run
                         total_chunks -= 1
@@ -217,7 +214,8 @@ def main():
                         master_pbar.update(1)
                         mz_pbar = method_z_pbars[(method, z)]
                         mz_pbar.update(frames_to_run)
-
+                        mz_pbar.set_postfix({"eval_time": f"{time_spent[(method, z)]:.2f}s"})
 
 if __name__ == "__main__":
     main()
+

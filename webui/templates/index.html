@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experiment Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Action Bar -->
+        <header class="action-bar">
+            <div class="action-bar-left">
+                <h1>Experiments Database</h1>
+            </div>
+            <button id="plot-selected-btn" class="btn-primary" disabled>Plot Selected (0)</button>
+        </header>
+
+        <main class="main-content">
+            <!-- Charts Section (hidden by default) -->
+            <section id="charts-section" class="hidden">
+                <div class="charts-header">
+                    <h2>Comparison Plots</h2>
+                    <div>
+                        <a id="download-plot-btn" class="btn-primary" style="margin-right: 12px; text-decoration: none;" download="plot.png">Download Plot</a>
+                        <button id="close-charts-btn" class="btn-secondary">Close Plots</button>
+                    </div>
+                </div>
+                <div class="matplotlib-container">
+                    <img id="matplotlib-output" src="" alt="Matplotlib Evaluation Plot" />
+                </div>
+            </section>
+
+            <!-- Search & Filters -->
+            <section class="search-section">
+                <div class="search-container">
+                    <input type="text" id="search-filter" class="search-bar-main" placeholder="Search experiments...">
+                    <button id="toggle-filters-btn" class="btn-secondary">Show Filters</button>
+                </div>
+                
+                <div id="filters-panel" class="filters-panel hidden">
+                    <div class="filters-header">
+                        <h3>Dynamic Parameters</h3>
+                        <button id="reset-filters-btn" class="btn-link">Reset</button>
+                    </div>
+                    <div id="dynamic-filters-container" class="dynamic-filters-grid">
+                        <!-- Filters injected via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Experiments List -->
+            <section class="experiments-section">
+                <table class="experiments-table">
+                    <thead>
+                        <tr>
+                            <th class="col-check"><input type="checkbox" id="select-all"></th>
+                            <th>Matrix</th>
+                            <th>Method</th>
+                            <th>Cluster Size (z)</th>
+                            <th>Episodes</th>
+                            <th>Config ID</th>
+                            <th class="col-action">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="experiments-body">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+    
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

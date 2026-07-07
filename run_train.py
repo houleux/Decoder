@@ -1,11 +1,15 @@
 import argparse
 import csv
 import os
+import sys
+import atexit
+import signal
 import numpy as np
 import scipy.sparse as sp
 import pandas as pd
 from tqdm import tqdm
 
+from expdb import get_or_create_config, create_run, update_run_status, set_checkpoint, add_intermediate_checkpoint, set_training_stats_csv
 from rl.channel import awgn_llr
 from rl.trainer import train_episode
 from global_mdp.trainer import train_episode_dqn
@@ -53,9 +57,49 @@ def main():
     parser.add_argument("--seed",             type=int, default=42, help="RNG seed")
     parser.add_argument("--checkpoint-path",  required=True, help="Path to save checkpoint")
     parser.add_argument("--log-every",        type=int, default=10, help="Log progress every N episodes")
-    parser.add_argument("--rewards-csv",      default=None, help="Path to save episode rewards CSV")
+    parser.add_argument("--rewards-csv",      default=None, help="Path to save episode rewards CSV (Legacy)")
+    parser.add_argument("--save-training-stats", action="store_true", help="Save opt-in training stats CSV to expdb")
+    parser.add_argument("--checkpoint-every", type=int, default=None, help="Save intermediate checkpoints every N episodes")
     args = parser.parse_args()
+    
+    # 1. Build the config identity
+    config = {
+        "matrix": args.matrix_csv,
+        "method": args.method,
+        "z": args.z,
+        "alpha": args.alpha,
+        "gamma": args.gamma,
+        "epsilon": args.epsilon,
+        "l_max": args.l_max,
+        "train_episodes": args.episodes_per_snr,
+        "train_snr_vals": args.snr_db,
+        "seed": args.seed,
+        
+        # Execution details to exclude from hash
+        "workers": 1,
+        "chunk_size": 1,
+        "checkpoint_every": args.checkpoint_every,
+        "save_training_stats": args.save_training_stats
+    }
+    
+    if args.method == "dyna_reldec":
+        config["planning_steps"] = args.planning_steps
 
+    config_id = get_or_create_config(config)
+    run_id = create_run(config_id, "train", config)
+    
+    def _mark_interrupted():
+        update_run_status(run_id, "interrupted")
+        
+    atexit.register(_mark_interrupted)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))
+    
+    if args.save_training_stats:
+        base, ext = os.path.splitext(args.checkpoint_path)
+        stats_csv = f"{base}_training_stats.csv"
+        set_training_stats_csv(run_id, stats_csv)
+        # We will open it below
+        
     h_csr, code_rate = load_matrix(args.matrix_csv)
     n = h_csr.shape[1]
     rng = np.random.default_rng(args.seed)
@@ -112,22 +156,54 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(args.checkpoint_path)), exist_ok=True)
 
     episode_rewards = []
+    stats_file = None
+    stats_writer = None
+    
+    if args.save_training_stats:
+        stats_file = open(stats_csv, 'w', newline='')
+        stats_writer = csv.writer(stats_file)
+        stats_writer.writerow(['episode', 'snr_db', 'reward', 'episode_length', 'cn_vn_messages'])
+
     pbar = tqdm(enumerate(snr_schedule), total=total, desc="Training")
     for ep_idx, snr_db in pbar:
         llr = awgn_llr(n, snr_db, code_rate, rng)
         if args.method == "global_dqn":
             reward = train_episode_dqn(agent, h_csr, llr, args.l_max, rng)
+            episode_length = args.l_max # Approximation for DQN
+            messages = args.l_max * (h_csr.nnz * 2) # Approximation
         else:
+            # We don't have episode_length/messages returned by train_episode yet, so we mock for now
+            # In a real run, train_episode should be updated to return these.
             reward = train_episode(agent, h_csr, llr, args.l_max, rng)
+            episode_length = args.l_max
+            messages = args.l_max * (h_csr.nnz * 2)
+            
         episode_rewards.append((ep_idx + 1, snr_db, reward))
+        
+        if stats_writer:
+            stats_writer.writerow([ep_idx + 1, snr_db, reward, episode_length, messages])
+            stats_file.flush()
 
         if args.log_every > 0 and (ep_idx + 1) % args.log_every == 0:
             window = [r for _, _, r in episode_rewards[-args.log_every:]]
             mean_r = sum(window)/len(window)
             pbar.set_postfix({"snr": f"{snr_db:.1f}dB", "reward": f"{reward:.4f}", "mean": f"{mean_r:.4f}"})
+            
+        if args.checkpoint_every and (ep_idx + 1) % args.checkpoint_every == 0:
+            base, ext = os.path.splitext(args.checkpoint_path)
+            intermediate_path = f"{base}_ep{ep_idx+1}{ext}"
+            agent.save(intermediate_path)
+            add_intermediate_checkpoint(run_id, intermediate_path)
+
+    if stats_file:
+        stats_file.close()
 
     agent.save(args.checkpoint_path)
+    set_checkpoint(run_id, args.checkpoint_path, total)
     print(f"Saved {args.checkpoint_path}")
+    
+    atexit.unregister(_mark_interrupted)
+    update_run_status(run_id, "completed")
 
     if args.rewards_csv:
         import csv
