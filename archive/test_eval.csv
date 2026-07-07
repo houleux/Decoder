@@ -1,0 +1,2 @@
+method,ebn0_db,frames,bit_errors,frame_errors,ber,fer,avg_iterations,avg_messages,converged_frames
+llr_vec_ave_res,1.0,10,33,4,0.034375,0.4,6.7,1929.6,6

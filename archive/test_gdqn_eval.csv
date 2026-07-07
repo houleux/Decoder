@@ -1,0 +1,2 @@
+method,ebn0_db,frames,bit_errors,frame_errors,ber,fer,avg_iterations,avg_messages,converged_frames
+global_dqn,1.0,5,20,2,0.041666666666666664,0.4,6.0,1728.0,3

@@ -193,7 +193,6 @@ tmp_exports/
 scratch/
 smoke_variants_plot.png
 *.png
-*.csv
 *.npz
 *.npy
 *.log

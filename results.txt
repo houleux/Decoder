@@ -1,3 +1,0 @@
-Flooding: FER=0.1944, Msgs=3969.7
-RELDEC  : FER=0.1753, Msgs=3064.8
-Dyna    : FER=0.2037, Msgs=3579.8
