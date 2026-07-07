@@ -16,6 +16,7 @@ from rl.trainer import train_episode
 from rl.decoder.engine import evaluate_snr_point
 from rl.agents.reldec import ReldecAgent
 from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
+from rl.agents.ave_mi_ave_mi_agent import AveMIAveMIAgent
 
 from expdb import get_or_create_config, create_run, update_run_status, set_checkpoint, ensure_eval_row, get_coverage, commit_chunk
 
@@ -39,7 +40,7 @@ def main():
     Z_VALS = [1, 2, 4, 8]
     TRAIN_SNR_VALS = [1.0, 1.5, 2.0, 2.5, 3.0]
     EVAL_SNR_VALS = [1.0, 2.0, 3.0]
-    METHODS = ["flooding", "reldec", "ave_tanh_ave_mi"]
+    METHODS = ["flooding", "reldec", "ave_tanh_ave_mi", "ave_mi_ave_mi"]
     
     TRAIN_EPISODES = 500
     MAX_FRAMES = 10000
@@ -83,6 +84,8 @@ def main():
                 agent = ReldecAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
             elif method == "ave_tanh_ave_mi":
                 agent = AveTanhAveMIAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
+            elif method == "ave_mi_ave_mi":
+                agent = AveMIAveMIAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
             
             rng = np.random.default_rng(42)
             snr_schedule = [TRAIN_SNR_VALS[i % len(TRAIN_SNR_VALS)] for i in range(TRAIN_EPISODES)]
