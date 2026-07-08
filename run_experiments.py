@@ -78,7 +78,7 @@ def main():
             }
             config_id = get_or_create_config(config)
             
-            ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json")
+            ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_{config_id[:8]}.json")
             if os.path.exists(ckpt_path):
                 print(f"[{method} z={z}] Checkpoint already exists. Skipping training.")
                 continue
@@ -188,7 +188,7 @@ def main():
                 }
                 config_id = get_or_create_config(config)
                 
-                ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}.json") if method != "flooding" else None
+                ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_{config_id[:8]}.json") if method != "flooding" else None
                     
                 frames_to_run = min(args.chunk_size, args.max_frames - frames_done)
                 

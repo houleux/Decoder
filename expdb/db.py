@@ -1,19 +1,25 @@
 import duckdb
 import os
-import threading
+import time
 
 DB_PATH = "experiments.db"
 
-_local = threading.local()
-
 def get_conn():
     """
-    Returns a thread-local DuckDB connection to experiments.db.
+    Returns a fresh DuckDB connection to experiments.db.
+    Callers should let the connection object go out of scope to release the lock.
     """
-    if not hasattr(_local, "conn"):
-        _local.conn = duckdb.connect(DB_PATH)
-        _init_schema(_local.conn)
-    return _local.conn
+    for _ in range(100):
+        try:
+            conn = duckdb.connect(DB_PATH)
+            _init_schema(conn)
+            return conn
+        except duckdb.IOException as e:
+            if "lock" in str(e).lower():
+                time.sleep(0.1)
+            else:
+                raise
+    raise Exception("Could not acquire DuckDB lock after 10 seconds. Is another process stuck?")
 
 def _init_schema(conn: duckdb.DuckDBPyConnection):
     """
