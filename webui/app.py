@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 # Ensure we can import expdb
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from expdb.db import get_conn
+import glob
+import subprocess
 
 app = Flask(__name__)
 
@@ -21,7 +23,15 @@ def index():
 @app.route('/api/configs')
 def get_configs():
     conn = get_conn()
-    rows = conn.execute("SELECT config_id, created_at, description, tags, config_json FROM configs ORDER BY created_at DESC").fetchall()
+    query = """
+        SELECT c.config_id, c.created_at, c.description, c.tags, c.config_json,
+               COALESCE(MAX(e.frames_done), 0) as max_frames_done
+        FROM configs c
+        LEFT JOIN eval_results e ON c.config_id = e.config_id
+        GROUP BY c.config_id, c.created_at, c.description, c.tags, c.config_json
+        ORDER BY c.created_at DESC
+    """
+    rows = conn.execute(query).fetchall()
     
     configs = []
     for row in rows:
@@ -31,7 +41,8 @@ def get_configs():
             "created_at": row[1].isoformat(),
             "description": row[2],
             "tags": row[3],
-            "data": config_data
+            "data": config_data,
+            "frames_done": row[5]
         })
     return jsonify(configs)
 
@@ -179,6 +190,95 @@ def plot_configs():
     return jsonify({
         "image": f"data:image/png;base64,{img_base64}"
     })
+
+@app.route('/api/matrices', methods=['GET'])
+def get_matrices():
+    matrices = glob.glob(os.path.join("..", "matrices", "*.csv"))
+    # The current working directory for app.py is often Decoder/, but if it's Decoder/webui, we handle it.
+    # Actually, sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    # The CWD where webui/app.py is run is usually the root `Decoder`.
+    # Let's glob absolute path just to be safe.
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    matrix_dir = os.path.join(base_dir, "matrices")
+    matrices = glob.glob(os.path.join(matrix_dir, "*.csv"))
+    
+    # Return relative paths from root, like "matrices/H_AB_LDPC_500.csv"
+    rel_matrices = [os.path.relpath(m, base_dir) for m in matrices]
+    return jsonify({"matrices": sorted(rel_matrices)})
+
+@app.route('/api/methods', methods=['GET'])
+def get_methods():
+    methods = [
+        "flooding", "round_robin", "random", "rbl", "ave_rbl", "max_rbl",
+        "reldec", "dyna_reldec", "ave_res_q", "max_res_q",
+        "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi",
+        "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi",
+        "ave_mi_ave_mi"
+    ]
+    return jsonify({"methods": methods})
+
+@app.route('/api/run_experiment', methods=['POST'])
+def run_experiment():
+    data = request.json
+    
+    # Build command
+    cmd = ["python3", "run_experiments.py"]
+    
+    if "matrix" in data and data["matrix"]:
+        cmd.extend(["--matrix", data["matrix"]])
+    else:
+        return jsonify({"error": "Matrix is required"}), 400
+        
+    if "methods" in data and data["methods"]:
+        cmd.extend(["--methods"] + data["methods"])
+    else:
+        return jsonify({"error": "At least one method is required"}), 400
+        
+    if "zVals" in data and data["zVals"]:
+        cmd.extend(["--z-vals"] + data["zVals"].split())
+        
+    if "trainSnrs" in data and data["trainSnrs"]:
+        cmd.extend(["--train-snrs"] + data["trainSnrs"].split())
+        
+    if "evalSnrs" in data and data["evalSnrs"]:
+        cmd.extend(["--eval-snrs"] + data["evalSnrs"].split())
+        
+    if "trainEpisodes" in data and data["trainEpisodes"]:
+        cmd.extend(["--train-episodes", str(data["trainEpisodes"])])
+        
+    if "maxFrames" in data and data["maxFrames"]:
+        cmd.extend(["--max-frames", str(data["maxFrames"])])
+        
+    if "workers" in data and data["workers"]:
+        cmd.extend(["--workers", str(data["workers"])])
+        
+        
+    if "lMax" in data and data["lMax"]:
+        cmd.extend(["--l-max", str(data["lMax"])])
+        
+    if "seed" in data and data["seed"]:
+        cmd.extend(["--seed", str(data["seed"])])
+        
+    if "targetFrameErrors" in data and data["targetFrameErrors"]:
+        cmd.extend(["--target-frame-errors", str(data["targetFrameErrors"])])
+        
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    try:
+        # Spawn process in background
+        proc = subprocess.Popen(
+            cmd,
+            cwd=base_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return jsonify({
+            "message": "Experiment started successfully",
+            "pid": proc.pid,
+            "command": " ".join(cmd)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

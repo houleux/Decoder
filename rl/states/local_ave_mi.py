@@ -30,7 +30,7 @@ class LocalAveMIState:
         if len(self.neighborhood) == 0:
             return (discretize_value(0.0, 0.0, 1.0, self.n_bins),) if self.discretize else 0.0
             
-        mi_array = np.array([_mi_for_llr(x) for x in llr_post[self.neighborhood]], dtype=np.float64)
+        mi_array = _mi_for_llr(llr_post[self.neighborhood])
         ave_mi = float(np.mean(mi_array))
         
         if self.discretize:

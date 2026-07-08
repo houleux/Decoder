@@ -130,6 +130,10 @@ def _worker(args: tuple) -> MethodStats:
         from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
         agent = AveTanhAveMIAgent.load(checkpoint_path, h_csr)
         decoder = agent
+    elif method == "ave_mi_ave_mi":
+        from rl.agents.ave_mi_ave_mi_agent import AveMIAveMIAgent
+        agent = AveMIAveMIAgent.load(checkpoint_path, h_csr)
+        decoder = agent
 
     else:
         raise ValueError(f"Unknown method: {method!r}")

@@ -13,7 +13,7 @@ class IncreaseAveMIClusterReward:
         if len(self.neighborhood) == 0:
             return 0.0
         
-        mi_before = np.array([_mi_for_llr(x) for x in llr_before[self.neighborhood]], dtype=np.float64)
-        mi_after = np.array([_mi_for_llr(x) for x in llr_post[self.neighborhood]], dtype=np.float64)
+        mi_before = _mi_for_llr(llr_before[self.neighborhood])
+        mi_after = _mi_for_llr(llr_post[self.neighborhood])
         
         return float(np.mean(mi_after) - np.mean(mi_before))

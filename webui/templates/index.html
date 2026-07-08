@@ -16,6 +16,7 @@
         <header class="action-bar">
             <div class="action-bar-left">
                 <h1>Experiments Database</h1>
+                <button id="launch-experiment-btn" class="btn-primary" style="margin-left: 20px;">Launch New Experiment</button>
             </div>
             <button id="plot-selected-btn" class="btn-primary" disabled>Plot Selected (0)</button>
         </header>
@@ -61,10 +62,11 @@
                             <th class="col-check"><input type="checkbox" id="select-all"></th>
                             <th>Matrix</th>
                             <th>Method</th>
-                            <th>Cluster Size (z)</th>
-                            <th>Episodes</th>
+                            <th>Z</th>
+                            <th>Eps</th>
+                            <th>Eval Frames</th>
                             <th>Config ID</th>
-                            <th class="col-action">Details</th>
+                            <th class="col-action">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="experiments-body">
@@ -73,6 +75,138 @@
                 </table>
             </section>
         </main>
+    </div>
+    
+    <!-- Launch Experiment Modal -->
+    <div id="launch-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h2>Launch New Experiment</h2>
+                <button id="close-modal-btn" class="btn-link">&times;</button>
+            </div>
+            <form id="launch-form">
+                <div class="form-group">
+                    <label for="matrix-select">Matrix</label>
+                    <select id="matrix-select" name="matrix" required>
+                        <!-- Options populated via JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Methods</label>
+                    <div class="checkbox-group" id="methods-checkboxes">
+                        <!-- Options populated via JS -->
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="z-vals">Cluster Size (Z)</label>
+                        <input type="text" id="z-vals" name="zVals" placeholder="e.g. 1 2 4" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="l-max">L Max</label>
+                        <input type="number" id="l-max" name="lMax" placeholder="e.g. 10" value="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="train-snrs">Train SNRs (space separated)</label>
+                    <input type="text" id="train-snrs" name="trainSnrs" placeholder="e.g. 1.0 1.5 2.0" value="1.0 1.5 2.0 2.5 3.0" required>
+                </div>
+                <div class="form-group">
+                    <label for="eval-snrs">Eval SNRs (space separated)</label>
+                    <input type="text" id="eval-snrs" name="evalSnrs" placeholder="e.g. 1.0 2.0 3.0" value="1.0 2.0 3.0" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="train-episodes">Train Episodes</label>
+                        <input type="number" id="train-episodes" name="trainEpisodes" value="100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="max-frames">Max Frames</label>
+                        <input type="number" id="max-frames" name="maxFrames" value="1000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="workers">Workers</label>
+                        <input type="number" id="workers" name="workers" value="40" required>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Terminal Command</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="launch-cmd-preview" readonly style="flex: 1; font-family: monospace; font-size: 0.8rem; background: #000;">
+                        <button type="button" id="copy-launch-cmd-btn" class="btn-secondary">Copy</button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <span id="launch-status" class="status-message"></span>
+                    <button type="submit" id="submit-launch-btn" class="btn-primary">Launch</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Extend Eval Modal -->
+    <div id="extend-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>Extend Evaluation</h2>
+                <button id="close-extend-btn" class="btn-link">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 24px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">TARGET CONFIGURATION (READ-ONLY)</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem;">
+                    <div><strong style="color: var(--text-primary)">Matrix:</strong> <span id="ext-matrix"></span></div>
+                    <div><strong style="color: var(--text-primary)">Method:</strong> <span id="ext-method"></span></div>
+                    <div><strong style="color: var(--text-primary)">Z-Val:</strong> <span id="ext-z"></span></div>
+                    <div><strong style="color: var(--text-primary)">Seed:</strong> <span id="ext-seed"></span></div>
+                    <div><strong style="color: var(--text-primary)">L Max:</strong> <span id="ext-lmax"></span></div>
+                    <div><strong style="color: var(--text-primary)">Train Episodes:</strong> <span id="ext-train-eps"></span></div>
+                </div>
+            </div>
+
+            <form id="extend-form">
+                <input type="hidden" id="ext-matrix-val" name="matrix">
+                <input type="hidden" id="ext-method-val" name="methods">
+                <input type="hidden" id="ext-z-val" name="zVals">
+                <input type="hidden" id="ext-seed-val" name="seed">
+                <input type="hidden" id="ext-lmax-val" name="lMax">
+                <input type="hidden" id="ext-train-eps-val" name="trainEpisodes">
+                
+                <div class="form-group">
+                    <label for="ext-eval-snrs">Eval SNRs (space separated)</label>
+                    <input type="text" id="ext-eval-snrs" name="evalSnrs" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ext-max-frames">New Max Frames</label>
+                        <input type="number" id="ext-max-frames" name="maxFrames" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ext-tfe">Target Frame Errors</label>
+                        <input type="number" id="ext-tfe" name="targetFrameErrors" value="100000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ext-workers">Workers</label>
+                        <input type="number" id="ext-workers" name="workers" value="40" required>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Terminal Command</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="ext-cmd-preview" readonly style="flex: 1; font-family: monospace; font-size: 0.8rem; background: #000;">
+                        <button type="button" id="copy-cmd-btn" class="btn-secondary">Copy</button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <span id="extend-status" class="status-message"></span>
+                    <button type="submit" id="submit-extend-btn" class="btn-primary">Run in Background</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <script src="/static/js/main.js"></script>

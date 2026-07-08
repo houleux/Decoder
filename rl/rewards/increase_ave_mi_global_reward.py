@@ -14,7 +14,7 @@ class IncreaseAveMIGlobalReward:
         if len(llr_before) == 0:
             return 0.0
             
-        mi_before = np.array([_mi_for_llr(x) for x in llr_before], dtype=np.float64)
-        mi_after = np.array([_mi_for_llr(x) for x in llr_post], dtype=np.float64)
+        mi_before = _mi_for_llr(llr_before)
+        mi_after = _mi_for_llr(llr_post)
         
         return float(np.mean(mi_after) - np.mean(mi_before))

@@ -41,7 +41,237 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('search-filter').addEventListener('input', applyFilters);
+    
+    // Extend Modal Logic
+    document.getElementById('close-extend-btn').addEventListener('click', () => {
+        document.getElementById('extend-modal').classList.add('hidden');
+    });
+    
+    document.getElementById('copy-cmd-btn').addEventListener('click', () => {
+        const cmd = document.getElementById('ext-cmd-preview').value;
+        navigator.clipboard.writeText(cmd).then(() => {
+            const btn = document.getElementById('copy-cmd-btn');
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = orig, 1500);
+        });
+    });
+    
+    // Generate command preview automatically
+    const extFormInputs = document.querySelectorAll('#extend-form input');
+    extFormInputs.forEach(input => {
+        input.addEventListener('input', updateExtendCommandPreview);
+    });
+
+    document.getElementById('extend-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        const submitBtn = document.getElementById('submit-extend-btn');
+        const statusMsg = document.getElementById('extend-status');
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Launching...';
+        statusMsg.textContent = '';
+        
+        const payload = {
+            matrix: form.matrix.value,
+            methods: [form.methods.value],
+            zVals: form.zVals.value,
+            seed: form.seed.value,
+            lMax: form.lMax.value,
+            trainEpisodes: form.trainEpisodes.value,
+            evalSnrs: form.evalSnrs.value,
+            maxFrames: form.maxFrames.value,
+            targetFrameErrors: form.targetFrameErrors.value,
+            workers: form.workers.value
+        };
+        
+        try {
+            const response = await fetch('/api/run_experiment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                statusMsg.textContent = `Started successfully! (PID: ${data.pid})`;
+                statusMsg.style.color = "#4ade80";
+                setTimeout(() => {
+                    document.getElementById('extend-modal').classList.add('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Run in Background';
+                    statusMsg.textContent = '';
+                }, 2000);
+            } else {
+                statusMsg.textContent = `Error: ${data.error}`;
+                statusMsg.style.color = "#ef4444";
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Run in Background';
+            }
+        } catch (error) {
+            statusMsg.textContent = `Error: ${error.message}`;
+            statusMsg.style.color = "#ef4444";
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Run in Background';
+        }
+    });
+    
+    // Launch Modal Logic
+    document.getElementById('launch-experiment-btn').addEventListener('click', () => {
+        document.getElementById('launch-modal').classList.remove('hidden');
+        fetchMatrices();
+        fetchMethods();
+    });
+    
+    document.getElementById('close-modal-btn').addEventListener('click', () => {
+        document.getElementById('launch-modal').classList.add('hidden');
+    });
+    
+    document.getElementById('copy-launch-cmd-btn').addEventListener('click', () => {
+        const cmd = document.getElementById('launch-cmd-preview').value;
+        navigator.clipboard.writeText(cmd).then(() => {
+            const btn = document.getElementById('copy-launch-cmd-btn');
+            const orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = orig, 1500);
+        });
+    });
+    
+    document.getElementById('launch-form').addEventListener('input', updateLaunchCommandPreview);
+    document.getElementById('launch-form').addEventListener('change', updateLaunchCommandPreview);
+    
+    document.getElementById('launch-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        const submitBtn = document.getElementById('submit-launch-btn');
+        const statusMsg = document.getElementById('launch-status');
+        
+        // Collect checked methods
+        const methods = Array.from(form.querySelectorAll('input[name="methods"]:checked')).map(cb => cb.value);
+        if (methods.length === 0) {
+            statusMsg.textContent = "Error: Select at least one method";
+            statusMsg.style.color = "#ef4444";
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Launching...';
+        statusMsg.textContent = '';
+        
+        const payload = {
+            matrix: form.matrix.value,
+            methods: methods,
+            zVals: form.zVals.value,
+            lMax: form.lMax.value,
+            trainSnrs: form.trainSnrs.value,
+            evalSnrs: form.evalSnrs.value,
+            trainEpisodes: form.trainEpisodes.value,
+            maxFrames: form.maxFrames.value,
+            workers: form.workers.value
+        };
+        
+        try {
+            const response = await fetch('/api/run_experiment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                statusMsg.textContent = `Started successfully! (PID: ${data.pid})`;
+                statusMsg.style.color = "#4ade80";
+                setTimeout(() => {
+                    document.getElementById('launch-modal').classList.add('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Launch';
+                    statusMsg.textContent = '';
+                }, 2000);
+            } else {
+                statusMsg.textContent = `Error: ${data.error}`;
+                statusMsg.style.color = "#ef4444";
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Launch';
+            }
+        } catch (error) {
+            statusMsg.textContent = `Error: ${error.message}`;
+            statusMsg.style.color = "#ef4444";
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Launch';
+        }
+    });
 });
+
+async function fetchMatrices() {
+    try {
+        const response = await fetch('/api/matrices');
+        const data = await response.json();
+        const select = document.getElementById('matrix-select');
+        
+        // Save current selection if any
+        const currentVal = select.value;
+        select.innerHTML = '';
+        
+        data.matrices.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            select.appendChild(opt);
+        });
+        
+        if (currentVal && data.matrices.includes(currentVal)) {
+            select.value = currentVal;
+        }
+        
+        updateLaunchCommandPreview();
+    } catch (e) {
+        console.error("Failed to load matrices", e);
+    }
+}
+
+async function fetchMethods() {
+    try {
+        const response = await fetch('/api/methods');
+        const data = await response.json();
+        const container = document.getElementById('methods-checkboxes');
+        
+        // Only populate if empty to avoid losing selection on reopen
+        if (container.children.length > 0) return;
+        
+        container.innerHTML = '';
+        data.methods.forEach(m => {
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="checkbox" name="methods" value="${m}"> ${m}`;
+            container.appendChild(label);
+        });
+        
+        updateLaunchCommandPreview();
+    } catch (e) {
+        console.error("Failed to load methods", e);
+    }
+}
+
+function updateLaunchCommandPreview() {
+    const form = document.getElementById('launch-form');
+    const methods = Array.from(form.querySelectorAll('input[name="methods"]:checked')).map(cb => cb.value);
+    
+    let cmd = `python3 run_experiments.py`;
+    
+    if (form.matrix.value) cmd += ` --matrix ${form.matrix.value}`;
+    if (methods.length > 0) cmd += ` --methods ${methods.join(' ')}`;
+    if (form.zVals.value) cmd += ` --z-vals ${form.zVals.value}`;
+    if (form.trainSnrs.value) cmd += ` --train-snrs ${form.trainSnrs.value}`;
+    if (form.evalSnrs.value) cmd += ` --eval-snrs ${form.evalSnrs.value}`;
+    if (form.trainEpisodes.value) cmd += ` --train-episodes ${form.trainEpisodes.value}`;
+    if (form.maxFrames.value) cmd += ` --max-frames ${form.maxFrames.value}`;
+    if (form.workers.value) cmd += ` --workers ${form.workers.value}`;
+    if (form.lMax && form.lMax.value) cmd += ` --l-max ${form.lMax.value}`;
+    
+    document.getElementById('launch-cmd-preview').value = cmd;
+}
 
 async function fetchConfigs() {
     try {
@@ -72,9 +302,12 @@ async function fetchConfigs() {
                 <td>${method}</td>
                 <td>${z}</td>
                 <td>${eps}</td>
+                <td>${config.frames_done.toLocaleString()}</td>
                 <td><span class="badge">${shortId}</span></td>
                 <td class="col-action">
-                    <button class="btn-expand" data-id="${config.id}">View Data</button>
+                    <button class="btn-expand" data-id="${config.id}" style="margin-bottom: 4px;">View Data</button><br>
+                    <button class="btn-extend" data-id="${config.id}" style="background: transparent; color: #4ade80; border: 1px solid var(--border-color); padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer; margin-bottom: 4px;">Extend Eval</button><br>
+                    <button class="btn-copy-config" data-id="${config.id}" style="background: transparent; color: #60a5fa; border: 1px solid var(--border-color); padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; cursor: pointer;">Copy Config</button>
                 </td>
             `;
             
@@ -83,7 +316,7 @@ async function fetchConfigs() {
             detailsRow.className = 'details-row';
             detailsRow.id = `details-row-${config.id}`;
             detailsRow.innerHTML = `
-                <td colspan="7">
+                <td colspan="8">
                     <div class="details-content" id="details-${config.id}">
                         <!-- Loading... -->
                     </div>
@@ -110,6 +343,16 @@ async function fetchConfigs() {
                     expandBtn.textContent = 'Hide Data';
                     await loadRowDetails(config.id);
                 }
+            });
+            
+            const extendBtn = mainRow.querySelector('.btn-extend');
+            extendBtn.addEventListener('click', () => {
+                openExtendModal(config.id);
+            });
+            
+            const copyConfigBtn = mainRow.querySelector('.btn-copy-config');
+            copyConfigBtn.addEventListener('click', () => {
+                openLaunchModalWithConfig(config.id);
             });
             
             tbody.appendChild(mainRow);
@@ -243,6 +486,90 @@ function applyFilters() {
             detailsRow.style.display = 'none';
         }
     });
+}
+
+async function openLaunchModalWithConfig(configId) {
+    const raw = configMetadata[configId].raw;
+    
+    // Ensure dropdowns and checkboxes are loaded
+    await Promise.all([fetchMatrices(), fetchMethods()]);
+    
+    const form = document.getElementById('launch-form');
+    
+    // Prefill fields
+    if (raw.matrix && form.matrix.querySelector(`option[value="${raw.matrix}"]`)) {
+        form.matrix.value = raw.matrix;
+    }
+    
+    // Clear existing method checkboxes and check the correct one
+    const methodCheckboxes = form.querySelectorAll('input[name="methods"]');
+    methodCheckboxes.forEach(cb => {
+        cb.checked = (cb.value === raw.method);
+    });
+    
+    if (raw.z !== undefined) form.zVals.value = raw.z;
+    if (raw.l_max !== undefined) form.lMax.value = raw.l_max;
+    if (raw.train_episodes !== undefined) form.trainEpisodes.value = raw.train_episodes;
+    if (raw.workers !== undefined) form.workers.value = raw.workers;
+    
+    if (raw.train_snr_vals) {
+        form.trainSnrs.value = Array.isArray(raw.train_snr_vals) ? raw.train_snr_vals.join(' ') : String(raw.train_snr_vals);
+    }
+    
+    updateLaunchCommandPreview();
+    
+    document.getElementById('launch-modal').classList.remove('hidden');
+}
+
+function openExtendModal(configId) {
+    const raw = configMetadata[configId].raw;
+    
+    // Read-only text display
+    document.getElementById('ext-matrix').textContent = raw.matrix;
+    document.getElementById('ext-method').textContent = raw.method;
+    document.getElementById('ext-z').textContent = raw.z;
+    document.getElementById('ext-seed').textContent = raw.seed;
+    document.getElementById('ext-lmax').textContent = raw.l_max;
+    document.getElementById('ext-train-eps').textContent = raw.train_episodes;
+    
+    // Hidden inputs for form submit
+    document.getElementById('ext-matrix-val').value = raw.matrix;
+    document.getElementById('ext-method-val').value = raw.method;
+    document.getElementById('ext-z-val').value = raw.z;
+    document.getElementById('ext-seed-val').value = raw.seed;
+    document.getElementById('ext-lmax-val').value = raw.l_max;
+    document.getElementById('ext-train-eps-val').value = raw.train_episodes;
+    
+    // Editable defaults
+    // Default to existing SNRs
+    if (raw.train_snr_vals) {
+        document.getElementById('ext-eval-snrs').value = Array.isArray(raw.train_snr_vals) ? raw.train_snr_vals.join(' ') : String(raw.train_snr_vals);
+    } else {
+        document.getElementById('ext-eval-snrs').value = '1.0 1.5 2.0 2.5 3.0';
+    }
+    document.getElementById('ext-max-frames').value = 5000; // Sensible default for extending
+    document.getElementById('ext-tfe').value = 100000;
+    document.getElementById('ext-workers').value = raw.workers || 40;
+    
+    updateExtendCommandPreview();
+    
+    document.getElementById('extend-modal').classList.remove('hidden');
+}
+
+function updateExtendCommandPreview() {
+    const form = document.getElementById('extend-form');
+    
+    let cmd = `python3 run_experiments.py --matrix ${form.matrix.value} --methods ${form.methods.value}`;
+    if (form.zVals.value) cmd += ` --z-vals ${form.zVals.value}`;
+    if (form.evalSnrs.value) cmd += ` --eval-snrs ${form.evalSnrs.value}`;
+    if (form.maxFrames.value) cmd += ` --max-frames ${form.maxFrames.value}`;
+    if (form.targetFrameErrors.value) cmd += ` --target-frame-errors ${form.targetFrameErrors.value}`;
+    if (form.workers.value) cmd += ` --workers ${form.workers.value}`;
+    if (form.seed.value) cmd += ` --seed ${form.seed.value}`;
+    if (form.lMax.value) cmd += ` --l-max ${form.lMax.value}`;
+    if (form.trainEpisodes.value) cmd += ` --train-episodes ${form.trainEpisodes.value}`;
+    
+    document.getElementById('ext-cmd-preview').value = cmd;
 }
 
 function updatePlotButton() {
