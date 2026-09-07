@@ -196,3 +196,4 @@ smoke_variants_plot.png
 *.npz
 *.npy
 *.log
+experiments.db*
