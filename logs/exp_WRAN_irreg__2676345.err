@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home2/harshitlalwani/Decoder/run_experiments.py", line 263, in <module>
+    main()
+  File "/home2/harshitlalwani/Decoder/run_experiments.py", line 75, in main
+    config_id = get_or_create_config(config)
+  File "/home2/harshitlalwani/Decoder/expdb/configs.py", line 13, in get_or_create_config
+    conn = get_conn()
+  File "/home2/harshitlalwani/Decoder/expdb/db.py", line 22, in get_conn
+    raise Exception("Could not acquire DuckDB lock after 10 seconds. Is another process stuck?")
+Exception: Could not acquire DuckDB lock after 10 seconds. Is another process stuck?

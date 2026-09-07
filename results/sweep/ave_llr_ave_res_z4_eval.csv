@@ -1,0 +1,6 @@
+method,ebn0_db,frames,bit_errors,frame_errors,ber,fer,avg_iterations,avg_messages,converged_frames
+ave_llr_ave_res,1.0,1000,7233,621,0.07534375,0.621,7.494,2158.272,390
+ave_llr_ave_res,1.5,1000,4602,415,0.0479375,0.415,5.925,1706.4,589
+ave_llr_ave_res,2.0,1000,2290,227,0.023854166666666666,0.227,4.447,1280.736,776
+ave_llr_ave_res,2.5,1000,849,87,0.00884375,0.087,3.068,883.584,918
+ave_llr_ave_res,3.0,1000,393,41,0.00409375,0.041,2.403,692.064,959

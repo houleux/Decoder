@@ -1,0 +1,2 @@
+method,ebn0_db,frames,bit_errors,frame_errors,ber,fer,avg_iterations,avg_messages,converged_frames,eval_time
+reldec,1.0,10,350,10,0.09114583333333333,1.0,5.0,6480.0,0,1.723151683807373

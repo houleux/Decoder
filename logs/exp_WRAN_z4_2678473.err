@@ -1,0 +1,25 @@
+Total Progress:   0%|          | 0/6000 [00:00<?, ?it/s]
+ave_tanh_ave_mi z=4:   0%|          | 0/300000 [00:00<?, ?it/s][A
+
+reldec z=4:   0%|          | 0/300000 [00:00<?, ?it/s][A[ATotal Progress:   0%|          | 1/6000 [00:12<20:05:02, 12.05s/it]
+
+reldec z=4:   0%|          | 100/300000 [00:12<10:02:24,  8.30it/s][A[ATotal Progress:   0%|          | 2/6000 [00:20<16:59:49, 10.20s/it]
+
+reldec z=4:   0%|          | 200/300000 [00:20<8:29:43,  9.80it/s] [A[ATotal Progress:   0%|          | 3/6000 [00:33<18:37:46, 11.18s/it]
+
+reldec z=4:   0%|          | 300/300000 [00:33<9:18:36,  8.94it/s][A[ATotal Progress:   0%|          | 4/6000 [00:46<19:38:48, 11.80s/it]
+ave_tanh_ave_mi z=4:   0%|          | 100/300000 [00:46<38:21:29,  2.17it/s][ATraceback (most recent call last):
+  File "/home2/harshitlalwani/Decoder/run_experiments.py", line 263, in <module>
+    main()
+  File "/home2/harshitlalwani/Decoder/run_experiments.py", line 223, in main
+    config_id = get_or_create_config(config)
+  File "/home2/harshitlalwani/Decoder/expdb/configs.py", line 13, in get_or_create_config
+    conn = get_conn()
+  File "/home2/harshitlalwani/Decoder/expdb/db.py", line 22, in get_conn
+    raise Exception("Could not acquire DuckDB lock after 10 seconds. Is another process stuck?")
+Exception: Could not acquire DuckDB lock after 10 seconds. Is another process stuck?
+Total Progress:   0%|          | 4/6000 [00:57<24:05:34, 14.47s/it]
+
+
+                                                                  [A[A
+                                                                            [A

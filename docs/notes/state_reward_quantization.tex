@@ -1,0 +1,260 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+\newenvironment{remark}
+  {\par\medskip\noindent\textbf{Remark.}\itshape}
+  {\par\medskip}
+
+\title{State, Reward, and Quantization Formulations\\
+\large Factored-MDP LDPC Scheduling: \code{local\_ave\_*}, \code{local\_tanh\_*},\\
+\code{ave\_cluster\_residue}, \code{increase\_ave\_mi\_cluster}}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Notation and setup}
+
+Let $H \in \{0,1\}^{m \times n}$ be the parity-check matrix ($m$ check nodes, $n$ variable
+nodes, VNs). For check node $c$, let $N(c) = \{v : H_{c,v} = 1\}$ be its VN neighborhood.
+
+Given cluster size $z$, check nodes are partitioned into $K = \lceil m/z \rceil$
+contiguous clusters (\file{rl/agents/reldec.py:46--48}):
+\[
+C_k = \{kz, kz+1, \dots, \min((k+1)z-1,\, m-1)\}, \qquad k = 0,\dots,K-1.
+\]
+The VN neighborhood of cluster $k$ is the (deduplicated) union of its check nodes'
+neighborhoods (\file{rl/agents/reldec.py:51--55}):
+\[
+N(k) \;=\; \bigcup_{c \in C_k} N(c) \;\subseteq\; \{1,\dots,n\}.
+\]
+
+Belief propagation processes one scheduled cluster $k_t$ per step $t$, mutating the
+global posterior LLR vector $\ell_{t-1}\in\mathbb{R}^n$ into $\ell_t\in\mathbb{R}^n$;
+only entries $\ell_t[v]$ for $v\in N(k_t)$ change. Write
+\[
+\ell^{\mathrm{before}} := \ell_{t-1}, \qquad \ell^{\mathrm{after}} := \ell_t
+\]
+for the LLR vectors immediately before/after cluster $k_t$'s update
+(\file{rl/trainer.py:42,49}). Each cluster $k$ owns an independent sub-MDP with state
+encoder $\varphi_k$, reward $r_k$, and (for tabular agents) Q-table
+$Q_k : S_k \to \mathbb{R}$ (\file{rl/algorithms/factored\_q\_learning.py}). Agent names
+concatenate a state family and a reward family, e.g. \code{ave\_tanh\_ave\_mi} $=$
+\code{local\_ave\_tanh\_llr} state $\otimes$ \code{increase\_ave\_mi\_cluster} reward
+(\file{rl/agents/ave\_tanh\_ave\_mi\_agent.py:17,20}).
+
+\section{State space}
+
+All four encoders below share the constructor signature
+\code{(neighborhood, discretize=False, n\_bins=21)} and are evaluated on whatever LLR
+vector is passed at call time (\file{rl/states/}).
+
+\subsection{\code{local\_ave\_llr} --- \code{LocalAveLLRState}}
+\label{sec:ave-llr}
+Mean posterior LLR over the cluster's VN neighborhood
+(\file{rl/states/local\_ave\_llr.py:19--37}):
+\[
+\varphi_k^{\mathrm{ave\text{-}llr}}(\ell) =
+\begin{cases}
+0 & N(k) = \varnothing \\[2pt]
+\dfrac{1}{|N(k)|}\displaystyle\sum_{v\in N(k)} \ell[v] & \text{otherwise.}
+\end{cases}
+\]
+Pre-quantization clip range: $[-100, 100]$.
+
+\subsection{\code{local\_ave\_tanh\_llr} --- \code{LocalAveTanhLLRState}}
+Mean of $\tanh(\ell)$ over the neighborhood
+(\file{rl/states/local\_ave\_tanh\_llr.py:19--37}):
+\[
+\varphi_k^{\mathrm{ave\text{-}tanh}}(\ell) =
+\begin{cases}
+0 & N(k) = \varnothing \\[2pt]
+\dfrac{1}{|N(k)|}\displaystyle\sum_{v\in N(k)} \tanh(\ell[v]) & \text{otherwise,}
+\end{cases}
+\qquad \varphi_k^{\mathrm{ave\text{-}tanh}}\in(-1,1).
+\]
+
+\begin{remark}
+The code applies $\tanh(\ell)$ directly, \emph{not} the textbook soft-bit convention
+$\tanh(\ell/2) = 1-2p$. This is what is implemented; treat the $\times\tfrac12$ scaling
+as absent unless the code is changed.
+\end{remark}
+
+\subsection{The MI proxy $\mathrm{mi}(\cdot)$ (shared by \S\ref{sec:ave-mi} and \S\ref{sec:reward-mi})}
+\label{sec:mi-fn}
+Both \code{local\_ave\_mi} and \code{increase\_ave\_mi\_cluster} call
+\code{\_mi\_for\_llr} (\file{rl/rewards/mi\_utils.py}), which maps a per-VN LLR to an
+estimated mutual information via a piecewise-cubic curve fit to the AWGN-consistent
+channel capacity function $J(\sigma)$:
+\[
+\sigma^2(\ell) = \max(2\ell,\,0), \qquad \sigma(\ell) = \sqrt{\sigma^2(\ell)},
+\]
+\[
+J(\sigma) =
+\begin{cases}
+-0.0421061\,\sigma^3 + 0.209252\,\sigma^2 - 0.00640081\,\sigma & 0 \le \sigma \le 1.6363 \\[4pt]
+1 - \exp\!\big(0.00181491\,\sigma^3 - 0.142675\,\sigma^2 - 0.0822054\,\sigma + 0.0549608\big) & 1.6363 < \sigma < 10 \\[4pt]
+1 & \sigma \ge 10,
+\end{cases}
+\]
+\[
+\mathrm{mi}(\ell) = \mathrm{clip}\big(J(\sigma(\ell)),\, 0,\, 1\big) \in [0,1].
+\]
+This assumes $\ell$ is distributed as an LLR-consistent Gaussian,
+$\ell \sim \mathcal{N}(\sigma^2/2,\,\sigma^2)$, the usual EXIT-chart approximation.
+
+\begin{remark}
+$\sigma^2$ clips negative LLRs to $0$, so $\mathrm{mi}(\ell) = J(0) = 0$ for
+\emph{every} $\ell \le 0$, regardless of magnitude. $\mathrm{mi}(\cdot)$ is therefore not
+symmetric under $\ell \to -\ell$: it is monotone increasing only for $\ell \ge 0$ and
+implicitly treats positive $\ell$ as ``confidence in the correct bit.'' This is a
+property of the code as written; it is not documented elsewhere.
+\end{remark}
+
+\subsection{\code{local\_ave\_mi} --- \code{LocalAveMIState}}
+\label{sec:ave-mi}
+Mean $\mathrm{mi}(\ell)$ over the neighborhood (\file{rl/states/local\_ave\_mi.py:20--39}):
+\[
+\varphi_k^{\mathrm{ave\text{-}mi}}(\ell) =
+\begin{cases}
+0 & N(k) = \varnothing \\[2pt]
+\dfrac{1}{|N(k)|}\displaystyle\sum_{v\in N(k)} \mathrm{mi}(\ell[v]) & \text{otherwise,}
+\end{cases}
+\qquad \varphi_k^{\mathrm{ave\text{-}mi}} \in [0,1].
+\]
+
+\subsection{\code{local\_tanh\_llr\_vector} --- \code{LocalTanhLLRVectorState}}
+Unlike \S\ref{sec:ave-llr}--\ref{sec:ave-mi}, this is \emph{not} averaged: it is the
+full per-VN vector of $\tanh(\ell)$ over the (sorted, deduplicated) neighborhood
+(\file{rl/states/local\_tanh\_llr\_vector.py:19--32}):
+\[
+\varphi_k^{\mathrm{tanh\text{-}vec}}(\ell) =
+\big(\tanh(\ell[v_1]),\, \tanh(\ell[v_2]),\, \dots,\, \tanh(\ell[v_{|N(k)|}])\big),
+\qquad v_1 < v_2 < \dots \in N(k).
+\]
+Dimension $=|N(k)|$, fixed once the graph and $z$ are fixed. If $N(k)=\varnothing$ the
+tuple is empty (no special-cased fallback, unlike the scalar encoders above).
+
+\subsection{Summary}
+\begin{center}
+\begin{tabular}{@{}lllc@{}}
+\toprule
+State & Type & Formula & Pre-quant.\ range \\
+\midrule
+\code{local\_ave\_llr} & scalar & mean $\ell$ & $[-100,100]$ \\
+\code{local\_ave\_tanh\_llr} & scalar & mean $\tanh(\ell)$ & $(-1,1)$ \\
+\code{local\_ave\_mi} & scalar & mean $\mathrm{mi}(\ell)$ & $[0,1]$ \\
+\code{local\_tanh\_llr\_vector} & vector, dim $|N(k)|$ & per-VN $\tanh(\ell)$ & $(-1,1)$ each \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Quantization scheme}
+
+All four encoders share one uniform-binning routine
+(\file{rl/states/discretize\_utils.py:3--9}):
+\[
+\mathrm{bin}(x;\,l,h,B) \;=\; \left\lfloor \frac{\mathrm{clip}(x,l,h) - l}{h - l}\,(B-1) \;+\; \tfrac12 \right\rfloor \;\in\; \{0,1,\dots,B-1\}.
+\]
+This clips $x$ to $[l,h]$, rescales linearly onto $[0, B-1]$, and rounds to the nearest
+integer (round-half-up via the $+\tfrac12$ floor trick) — i.e.\ nearest-bin-center
+quantization with step $\Delta = (h-l)/(B-1)$. Default $B = 21$ (\code{n\_bins=21})
+for every state class above.
+
+\begin{center}
+\begin{tabular}{@{}llc@{}}
+\toprule
+State & $(l, h)$ & Quantized shape \\
+\midrule
+\code{local\_ave\_llr} & $(-100, 100)$ & 1-tuple of int \\
+\code{local\_ave\_tanh\_llr} & $(-1, 1)$ & 1-tuple of int \\
+\code{local\_ave\_mi} & $(0, 1)$ & 1-tuple of int \\
+\code{local\_tanh\_llr\_vector} & $(-1, 1)$, componentwise & $|N(k)|$-tuple of int \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Empty-neighborhood edge case.} When $N(k)=\varnothing$, the scalar encoders
+still call $\mathrm{bin}(0.0; l, h, B)$ rather than skipping quantization
+(\file{local\_ave\_llr.py:30}, \file{local\_ave\_tanh\_llr.py:30},
+\file{local\_ave\_mi.py:31}) — so the returned bin is wherever $0$ falls in
+$[l,h]$: bin $10$ of $\{0,\dots,20\}$ for the LLR/tanh ranges (since $0$ is their
+midpoint), bin $0$ of $\{0,\dots,20\}$ for the MI range (since $0$ is its lower
+bound). \code{local\_tanh\_llr\_vector} has no such fallback — it returns an empty
+tuple.
+
+Quantized states are hashable \code{tuple[int, \dots]} objects, which is what makes
+them usable as dictionary keys for the tabular
+$Q_k$ in \code{FactoredQLearning.q\_table} (\file{rl/algorithms/factored\_q\_learning.py:23}).
+With discretization on, \code{local\_tanh\_llr\_vector} induces a state space of size
+$B^{|N(k)|}$ for cluster $k$ — combinatorially larger than the three scalar encoders'
+$B$-state spaces.
+
+\section{Reward functions}
+
+Both rewards take $(\ell^{\mathrm{before}}, \ell^{\mathrm{after}})$ — the LLR vectors
+immediately surrounding cluster $k$'s BP update (\S1) — and are $0$ by convention when
+$N(k)=\varnothing$.
+
+\subsection{\code{ave\_cluster\_residue} --- \code{AveClusterResidualReward}}
+Mean absolute LLR change over the neighborhood
+(\file{rl/rewards/ave\_cluster\_residual\_reward.py:16--27}):
+\[
+r_k^{\mathrm{ave\text{-}res}}(\ell^{\mathrm{before}}, \ell^{\mathrm{after}}) =
+\begin{cases}
+0 & N(k)=\varnothing \\[2pt]
+\dfrac{1}{|N(k)|}\displaystyle\sum_{v\in N(k)} \big|\ell^{\mathrm{after}}[v] - \ell^{\mathrm{before}}[v]\big| & \text{otherwise,}
+\end{cases}
+\qquad r_k^{\mathrm{ave\text{-}res}} \ge 0.
+\]
+Channel-agnostic: it makes no assumption about the transmitted codeword, only about
+belief \emph{change} magnitude.
+
+\subsection{\code{increase\_ave\_mi\_cluster} --- \code{IncreaseAveMIClusterReward}}
+\label{sec:reward-mi}
+Change in mean MI proxy (\S\ref{sec:mi-fn}) over the neighborhood, before vs.\ after
+the update (\file{rl/rewards/increase\_ave\_mi\_cluster\_reward.py:12--19}):
+\[
+r_k^{\Delta\mathrm{mi}}(\ell^{\mathrm{before}}, \ell^{\mathrm{after}}) =
+\begin{cases}
+0 & N(k)=\varnothing \\[4pt]
+\underbrace{\dfrac{1}{|N(k)|}\!\!\sum_{v\in N(k)}\!\! \mathrm{mi}(\ell^{\mathrm{after}}[v])}_{\overline{\mathrm{mi}}^{\,\mathrm{after}}_k}
+\;-\;
+\underbrace{\dfrac{1}{|N(k)|}\!\!\sum_{v\in N(k)}\!\! \mathrm{mi}(\ell^{\mathrm{before}}[v])}_{\overline{\mathrm{mi}}^{\,\mathrm{before}}_k}
+& \text{otherwise.}
+\end{cases}
+\]
+Signed; unlike $r_k^{\mathrm{ave\text{-}res}}$ it can be negative (local MI can drop
+under BP, e.g. across short cycles), and inherits the sign asymmetry of $\mathrm{mi}(\cdot)$
+noted in \S\ref{sec:mi-fn}.
+
+\section{Integration into the per-cluster sub-MDP}
+
+Each sub-MDP has exactly one action (``schedule cluster $k$ now''), so its Q-update
+bootstraps against the next state with no $\max$ over actions
+(\file{rl/algorithms/factored\_q\_learning.py:29--36}):
+\[
+Q_k(s) \;\leftarrow\; Q_k(s) + \alpha\big[\,r_k + \gamma\, Q_k(s') - Q_k(s)\,\big].
+\]
+Per training step (\file{rl/trainer.py:42--51}, \file{rl/agents/reldec.py:90--104}),
+for the scheduled cluster $k$:
+\[
+s = \varphi_k(\ell^{\mathrm{before}}), \qquad
+r_k = r_k(\ell^{\mathrm{before}}, \ell^{\mathrm{after}}), \qquad
+s' = \varphi_k(\ell^{\mathrm{after}}).
+\]
+The eight \code{*\_ave\_res}/\code{*\_ave\_mi} agents in \file{rl/agents/} are exactly
+the $\{$\code{local\_ave\_llr}, \code{local\_ave\_tanh\_llr}, \code{local\_ave\_mi}
+(state, as \code{local\_llr\_vector}/\code{local\_tanh\_llr\_vector} for the
+\code{*\_vec\_*} variants)$\} \times \{$\code{ave\_cluster\_residue},
+\code{increase\_ave\_mi\_cluster}$\}$ combinations described above, all sharing the
+same $Q_k$-update and the same cluster/neighborhood construction from \S1.
+
+\end{document}

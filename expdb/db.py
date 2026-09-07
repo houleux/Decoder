@@ -9,7 +9,7 @@ def get_conn():
     Returns a fresh DuckDB connection to experiments.db.
     Callers should let the connection object go out of scope to release the lock.
     """
-    for _ in range(100):
+    for _ in range(1200):
         try:
             conn = duckdb.connect(DB_PATH)
             _init_schema(conn)
@@ -19,7 +19,7 @@ def get_conn():
                 time.sleep(0.1)
             else:
                 raise
-    raise Exception("Could not acquire DuckDB lock after 10 seconds. Is another process stuck?")
+    raise Exception("Could not acquire DuckDB lock after 120 seconds. Is another process stuck?")
 
 def _init_schema(conn: duckdb.DuckDBPyConnection):
     """

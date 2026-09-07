@@ -1,0 +1,8 @@
+Total Progress:   0%|          | 0/3 [00:00<?, ?it/s]
+flooding z=1:   0%|          | 0/1 [00:00<?, ?it/s][A
+
+random z=1:   0%|          | 0/1 [00:00<?, ?it/s][A[A
+
+
+reldec z=1:   0%|          | 0/1 [00:00<?, ?it/s][A[A[A/var/spool/slurmd/job2675406/slurm_script: line 25: 794242 Killed                  python3 run_experiments.py --matrix matrices/WRAN_irreg_384_256.csv --methods flooding random reldec --train-episodes 1 --max-frames 1 --train-snrs 1.0 --eval-snrs 1.0
+slurmstepd: error: Detected 1 oom-kill event(s) in StepId=2675406.batch. Some of your processes may have been killed by the cgroup out-of-memory handler.

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home2/harshitlalwani/Decoder/run_experiments.py", line 20, in <module>
+    from expdb import get_or_create_config, create_run, update_run_status, set_checkpoint, ensure_eval_row, get_coverage, commit_chunk
+  File "/home2/harshitlalwani/Decoder/expdb/__init__.py", line 2, in <module>
+    from .configs import get_or_create_config, get_config
+  File "/home2/harshitlalwani/Decoder/expdb/configs.py", line 2, in <module>
+    from .db import get_conn
+  File "/home2/harshitlalwani/Decoder/expdb/db.py", line 1, in <module>
+    import duckdb
+ModuleNotFoundError: No module named 'duckdb'

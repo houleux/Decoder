@@ -1,0 +1,10 @@
+==========================================
+SLURM_JOB_ID = 2688235
+SLURM_NODELIST = gnode056
+SLURM_JOB_GPUS = 3
+==========================================
+=== Training Phase ===
+[reldec z=4] Checkpoint already exists. Skipping training.
+[ave_tanh_ave_mi z=4] Checkpoint already exists. Skipping training.
+
+=== Evaluation Phase ===

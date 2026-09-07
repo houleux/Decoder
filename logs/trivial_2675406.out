@@ -1,0 +1,10 @@
+==========================================
+SLURM_JOB_ID = 2675406
+SLURM_NODELIST = gnode059
+SLURM_JOB_GPUS = 
+==========================================
+=== Training Phase ===
+[reldec z=1] Training for 1 episodes...
+[reldec z=1] Training complete. Saved to results/unified/reldec_z1_1b35bf2c.json.
+
+=== Evaluation Phase ===
