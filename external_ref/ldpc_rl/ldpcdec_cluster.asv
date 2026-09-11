@@ -1,0 +1,22 @@
+function [LLR_final,Res] = ldpcdec_cluster(i,Res_prev,LLR_in,pcmatrix,P,BlockSize)
+p_sub = pcmatrix((i-1)*(BlockSize)+1:i*BlockSize,:);
+Res = Res_prev;
+LLR_int = LLR_in - Res_prev;
+p_temp = p_sub.*LLR_int;
+p_temp(p_temp == 0) = inf;
+% v = P(i,j): P(i,j) + blockSize-1;
+% v = rem(v,blockSize)+1;
+% for k = 1 : blockSize
+%     Res((j-1)*blockSize+v(k)) = 2*atanh((prod(tanh(p_temp(k,:)/2)))/tanh(p_temp(k,(j-1)*blockSize+v(k))/2));
+% end
+for i = 1 : length(p_sub)
+    for j = 1 : height(p_sub)
+        if p_temp(i,j) == 0
+            Res(j) = Res_prev(j);
+        else
+            Res(j) = 2*atanh((prod(tanh(p_temp(k,:)/2)))/tanh(p_temp(k,(j-1)*blockSize+v(k))/2));
+    end
+end
+LLR_final = (LLR_int + Res)';
+Res = Res';
+end

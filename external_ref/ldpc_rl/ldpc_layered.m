@@ -1,0 +1,35 @@
+function [LLR_out1,Res_int] = ldpc_layered(LLR_in,C,Res,row_weight,BlockSize)
+for i = 1 : numel(Res)
+    % LLR_int{i} = LLR_in - Res{i};
+    Res_int{i} = zeros(length(LLR_in),1);
+    Res1{i} = zeros(length(LLR_in),1);
+end
+LLR_int = LLR_in;
+for i = 1 : numel(C)
+    LLR_int = LLR_int - Res{i};
+    for j = 1 : BlockSize
+        idx = C{i}(j,1:row_weight(i)); 
+        llr_temp = LLR_int(idx);
+        temp = tanh(llr_temp./2);
+        prodLq = prod(temp);  
+        Res_int{i}(idx) = 2*atanh(prodLq ./ temp);
+    end
+    LLR_int = LLR_int + Res_int{i};
+end
+LLR_out1 = LLR_int;
+% LLR = LLR_in;
+% 
+% for i = 1:numel(C)
+%     for j = 1:BlockSize
+%         idx = C{i}(j,1:row_weight(i));
+%         Lq = LLR(idx) - Res{i}(idx);
+%         temp = tanh(Lq/2);
+%         prod_all = prod(temp);
+%         R_new = 2*atanh(prod_all ./ temp);
+%         LLR(idx) = Lq + R_new;
+%         Res1{i}(idx) = R_new;
+%     end
+% end
+% 
+% LLR_out2 = LLR;
+end

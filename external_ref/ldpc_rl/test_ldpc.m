@@ -1,0 +1,288 @@
+load("P.mat");
+p1 = [
+    25 12 12  3  3 26  6 21 -1 15 22 -1 15 -1  4 -1 -1 16 -1  0  0 -1 -1 -1
+    25 18 26 16 22 23  9 -1  0 -1  4 -1  4 -1  8 23 11 -1 -1 -1  0  0 -1 -1
+     9  7  0  1 17 -1 -1  7  3 -1  3 23 -1 16 -1 -1 21 -1  0 -1 -1  0  0 -1
+    24  5 26  7  1 -1 -1 15 24 15 -1  8 -1 13 -1 13 -1 11 -1 -1 -1 -1  0  0
+     2  2 19 14 24  1 15 19 -1 21 -1  2 -1 24 -1  3 -1  2  1 -1 -1 -1 -1  0
+    ];
+p2 = [
+    16 17 22 24  9  3 14 -1  4  2  7 -1 26 -1  2 -1 21 -1  1  0 -1 -1 -1 -1
+    25 18 26 16 22 23  9 -1  0 -1  4 -1  4 -1  8 23 11 -1 -1 -1  0  0 -1 -1
+     9  7  0  1 17 -1 -1  7  3 -1  3 23 -1 16 -1 -1 21 -1  0 -1 -1  0  0 -1
+    24  5 26  7  1 -1 -1 15 24 15 -1  8 -1 13 -1 13 -1 11 -1 -1 -1 -1  0  0
+     2  2 19 14 24  1 15 19 -1 21 -1  2 -1 24 -1  3 -1  2  1 -1 -1 -1 -1  0
+    ];
+p3 = [
+    16 17 22 24  9  3 14 -1  4  2  7 -1 26 -1  2 -1 21 -1  1  0 -1 -1 -1 -1
+    25 12 12  3  3 26  6 21 -1 15 22 -1 15 -1  4 -1 -1 16 -1  0  0 -1 -1 -1
+     9  7  0  1 17 -1 -1  7  3 -1  3 23 -1 16 -1 -1 21 -1  0 -1 -1  0  0 -1
+    24  5 26  7  1 -1 -1 15 24 15 -1  8 -1 13 -1 13 -1 11 -1 -1 -1 -1  0  0
+     2  2 19 14 24  1 15 19 -1 21 -1  2 -1 24 -1  3 -1  2  1 -1 -1 -1 -1  0
+    ];
+p4 = [
+    16 17 22 24  9  3 14 -1  4  2  7 -1 26 -1  2 -1 21 -1  1  0 -1 -1 -1 -1
+    25 12 12  3  3 26  6 21 -1 15 22 -1 15 -1  4 -1 -1 16 -1  0  0 -1 -1 -1
+    25 18 26 16 22 23  9 -1  0 -1  4 -1  4 -1  8 23 11 -1 -1 -1  0  0 -1 -1
+    24  5 26  7  1 -1 -1 15 24 15 -1  8 -1 13 -1 13 -1 11 -1 -1 -1 -1  0  0
+     2  2 19 14 24  1 15 19 -1 21 -1  2 -1 24 -1  3 -1  2  1 -1 -1 -1 -1  0
+    ];
+p5 = [
+    16 17 22 24  9  3 14 -1  4  2  7 -1 26 -1  2 -1 21 -1  1  0 -1 -1 -1 -1
+    25 12 12  3  3 26  6 21 -1 15 22 -1 15 -1  4 -1 -1 16 -1  0  0 -1 -1 -1
+    25 18 26 16 22 23  9 -1  0 -1  4 -1  4 -1  8 23 11 -1 -1 -1  0  0 -1 -1
+     9  7  0  1 17 -1 -1  7  3 -1  3 23 -1 16 -1 -1 21 -1  0 -1 -1  0  0 -1
+     2  2 19 14 24  1 15 19 -1 21 -1  2 -1 24 -1  3 -1  2  1 -1 -1 -1 -1  0
+    ];
+p6 = [
+    16 17 22 24  9  3 14 -1  4  2  7 -1 26 -1  2 -1 21 -1  1  0 -1 -1 -1 -1
+    25 12 12  3  3 26  6 21 -1 15 22 -1 15 -1  4 -1 -1 16 -1  0  0 -1 -1 -1
+    25 18 26 16 22 23  9 -1  0 -1  4 -1  4 -1  8 23 11 -1 -1 -1  0  0 -1 -1
+     9  7  0  1 17 -1 -1  7  3 -1  3 23 -1 16 -1 -1 21 -1  0 -1 -1  0  0 -1
+    24  5 26  7  1 -1 -1 15 24 15 -1  8 -1 13 -1 13 -1 11 -1 -1 -1 -1  0  0
+    ];
+% load("p2.mat");
+% load("p3.mat");
+% load("p4.mat");
+% load("p5.mat");
+% load("p6.mat");
+blockSize = 27;
+pcmatrix = ldpcQuasiCyclicMatrix(blockSize,P);
+pcmatrix1 = ldpcQuasiCyclicMatrix(blockSize,p1);
+pcmatrix2 = ldpcQuasiCyclicMatrix(blockSize,p2);
+pcmatrix3 = ldpcQuasiCyclicMatrix(blockSize,p3);
+pcmatrix4 = ldpcQuasiCyclicMatrix(blockSize,p4);
+pcmatrix5 = ldpcQuasiCyclicMatrix(blockSize,p5);
+pcmatrix6 = ldpcQuasiCyclicMatrix(blockSize,p6);
+cfgLDPCEnc = ldpcEncoderConfig(pcmatrix);
+cfgLDPCDec_bp = ldpcDecoderConfig(pcmatrix);
+cfgLDPCDec = ldpcDecoderConfig(pcmatrix,'layered-bp');
+cfgLDPCDec1 = ldpcDecoderConfig(pcmatrix1);
+cfgLDPCDec2 = ldpcDecoderConfig(pcmatrix2);
+cfgLDPCDec3 = ldpcDecoderConfig(pcmatrix3);
+cfgLDPCDec4 = ldpcDecoderConfig(pcmatrix4);
+cfgLDPCDec5 = ldpcDecoderConfig(pcmatrix5);
+cfgLDPCDec6 = ldpcDecoderConfig(pcmatrix6);
+SNR_db = 4;
+SNR = 10.^(SNR_db/10);
+
+for i =1 : length(SNR)
+    parfor j = 1 : 10000
+        % Y_int1_1 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_1 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_1 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_1 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_1 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int1_2 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_2 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_2 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_2 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_2 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int1_3 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_3 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_3 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_3 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_3 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int1_4 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_4 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_4 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_4 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_4 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int1_5 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_5 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_5 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_5 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_5 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int1_6 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int2_6 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int3_6 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int4_6 = zeros(cfgLDPCEnc.BlockLength,1);
+        % Y_int5_6 = zeros(cfgLDPCEnc.BlockLength,1);
+
+        bits = randi([0 1], cfgLDPCEnc.NumInformationBits,1);
+        codeword = ldpcEncode(bits,cfgLDPCEnc);
+        codeword_1 = (codeword == 0);
+        codeword_2 = (codeword == 1);
+        data_modulated = sqrt(SNR(i)).*real(pskmod(codeword, 2));
+        noise = randn(cfgLDPCEnc.BlockLength,1);
+        data_received = data_modulated + noise;
+        soft_demodulated_output = 2*data_received;
+        % Output From Layered with 1 iteration
+        [Y,actualnumiter,finalparitychecks] = ldpcDecode(soft_demodulated_output,cfgLDPCDec,5);
+        %1 st iteration
+        % Output from each sub iterations
+        % 1
+        Y_BP1 = ldpcDecode(soft_demodulated_output,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB1 = ldpcDecode(soft_demodulated_output,cfgLDPCDec1,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_1 = Y_BP1 - Y_SUB1;
+        Y_out1 = soft_demodulated_output + Y_int1_1;
+        %2
+        Y_BP2 = ldpcDecode(Y_out1,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2 = ldpcDecode(Y_out1,cfgLDPCDec2,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_2 = Y_BP2 - Y_SUB2;
+        Y_out2 = Y_out1 + Y_int1_2;
+        %3
+        Y_BP3 = ldpcDecode(Y_out2,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3 = ldpcDecode(Y_out2,cfgLDPCDec3,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_3 = Y_BP3 - Y_SUB3;
+        Y_out3 = Y_out2 + Y_int1_3;
+        %4
+        Y_BP4 = ldpcDecode(Y_out3,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4 = ldpcDecode(Y_out3,cfgLDPCDec4,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_4 = Y_BP4 - Y_SUB4;
+        Y_out4 = Y_out3 + Y_int1_4;
+        %5
+        Y_BP5 = ldpcDecode(Y_out4,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5 = ldpcDecode(Y_out4,cfgLDPCDec5,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_5 = Y_BP5 - Y_SUB5;
+        Y_out5 = Y_out4 + Y_int1_5;
+        %6
+        Y_BP6 = ldpcDecode(Y_out5,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB6 = ldpcDecode(Y_out5,cfgLDPCDec6,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int1_6 = Y_BP6 - Y_SUB6;
+        Y_out6 = Y_out5 + Y_int1_6;
+
+        % 2ND Iteration
+        % 1
+        Y_BP2_1 = ldpcDecode(Y_out6-Y_int1_1,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_1 = ldpcDecode(Y_out6-Y_int1_1,cfgLDPCDec1,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_1 = Y_BP2_1 - Y_SUB2_1;
+        Y_out2_1 = Y_out6 - Y_int1_1 +Y_int2_1;
+        %2
+        Y_BP2_2 = ldpcDecode(Y_out2_1-Y_int1_2,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_2 = ldpcDecode(Y_out2_1-Y_int1_2,cfgLDPCDec2,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_2 = Y_BP2_2 - Y_SUB2_2;
+        Y_out2_2 = Y_out2_1- Y_int1_2 + Y_int2_2;
+        %3
+        Y_BP2_3 = ldpcDecode(Y_out2_2-Y_int1_3,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_3 = ldpcDecode(Y_out2_2-Y_int1_3,cfgLDPCDec3,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_3 = Y_BP2_3 - Y_SUB2_3;
+        Y_out2_3 = Y_out2_2- Y_int1_3 + Y_int2_3;
+        %4
+        Y_BP2_4 = ldpcDecode(Y_out2_3-Y_int1_4,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_4 = ldpcDecode(Y_out2_3-Y_int1_4,cfgLDPCDec4,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_4 = Y_BP2_4 - Y_SUB2_4;
+        Y_out2_4 = Y_out2_3- Y_int1_4 + Y_int2_4;
+        %5
+        Y_BP2_5 = ldpcDecode(Y_out2_4-Y_int1_5,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_5 = ldpcDecode(Y_out2_4-Y_int1_5,cfgLDPCDec5,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_5 = Y_BP2_5 - Y_SUB2_5;
+        Y_out2_5 = Y_out2_4- Y_int1_5 + Y_int2_5;
+        %6
+        Y_BP2_6 = ldpcDecode(Y_out2_5-Y_int1_6,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB2_6 = ldpcDecode(Y_out2_5-Y_int1_6,cfgLDPCDec6,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int2_6 = Y_BP2_6 - Y_SUB2_6;
+        Y_out2_6 = Y_out2_5- Y_int1_6 + Y_int2_6;
+
+
+
+        % 3RD Iteration
+        % 1
+        Y_BP3_1 = ldpcDecode(Y_out2_6-Y_int2_1,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_1 = ldpcDecode(Y_out2_6-Y_int2_1,cfgLDPCDec1,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_1 = Y_BP3_1 - Y_SUB3_1;
+        Y_out3_1 = Y_out2_6 - Y_int2_1 +Y_int3_1;
+        %2
+        Y_BP3_2 = ldpcDecode(Y_out3_1-Y_int2_2,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_2 = ldpcDecode(Y_out3_1-Y_int2_2,cfgLDPCDec2,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_2 = Y_BP3_2 - Y_SUB3_2;
+        Y_out3_2 = Y_out3_1 - Y_int2_2 +Y_int3_2;
+        %3
+        Y_BP3_3 = ldpcDecode(Y_out3_2-Y_int2_3,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_3 = ldpcDecode(Y_out3_2-Y_int2_3,cfgLDPCDec3,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_3 = Y_BP3_3 - Y_SUB3_3;
+        Y_out3_3 = Y_out3_2 - Y_int2_3 +Y_int3_3;
+        %4
+        Y_BP3_4 = ldpcDecode(Y_out3_3-Y_int2_4,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_4 = ldpcDecode(Y_out3_3-Y_int2_4,cfgLDPCDec4,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_4 = Y_BP3_4 - Y_SUB3_4;
+        Y_out3_4 = Y_out3_3 - Y_int2_4 +Y_int3_4;
+        %5
+        Y_BP3_5 = ldpcDecode(Y_out3_4-Y_int2_5,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_5 = ldpcDecode(Y_out3_4-Y_int2_5,cfgLDPCDec5,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_5 = Y_BP3_5 - Y_SUB3_5;
+        Y_out3_5 = Y_out3_4 - Y_int2_5 +Y_int3_5;
+        %6
+        Y_BP3_6 = ldpcDecode(Y_out3_5-Y_int2_6,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB3_6 = ldpcDecode(Y_out3_5-Y_int2_6,cfgLDPCDec6,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int3_6 = Y_BP3_6 - Y_SUB3_6;
+        Y_out3_6 = Y_out3_5 - Y_int2_6 +Y_int3_6;
+
+        % 4th Iteration
+        % 1
+        Y_BP4_1 = ldpcDecode(Y_out3_6-Y_int3_1,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_1 = ldpcDecode(Y_out3_6-Y_int3_1,cfgLDPCDec1,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_1 = Y_BP4_1 - Y_SUB4_1;
+        Y_out4_1 = Y_out3_6 - Y_int3_1 +Y_int4_1;
+        %2
+        Y_BP4_2 = ldpcDecode(Y_out4_1-Y_int3_2,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_2 = ldpcDecode(Y_out4_1-Y_int3_2,cfgLDPCDec2,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_2 = Y_BP4_2 - Y_SUB4_2;
+        Y_out4_2 = Y_out4_1 - Y_int3_2 +Y_int4_2;
+        %3
+        Y_BP4_3 = ldpcDecode(Y_out4_2-Y_int3_3,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_3 = ldpcDecode(Y_out4_2-Y_int3_3,cfgLDPCDec3,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_3 = Y_BP4_3 - Y_SUB4_3;
+        Y_out4_3 = Y_out4_2 - Y_int3_3 +Y_int4_3;
+        %4
+        Y_BP4_4 = ldpcDecode(Y_out4_3-Y_int3_4,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_4 = ldpcDecode(Y_out4_3-Y_int3_4,cfgLDPCDec4,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_4 = Y_BP4_4 - Y_SUB4_4;
+        Y_out4_4 = Y_out4_3 - Y_int3_4 +Y_int4_4;
+        %5
+        Y_BP4_5 = ldpcDecode(Y_out4_4-Y_int3_5,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_5 = ldpcDecode(Y_out4_4-Y_int3_5,cfgLDPCDec5,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_5 = Y_BP4_5 - Y_SUB4_5;
+        Y_out4_5 = Y_out4_4 - Y_int3_5 +Y_int4_5;
+        %6
+        Y_BP4_6 = ldpcDecode(Y_out4_5-Y_int3_6,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB4_6 = ldpcDecode(Y_out4_5-Y_int3_6,cfgLDPCDec6,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int4_6 = Y_BP4_6 - Y_SUB4_6;
+        Y_out4_6 = Y_out4_5 - Y_int3_6 +Y_int4_6;
+
+        % 5th Iteration
+        % 1
+        Y_BP5_1 = ldpcDecode(Y_out4_6-Y_int4_1,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_1 = ldpcDecode(Y_out4_6-Y_int4_1,cfgLDPCDec1,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_1 = Y_BP5_1 - Y_SUB5_1;
+        Y_out5_1 = Y_out4_6 - Y_int4_1 +Y_int5_1;
+        %2
+        Y_BP5_2 = ldpcDecode(Y_out5_1-Y_int4_2,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_2 = ldpcDecode(Y_out5_1-Y_int4_2,cfgLDPCDec2,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_2 = Y_BP5_2 - Y_SUB5_2;
+        Y_out5_2 = Y_out5_1 - Y_int4_2 +Y_int5_2;
+        %3
+        Y_BP5_3 = ldpcDecode(Y_out5_2-Y_int4_3,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_3 = ldpcDecode(Y_out5_2-Y_int4_3,cfgLDPCDec3,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_3 = Y_BP5_3 - Y_SUB5_3;
+        Y_out5_3 = Y_out5_2 - Y_int4_3 +Y_int5_3;
+        %4
+        Y_BP5_4 = ldpcDecode(Y_out5_3-Y_int4_4,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_4 = ldpcDecode(Y_out5_3-Y_int4_4,cfgLDPCDec4,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_4 = Y_BP5_4 - Y_SUB5_4;
+        Y_out5_4 = Y_out5_3 - Y_int4_4 +Y_int5_4;
+        %5
+        Y_BP5_5 = ldpcDecode(Y_out5_4-Y_int4_5,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_5 = ldpcDecode(Y_out5_4-Y_int4_5,cfgLDPCDec5,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_5 = Y_BP5_5 - Y_SUB5_5;
+        Y_out5_5 = Y_out5_4 - Y_int4_5 +Y_int5_5;
+        %6
+        Y_BP5_6 = ldpcDecode(Y_out5_5-Y_int4_6,cfgLDPCDec_bp,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_SUB5_6 = ldpcDecode(Y_out5_5-Y_int4_6,cfgLDPCDec6,1,DecisionType='soft',OutputFormat='whole',MinSumScalingFactor=1,MinSumOffset=0);
+        Y_int5_6 = Y_BP5_6 - Y_SUB5_6;
+        Y_out5_6 = Y_out5_5 - Y_int4_6 +Y_int5_6;
+        output_final_whole = Y_out5_6 < 0;
+        output_final = output_final_whole(1:cfgLDPCEnc.NumInformationBits);
+        ber_uc(j) = biterr(bits,data_received(1:cfgLDPCEnc.NumInformationBits) < 0);
+        ber(j) = biterr(output_final,bits);
+        ber1(j) = biterr(Y,bits);
+        j
+        i
+    end
+    ber_ucf(i) = mean(ber_uc)/cfgLDPCEnc.NumInformationBits;
+    ber_t(i) = mean(ber)/cfgLDPCEnc.NumInformationBits;
+    ber_t_1(i) = mean(ber1)/cfgLDPCEnc.NumInformationBits;
+end
+
+
+
