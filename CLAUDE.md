@@ -4,9 +4,80 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## `external_ref/` — do not touch unless explicitly asked
 
-`external_ref/ldpc_rl` is a clone of a third-party MATLAB reference repo (`github.com/devious6969/ldpc_rl`), pulled in for a one-off comparison against this codebase's RELDEC implementation. It is **not part of this project**: it is gitignored, it is not Python, and none of this repo's code depends on it or ever will.
+`external_ref/ldpc_rl` is a clone of a third-party **MATLAB** reference repo (`github.com/devious6969/ldpc_rl`), pulled in for one-off comparisons against this codebase's RELDEC implementation. It is **not part of this project**: it is not Python, and none of this repo's code imports, reads, or depends on it — nor ever will.
 
-**Never read, search, import, or reference anything under `external_ref/` unless the user explicitly names it or explicitly asks for a comparison against it in that turn.** Do not let it influence architecture decisions, do not treat its MATLAB conventions as prior art to follow, and do not mention it unprompted. If it's still present in a future session and the user hasn't brought it up, ignore it exactly like `archive/`.
+**Never read, search, import, or reference anything under `external_ref/` unless the user explicitly names it or explicitly asks for a comparison against it in that turn.** Do not let it influence architecture decisions, do not treat its MATLAB conventions as prior art to follow, and do not mention it unprompted. If the user hasn't brought it up, ignore it exactly like `archive/`.
+
+Note: despite the guidance elsewhere in this file, `external_ref/` **is tracked by git** (it is not in `.gitignore`). Moving/renaming anything in it produces a real, committable diff.
+
+### Layout
+
+Reorganized from a flat 113-file dump into:
+
+| Directory | Contents |
+|---|---|
+| `ldpc_rl/train/` | Q-learning training scripts (each writes a `Q_*.mat`) |
+| `ldpc_rl/eval/` | BER/FER simulation harnesses (load a `Q_*.mat`, produce `semilogy` plots) |
+| `ldpc_rl/lib/` | Reusable functions — the only non-script MATLAB files |
+| `ldpc_rl/matrices/` | Parity-check matrices and fixtures (`P_*.mat`, `wran_384_256.mat`, `p_mackey.mat`, …) |
+| `ldpc_rl/checkpoints/` | Trained Q-tables, `Q_<matrix>_<variant>_<snr>.mat` |
+| `ldpc_rl/misc/` | One-off scratch scripts (`csv2mat.m`, `degree_calucation.m`, `M2I2_cluster.m`) and a stray `.ps` |
+| `archive/superseded/` | Files superseded by a near-identical sibling (see below) |
+| `archive/matlab_autosave/` | MATLAB editor `.asv` autosave backups |
+
+**The reorganization broke every `load(...)` call.** These scripts were written to run from a single flat directory and all `load`/`save` calls use bare filenames. To run anything now, start MATLAB in `external_ref/ldpc_rl` and `addpath(genpath(pwd))`, or `cd` into the matrix/checkpoint directory first. No script was edited to fix this — they are reference material, not something we run in CI.
+
+### Key scripts
+
+All three key trainers share the same skeleton: build `CN_neighbors`/`VN_neighbors` from `H`, make one cluster per check node (`clusters = num2cell(1:m)`), pre-generate `numSamples` all-ones-codeword AWGN LLR vectors into `L_set`, then run `lmax`-step ε-greedy tabular Q-learning episodes where each action is "update this check node's CN→VN messages" and the Q-table is `Q(state, cluster)`. Common params: `alpha=0.1`, `beta=0.9` (discount), `epsilon=0.1`, `lmax=50`. They differ only in **state encoding** and **reward**.
+
+| Script | State encoding | Reward | Q shape | Default input | Writes |
+|---|---|---|---|---|---|
+| `train/reldec_test.m` | Hard decisions (`LLR < 0`) of the first `maxStateBits` neighbor LLRs, packed to an integer index | `(nnz(hard==0) - (maxStateBits - deg)) / deg` — fraction of satisfied bits, corrected for zero padding | `2^maxStateBits × m` | `wran_384_256.mat` | `Q_mackey_3.mat` |
+| `train/reldec_residue.m` | Same hard-decision index, **plus** a 4-level quantization of `min|LLR - res|` selecting one of 4 Q-tables | `(sum(hard) + sum(abs(res_new - res_old))) / deg` — hard-decision term plus residual magnitude | `{4} × (2^maxStateBits × m)` | `wran_384_256.mat` | `Q_wran_snr_0_new_reward.mat` |
+| `train/rl_nips_test.m` | Soft: `sum(LLR)` over the cluster's neighbors, Lloyd-Max quantized to `maxStates=6` levels | `sum(abs(res_new - res_prev))` — pure residual, no hard decisions | `maxStates × m` | `p_mackey.mat` | `Q_mackay_rl_nips_snr_3.mat` + `codebook`, `partition` |
+
+Notes on each:
+
+- **`reldec_test.m`** — the baseline RELDEC reproduction, closest to this repo's `rl/agents/reldec.py`. `params.maxStateBits` must match the code's max check-node degree (11 for WRAN, 10 for `P_520`, 6 for Mackay); it silently truncates state if set too low. Its matrix choice is a block of commented-out `load` lines at the top — the "default" is just whichever line is currently uncommented. Depends on nothing in `lib/`; the whole trainer is one local function in the file. Evaluated by `eval/test_reldec.m`.
+- **`reldec_residue.m`** — adds a residual-magnitude dimension to both state and reward, hence the cell array of 4 Q-tables indexed by the quantization bin. Self-contained (no `lib/` deps). The quantization thresholds (0.25/0.5/0.75) are hardcoded. Evaluated by `eval/test_reldec_residue.m`.
+- **`rl_nips_test.m`** — the only trainer with a **two-phase** structure: it first runs 1000 short random-schedule rollouts to collect soft states, then fits a Lloyd-Max quantizer (`lloyds`, Communications Toolbox) over them, and only then trains. `codebook`/`partition` are saved alongside `Q` and **must be loaded together** — the Q-table is meaningless without them. Uses `quantiz` (Communications Toolbox). Evaluated by `eval/test_rl_nips.m`, which loads all three variables per SNR into `Q1{}`/`codebook1{}`/`partition1{}`.
+
+### Their dependencies and outputs
+
+- **Matrices** (`matrices/`): `wran_384_256.mat` (384×256 WRAN, the most-used), `p_mackey.mat` (96×48 Mackay, rate 1/2), `P_520.mat`/`P_156.mat`/`P_2176.mat`/`P_3840.mat` (quasi-cyclic *base* matrices — expanded at runtime via `ldpcQuasiCyclicMatrix(blocksize, P)`, not parity-check matrices themselves).
+- **Checkpoints** (`checkpoints/`): `Q_wran_snr_*` ← `reldec_test.m`-family, `Q_wran_residue_reward_*` / `Q_wran_snr_0_new_reward` ← `reldec_residue.m`, `Q_wran_crt_llr_*` ← `reldec_residue_reward.m`, `Q_*_rl_nips_snr_*` ← `rl_nips_test.m`, `Q_wran_0_tanh_mi` / `Q_mackey_0.5_tanh_mi` ← the tanh/MI trainer.
+- **`lib/`**: `ldpc_cluster.m` is the single-cluster CN→VN update used by most `eval/` harnesses. `Jfun.m`/`Jinv.m` are the standard J-function / inverse-J EXIT-chart approximations, used by the MI-reward trainer and `misc/M2I2_cluster.m`. `ldpc_layered.m`, `ldpc_residue_cluster.m`, `ldpcdec_cluster.m`, `ldpcdec_edge.m`, `scheduler_c_v.m` are baseline/alternative schedulers used by the older `eval/test_ldpc*.m` harnesses.
+- **Outputs**: nothing writes CSV or JSON. Trainers `save` a `.mat`; eval harnesses accumulate `ber_t(i)` arrays and `semilogy` them to a figure. Nothing is persisted in a form this repo's `expdb`/`experiments.db` can ingest — any comparison against our numbers has to be transcribed by hand.
+- **Toolboxes required**: Communications Toolbox (`ldpcEncode`/`ldpcDecode`/`ldpcEncoderConfig`/`ldpcDecoderConfig`/`ldpcQuasiCyclicMatrix`/`quantiz`/`lloyds`/`biterr`), Parallel Computing Toolbox (`parfor` in most `eval/` scripts).
+
+### What was archived, and why
+
+`archive/superseded/` holds the loser of each near-identical pair, kept only for provenance:
+
+| Archived | Superseded by | Difference |
+|---|---|---|
+| `reldec.m` | `train/reldec_test.m` | Older, `P_520`-hardcoded (`n = 520`), loop-based state packing, reward not corrected for zero padding |
+| `rl_tanh_mi.m` | `train/rl_tanh_mi_fixed.m` | Called `Jfun(x)` on a raw LLR; `Jfun` expects a noise sigma. The fixed version uses `sqrt(max(2*LLR, 0))`, matching `rl/rewards/mi_utils.py::_mi_for_llr` |
+| `ldpc_cluster_residue.m` | `lib/ldpc_residue_cluster.m` | Builds `p_temp{i}` as a cell array then indexes it as `p_temp(i,j)` — cannot run as written |
+
+`archive/matlab_autosave/` holds 9 `.asv` files (MATLAB editor autosave backups, not source).
+
+One pair was deliberately **kept as two files**: `eval/test_reldec.m` and `eval/test_reldec_residue_reward.m` share an identical decode loop but represent distinct experiments (BlockSize 4 vs 1, `Q_wran_snr_*` vs `Q_wran_crt_llr_*` checkpoints, 100k vs 20k frames).
+
+### Added architecture: quartile-average-LLR RELDEC
+
+Added at explicit user request (2026-09-11) — see `docs/notes/quartile_llr_reldec.md` for full design rationale and `docs/notes/quartile_llr_reldec_results.md` for the actual run's numbers. State for a cluster (one check node, same convention as `reldec_test.m`) is a vector of size `k`: sort the check node's neighbor LLRs ascending, split into `k` groups as evenly as possible, average within each group. `k=4` ("quartiles") is the default; the trainer runs `k = 3, 4, 5` on `wran_384_256.mat`. Reward reuses `reldec_test.m`'s formula with `k` substituted for `maxStateBits`.
+
+| File | Role |
+|---|---|
+| `lib/quartile_state.m` | Reference (unvectorized) per-check-node state encoder |
+| `lib/build_deg_groups.m` + `lib/quartile_state_batch.m` | Vectorized state encoder for all check nodes at once (numerically verified identical to `quartile_state.m`) — needed because Octave, the only interpreter actually available in this environment, has no JIT and the per-node loop was intractably slow at the scale this run needed |
+| `lib/RELDEC_QUARTILE_MAIN.m` | Training loop, split into its own function file rather than a script-trailing local function — **Octave 11.1 does not support MATLAB's script-local-function form** that every upstream reference script (`reldec_test.m` etc.) uses. Real MATLAB would run either form. |
+| `train/reldec_quartile_llr.m` | Trains `k = 3, 4, 5`, saves `checkpoints/Q_wran_quartile_k{3,4,5}.mat` |
+| `eval/test_reldec_quartile_llr.m` | Greedy-policy eval over SNR_db = [0 1 2 3 4], 1000 frames/point, all 3 `k`; writes `checkpoints/quartile_llr_eval_results.mat` and `checkpoints/quartile_llr_ber.png` |
+
+**MATLAB is not installed in this environment.** `apt-get install octave` was run (with explicit user go-ahead) to actually execute this architecture; the scripts are plain `.m` and should run unmodified in real MATLAB. Unlike `eval/test_reldec.m`, the new eval script avoids the Communications Toolbox (`ldpcEncode`/`ldpcEncoderConfig`) entirely — it generates all-zero-codeword BPSK+AWGN LLRs directly across all `n` bits, matching how the RELDEC training scripts already generate their own training data, and reports BER over all `n` bits rather than isolated information bits (there is no encoder config here to separate them).
 
 ## Repo hygiene warning
 
