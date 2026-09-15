@@ -11,20 +11,24 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# Anchored to repo root (/) — the unanchored toptal template versions of
+# these matched a directory of that name ANYWHERE in the tree, which
+# silently swallowed external_ref/ldpc_rl/lib/ (a real, hand-written
+# directory, not a Python build artifact — see docs/notes/quartile_llr_lib_gitignore_bug.md).
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
