@@ -11,9 +11,10 @@ Date: 2026-09-25
 - The connection string is `EXPDB_URL`, read from the environment or the
   repo-root `.env` (gitignored; template in `.env.example`). If it is missing,
   every `expdb` call raises. There is no local fallback.
-- `experiments.db` (and its `.wal`) was removed from git **and from all git
-  history**, then force-pushed. It had grown to 73 MB for ~730 rows, with three
-  copies in history.
+- `experiments.db` (and its `.wal`) is no longer tracked and is gitignored. It
+  had grown to 73 MB for ~730 rows. **Its old versions are still in history**
+  (three copies on GitHub, a fourth in the unpushed commit `46eb223`). See
+  "Pending: purge from history" below.
 - Schema creation is explicit: `python3 cli/exp.py init-db` (idempotent), no
   longer run on every connect.
 - `requirements.txt` added (pinned); the unrelated `pyproject.toml` deleted.
@@ -111,3 +112,29 @@ on a warm connection.
   is blocked); a periodic `SELECT` export through `expdb` would work.
 - The web UI's "Launch New Experiment" spawns `python3` (the system
   interpreter), not the venv's. This predates the change.
+
+## Pending: purge from history
+
+Not done yet: the rewrite needs explicit permission. Only `June_26_Refactor`
+(and 3 stashes) contain the file; `main`, `RELDEC`, `klear`, the copilot branch
+and PR #1 do not. **Don't push `June_26_Refactor` before purging**: its
+unpushed commit `46eb223 checkpoint` modifies `experiments.db`, so a plain push
+uploads another copy.
+
+Stashes are pinned as `refs/stash-keep/0..8` so the rewrite carries all nine
+(filter-repo only keeps the top of `refs/stash`). Pre-rewrite ref and stash
+snapshots: `scratch/postgres_migration/refs_before.txt`, `stashes_before.tsv`.
+A full backup of `.git`, a bundle of all refs, a GitHub mirror and the DuckDB
+file are in `~/Decoder_backup_20260925/`.
+
+```bash
+.venv/bin/git-filter-repo --invert-paths --path experiments.db --path experiments.db.wal --force
+git remote add origin https://github.com/houleux/Decoder.git 2>/dev/null || true
+# restore the stash stack from the pinned refs, oldest first
+git update-ref -d refs/stash
+for i in 8 7 6 5 4 3 2 1 0; do
+  git stash store -m "$(sed -n "$((i+1))p" scratch/postgres_migration/stashes_before.tsv | cut -f2)" "refs/stash-keep/$i"
+done
+git for-each-ref --format='%(refname)' refs/stash-keep | xargs -n1 git update-ref -d
+git push --force-with-lease=June_26_Refactor:e4d68c998dfaa9f9455b21a37899cc2399edfbb2 origin June_26_Refactor
+```

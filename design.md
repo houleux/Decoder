@@ -308,7 +308,7 @@ because most of it still explains why a database beat CSVs.
 - **Multiple machines.** A single file on one machine's disk can't be read or written
   from another machine. Results were meant to be viewable and producible from anywhere.
 - **The file didn't belong in git.** `experiments.db` was committed; it had grown to 73 MB
-  (for ~730 rows, mostly dead pages), and every version stayed in history. It was purged.
+  (for ~730 rows, mostly dead pages), and every version stayed in history. It is now untracked; purging the old versions from history is pending.
 - **DuckDB's single-writer lock** made the dashboard and a sweep contend, and forced the
   MATLAB bridge into a one-ingester design purely to serialise writes. Postgres locks
   rows, so concurrent writers are fine.

@@ -91,7 +91,7 @@ This repo has accumulated significant dead code and stale documentation from mul
 - `archive/` is a graveyard of old scripts/CSVs — don't build on anything in there.
 - `logs/` holds SLURM job stdout/stderr (tracked); it is not part of the system.
 - **`scratch/` is the designated workspace for one-off exploratory work** — timing comparisons, ad hoc harnesses, throwaway analysis scripts, anything that isn't a deliverable part of the repo. It's gitignored (`.gitignore` line ~193), so nothing placed there is ever committed. Use subdirectories per task (e.g. `scratch/matlab_vs_python_timing/`) rather than dumping files loose at its root. This is the file-creation exception implied by the Constitution's "no new files without permission" rule for exploratory/investigative work the user has asked for in-session — it does not extend to creating files under `scratch/` unprompted.
-- **`.env` holds the database credentials** (`EXPDB_URL`). It is gitignored; never commit it, print it, or paste it anywhere. `.env.example` shows the expected variable. The old DuckDB file `experiments.db` was purged from git history on 2026-09-25 and is gitignored.
+- **`.env` holds the database credentials** (`EXPDB_URL`). It is gitignored; never commit it, print it, or paste it anywhere. `.env.example` shows the expected variable. The old DuckDB file `experiments.db` was untracked on 2026-09-25 and is gitignored; its old versions (~73 MB each) are **still in git history** until the pending purge in `docs/notes/postgres_migration.md` is run.
 - When you notice other docs/comments contradicting the code, trust the code and flag the discrepancy to the user rather than silently propagating the stale doc.
 
 ## Agent Constitution (originally `Constitution.md`, since deleted)
