@@ -58,7 +58,7 @@ flowchart TB
     subgraph CLI["Entry points"]
         RE["run_experiments.py<br/>(unified sweep: train → eval)"]
         RT["run_train.py / run_eval.py<br/>(single-method, fine control)"]
-        SB["run_ada_job.sh<br/>(SLURM sbatch wrapper)"]
+        SB["SLURM sbatch job<br/>(wraps run_experiments.py)"]
     end
 
     subgraph CORE["Decoding + learning core"]
@@ -84,7 +84,7 @@ flowchart TB
     end
 
     subgraph STORE["Persistence"]
-        DB[("experiments.db<br/>DuckDB, single file<br/>configs / runs / eval_results")]
+        DB[("Central PostgreSQL (Neon)<br/>over HTTPS, shared by all machines<br/>configs / runs / eval_results")]
         CKPT["results/ — checkpoints<br/>.json (tabular) / .pt (DQN)"]
     end
 
@@ -216,7 +216,7 @@ inheritance tree with one class per combination.
 **Decision.** `rl/` (factored MDP: one small Q-table per cluster, local state, local
 reward) and `global_mdp/` (one DQN seeing the whole graph, global state, global reward)
 are **separate packages that share no agent, trainer, or algorithm code**. The
-incompatibility is documented explicitly in `architecture.md`, and the only shared code
+incompatibility is documented explicitly in `CLAUDE.md`, and the only shared code
 is the neutral `SequentialDecoderBase` adapter from D1.
 
 **Alternatives.** A single `Agent` interface with a `backend={tabular,dqn}` flag,
@@ -273,10 +273,15 @@ table: `PRIMARY KEY (config_id, snr_db, target_frame_errors, max_frames)`.
 
 ---
 
-### D5. DuckDB embedded database instead of CSVs, SQLite, or a hosted tracker
+### D5. A database instead of CSVs: first an embedded DuckDB file, now a central Postgres
 
-**Decision.** All experiment state lives in one file, `experiments.db`, via DuckDB.
-Three tables: `configs`, `runs`, `eval_results`.
+**Decision (current, since 2026-09-25).** All experiment state lives in one central
+PostgreSQL database hosted on Neon, shared by every machine. Three tables: `configs`,
+`runs`, `eval_results`. `expdb/db.py` talks to it over HTTPS (see "Why it moved" below).
+
+**Original decision (until 2026-09-25).** All experiment state lived in one file,
+`experiments.db`, via DuckDB. The rest of this section is the original rationale, kept
+because most of it still explains why a database beat CSVs.
 
 **Alternatives.** (a) The original approach: one CSV per run under `results/`.
 (b) SQLite. (c) Weights & Biases / MLflow.
@@ -298,6 +303,25 @@ Three tables: `configs`, `runs`, `eval_results`.
 - The schema keeps `full_config_json` on each run alongside the normalised
   `config_json`, so the *exact* invocation is always recoverable even though the identity
   hash ignores parts of it.
+
+**Why it moved to a central Postgres (2026-09-25).**
+- **Multiple machines.** A single file on one machine's disk can't be read or written
+  from another machine. Results were meant to be viewable and producible from anywhere.
+- **The file didn't belong in git.** `experiments.db` was committed; it had grown to 73 MB
+  (for ~730 rows, mostly dead pages), and every version stayed in history. It was purged.
+- **DuckDB's single-writer lock** made the dashboard and a sweep contend, and forced the
+  MATLAB bridge into a one-ingester design purely to serialise writes. Postgres locks
+  rows, so concurrent writers are fine.
+- **The "no outbound network" premise was only half true.** Compute nodes do reach the
+  internet, but only on web ports (22/80/443/8080/8443); Postgres's 5432 is blocked. Neon
+  serves SQL over HTTPS on 443 (the transport of its official serverless driver), so
+  `expdb/db.py` is a small stdlib client for that endpoint rather than a psycopg
+  connection. Costs of that choice: `$n` placeholders, no interactive transactions (only
+  atomic batches via `execute_batch`), and values parsed from text by type OID.
+- **Neon over self-hosting** because the college network is not reliable enough to host a
+  server, and Neon's free tier doesn't pause projects (Supabase's does after 7 idle days).
+- The migration copied every row and verified all 734 rows and all 438 BER/FER points
+  identical to DuckDB; see `docs/notes/postgres_migration.md`.
 
 ---
 
@@ -440,7 +464,7 @@ function takes an explicit `rng: np.random.Generator`. The seed hierarchy is:
 
 ### D10. Fail loudly; no silent fallbacks (enforced project-wide)
 
-**Decision.** A standing rule (`Constitution.md`, and repeated in `CLAUDE.md`) that this
+**Decision.** A standing rule (originally `Constitution.md`, now kept in `CLAUDE.md`) that this
 codebase must not contain default behaviours or broad exception handlers that could
 silently alter results. Concretely:
 
@@ -450,6 +474,8 @@ silently alter results. Concretely:
   flooding.
 - Checkpoint loading raises `FileNotFoundError` rather than starting from an empty table.
 - Checkpoint writes are **atomic**: write to `path + ".tmp"`, then `os.replace(tmp, path)`.
+- A missing `EXPDB_URL` raises; there is no fallback to a local database. `commit_chunk`
+  raises if its `eval_results` row doesn't exist instead of silently dropping the chunk.
 
 **Justification.**
 - In a research codebase the failure mode that matters is not a crash, it's a **plausible
@@ -463,7 +489,7 @@ silently alter results. Concretely:
 
 ### D11. Query-time plotting in a web UI instead of generated PNG files
 
-**Decision.** `webui/app.py` is a small Flask app that queries `experiments.db` directly
+**Decision.** `webui/app.py` is a small Flask app that queries the central database directly
 and renders Matplotlib figures **in memory** (headless `Agg` backend, base64-encoded into
 the response). No plot files are written unless a human clicks download. It is accessed
 from a laptop over SSH local port forwarding while the sweep runs on the cluster.
@@ -572,11 +598,12 @@ production-grade.
 | W2 | **The matrix CSV loader is copy-pasted verbatim in three entry points**; a bug fix must be applied three times. | Extract to one shared `io` module. |
 | W3 | **The config dict literal is constructed three times inside `run_experiments.py`** (train, coverage, chunk loop), and re-hashed on *every chunk*. Any divergence between the copies would split one experiment into two `config_id`s. | Build the config once per (method, z); hash once and cache. |
 | W4 | **`_worker` reconstructs the decoder and re-reads the checkpoint JSON on every chunk.** With `chunk_size=100` and `workers=40`, each worker decodes only ~2 frames per task, so setup cost dominates. | Increase chunk size, or make the pool worker cache the decoder per `(method, z, checkpoint)` in a process-global initialised via `Pool(initializer=...)`. |
-| W5 | **`commit_chunk` issues two `UPDATE`s with no enclosing transaction**, and chunks carry no unique ID, so the accumulate-in-place scheme is not strictly idempotent under a crash *between* the two statements. | Wrap in an explicit transaction; optionally record committed chunk IDs for exactly-once semantics. |
-| W6 | **`get_conn()` opens a fresh DuckDB connection and re-runs `CREATE TABLE IF NOT EXISTS` on every single call**, and contends for the single-writer lock via a retry loop of up to 100 × 100 ms. | Cache one connection per process; initialise the schema once at startup via an explicit migration step. |
+| W5 | ~~`commit_chunk` issues two `UPDATE`s with no enclosing transaction.~~ **Fixed 2026-09-25:** both run in one transaction (`execute_batch`). Chunks still carry no unique ID; instead, writes are never retried, so a lost response crashes the run rather than risking a double count. | Record committed chunk IDs if automatic retries are ever wanted. |
+| W6 | ~~`get_conn()` opens a fresh DuckDB connection and re-runs `CREATE TABLE IF NOT EXISTS` on every call, contending for the single-writer lock.~~ **Fixed 2026-09-25:** one cached connection per process and thread; the schema is created once via `cli/exp.py init-db`; Postgres has no single-writer lock. | — |
 | W7 | **Early stopping is approximate under parallelism**: the `target_frame_errors` budget is divided across workers, so the aggregate stop condition is per-worker, not global. | Either accept and document it, or use a shared counter / smaller chunks with the global check between chunks. |
 | W8 | **The DQN evaluation path is single-process**, so it does not benefit from the parallel engine at all and is orders of magnitude slower to measure. | Batch inference across frames within one process, or use `spawn`-based workers with per-worker Torch threads pinned to 1. |
-| W9 | **No dependency manifest.** `pyproject.toml` in the repo describes an unrelated package; actual runtime deps are undeclared. Tests are also broken at collection, and `docs/architecture.md` is stale enough to be misleading. | A real `pyproject.toml`/lockfile, a CI job running the tests, and deletion of the stale doc. |
+| W9 | ~~No dependency manifest; tests broken at collection; stale `docs/architecture.md`.~~ **Mostly fixed 2026-09-25:** pinned `requirements.txt`, the unrelated `pyproject.toml` and the stale doc deleted, tests rewritten and passing. | A CI job running the tests. |
+| W10 | **Running the same sweep on two machines double-counts.** Eval seeds are `seed + frames_done`, so two machines starting from the same `frames_done` simulate identical frames and both commit them. Only reachable since the database became central. | Claim chunks in the database (a work queue) instead of deriving them from a locally cached `frames_done`. |
 
 ---
 
@@ -584,8 +611,8 @@ production-grade.
 
 - **Distributed evaluation.** The chunk is already the natural unit of work and the DB
   already tracks coverage, so scaling from one node to many is mostly replacing "pick the
-  next cell in a Python loop" with a work queue and giving DuckDB a single-writer
-  coordinator (or moving to Postgres). The statistical model — commutative counter
+  next cell in a Python loop" with a work queue (see W10). The database is already a
+  central multi-writer Postgres. The statistical model — commutative counter
   accumulation — needs no change at all.
 - **Function approximation for the tabular family.** Tabular Q-tables are keyed on
   discretised local states, which bounds how rich an observation can be. Replacing the
@@ -606,7 +633,7 @@ hard engineering constraint is that measuring an error rate of 1e-5 needs millio
 simulated frames — days of compute on a shared cluster where jobs get preempted. So the
 design centres on three things: every experiment is content-addressed by a hash of its
 config, so re-running is automatically idempotent; evaluation is chunked into small units
-that commit running counters to an embedded DuckDB, so any crash loses at most one chunk;
+that commit running counters to a central Postgres database, so any crash loses at most one chunk;
 and frame simulation is fanned out across processes with an explicit seed hierarchy so
 parallel and serial runs are statistically identical. On top of that, the research
 variables — what the agent observes and what it's rewarded for — are pluggable objects,
@@ -614,7 +641,7 @@ so 13 method variants are a Cartesian product of 6 encoders and 4 rewards rather
 implementations."
 
 **Best questions to invite:**
-- *Why DuckDB and not W&B?* → D5 (offline cluster, no server, columnar aggregation).
+- *Why a plain Postgres and not W&B?* → D5 (SQL over counters, and it had to work through a firewall that only allows web ports).
 - *How do you know a resumed run isn't biased?* → D9 (seed derived from `frames_done`).
 - *How is the comparison to flooding fair?* → D12 (messages, not iterations) + D14
   (same harness, same seeds).

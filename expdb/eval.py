@@ -4,17 +4,14 @@ def ensure_eval_row(config_id: str, snr_db: float, target_frame_errors: int, max
     """
     Creates an eval_results row if it doesn't exist.
 
-    conn: optional existing connection to reuse. Opening a connection is not
-    cheap -- it re-runs _init_schema and, for a large database file on network
-    storage, dominates the cost of the write itself. A caller committing many
-    rows in a row (e.g. matlab_bridge.ingest draining a spool) should open one
-    connection and pass it here rather than paying that per row.
+    conn: optional connection to use instead of this thread's cached one
+    (expdb.db.get_conn()).
     """
     conn = conn if conn is not None else get_conn()
     conn.execute(
         """
         INSERT INTO eval_results (config_id, snr_db, target_frame_errors, max_frames)
-        VALUES (?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (config_id, snr_db, target_frame_errors, max_frames) DO NOTHING
         """,
         (config_id, snr_db, target_frame_errors, max_frames)
@@ -29,7 +26,7 @@ def get_eval_row(config_id: str, snr_db: float, target_frame_errors: int, max_fr
         """
         SELECT frames_done, completed, bit_errors, total_bits, frame_errors, messages
         FROM eval_results
-        WHERE config_id = ? AND snr_db = ? AND target_frame_errors = ? AND max_frames = ?
+        WHERE config_id = $1 AND snr_db = $2 AND target_frame_errors = $3 AND max_frames = $4
         """,
         (config_id, snr_db, target_frame_errors, max_frames)
     ).fetchone()
@@ -54,7 +51,7 @@ def get_coverage(config_id: str, target_frame_errors: int, max_frames: int) -> d
         """
         SELECT snr_db, frames_done, completed
         FROM eval_results
-        WHERE config_id = ? AND target_frame_errors = ? AND max_frames = ?
+        WHERE config_id = $1 AND target_frame_errors = $2 AND max_frames = $3
         """,
         (config_id, target_frame_errors, max_frames)
     ).fetchall()
@@ -70,9 +67,10 @@ def commit_chunk(config_id: str, snr_db: float, target_frame_errors: int, max_fr
     stats dict should contain: frames, bit_errors, frame_errors, messages (optional, defaults to 0).
     Note: total_bits must also be provided or calculated.
 
-    conn: optional existing connection to reuse -- see ensure_eval_row(). The
-    two UPDATEs below are cheap; the connection open is not, so batch callers
-    should pass one in.
+    Both UPDATEs run in one transaction. Raises if the row does not exist
+    (call ensure_eval_row() first) instead of silently dropping the chunk.
+
+    conn: optional connection to use instead of this thread's cached one.
     """
     frames = stats.get('frames', 0)
     bit_errors = stats.get('bit_errors', 0)
@@ -82,32 +80,37 @@ def commit_chunk(config_id: str, snr_db: float, target_frame_errors: int, max_fr
 
     conn = conn if conn is not None else get_conn()
 
-    # Update aggregate counts
-    conn.execute(
-        """
-        UPDATE eval_results
-        SET frames_done = frames_done + ?,
-            bit_errors = bit_errors + ?,
-            total_bits = total_bits + ?,
-            frame_errors = frame_errors + ?,
-            messages = messages + ?,
-            last_updated = current_timestamp
-        WHERE config_id = ? AND snr_db = ? AND target_frame_errors = ? AND max_frames = ?
-        """,
-        (frames, bit_errors, total_bits, frame_errors, messages,
-         config_id, snr_db, target_frame_errors, max_frames)
-    )
-    
-    # Check for completion
-    conn.execute(
-        """
-        UPDATE eval_results
-        SET completed = TRUE
-        WHERE config_id = ? AND snr_db = ? AND target_frame_errors = ? AND max_frames = ?
-          AND (frame_errors >= target_frame_errors OR frames_done >= max_frames)
-        """,
-        (config_id, snr_db, target_frame_errors, max_frames)
-    )
+    key = (config_id, snr_db, target_frame_errors, max_frames)
+    increment, _ = conn.execute_batch([
+        # Update aggregate counts
+        (
+            """
+            UPDATE eval_results
+            SET frames_done = frames_done + $1,
+                bit_errors = bit_errors + $2,
+                total_bits = total_bits + $3,
+                frame_errors = frame_errors + $4,
+                messages = messages + $5,
+                last_updated = current_timestamp
+            WHERE config_id = $6 AND snr_db = $7 AND target_frame_errors = $8 AND max_frames = $9
+            """,
+            (frames, bit_errors, total_bits, frame_errors, messages) + key,
+        ),
+        # Check for completion
+        (
+            """
+            UPDATE eval_results
+            SET completed = TRUE
+            WHERE config_id = $1 AND snr_db = $2 AND target_frame_errors = $3 AND max_frames = $4
+              AND (frame_errors >= target_frame_errors OR frames_done >= max_frames)
+            """,
+            key,
+        ),
+    ])
+    if increment.rowcount != 1:
+        raise RuntimeError(
+            f"commit_chunk updated {increment.rowcount} rows for {key}; expected 1. "
+            f"Was ensure_eval_row() called first?")
 
 def query_ber(config_id: str, target_frame_errors: int, max_frames: int) -> list[dict]:
     """
@@ -118,13 +121,13 @@ def query_ber(config_id: str, target_frame_errors: int, max_frames: int) -> list
         """
         SELECT 
             snr_db,
-            CASE WHEN total_bits > 0 THEN CAST(bit_errors AS DOUBLE) / total_bits ELSE 0.0 END AS ber,
-            CASE WHEN frames_done > 0 THEN CAST(frame_errors AS DOUBLE) / frames_done ELSE 0.0 END AS fer,
-            CASE WHEN frames_done > 0 THEN CAST(messages AS DOUBLE) / frames_done ELSE 0.0 END AS avg_messages,
+            CASE WHEN total_bits > 0 THEN CAST(bit_errors AS DOUBLE PRECISION) / total_bits ELSE 0.0 END AS ber,
+            CASE WHEN frames_done > 0 THEN CAST(frame_errors AS DOUBLE PRECISION) / frames_done ELSE 0.0 END AS fer,
+            CASE WHEN frames_done > 0 THEN CAST(messages AS DOUBLE PRECISION) / frames_done ELSE 0.0 END AS avg_messages,
             frames_done,
             completed
         FROM eval_results
-        WHERE config_id = ? AND target_frame_errors = ? AND max_frames = ?
+        WHERE config_id = $1 AND target_frame_errors = $2 AND max_frames = $3
         ORDER BY snr_db
         """,
         (config_id, target_frame_errors, max_frames)

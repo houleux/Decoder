@@ -14,7 +14,7 @@ def create_run(config_id: str, run_type: str, full_config: dict) -> str:
     conn.execute(
         """
         INSERT INTO runs (run_id, config_id, run_type, status, full_config_json)
-        VALUES (?, ?, ?, 'running', ?)
+        VALUES ($1, $2, $3, 'running', $4)
         """,
         (run_id, config_id, run_type, full_config_json)
     )
@@ -29,8 +29,8 @@ def update_run_status(run_id: str, status: str, error_message: str = None) -> No
         conn.execute(
             """
             UPDATE runs 
-            SET status = ?, completed_at = current_timestamp, error_message = ?
-            WHERE run_id = ?
+            SET status = $1, completed_at = current_timestamp, error_message = $2
+            WHERE run_id = $3
             """,
             (status, error_message, run_id)
         )
@@ -38,8 +38,8 @@ def update_run_status(run_id: str, status: str, error_message: str = None) -> No
         conn.execute(
             """
             UPDATE runs 
-            SET status = ?, error_message = ?
-            WHERE run_id = ?
+            SET status = $1, error_message = $2
+            WHERE run_id = $3
             """,
             (status, error_message, run_id)
         )
@@ -52,8 +52,8 @@ def set_checkpoint(run_id: str, checkpoint_path: str, episodes_done: int) -> Non
     conn.execute(
         """
         UPDATE runs 
-        SET checkpoint_path = ?, episodes_done = ?
-        WHERE run_id = ?
+        SET checkpoint_path = $1, episodes_done = $2
+        WHERE run_id = $3
         """,
         (checkpoint_path, episodes_done, run_id)
     )
@@ -63,7 +63,7 @@ def add_intermediate_checkpoint(run_id: str, checkpoint_path: str) -> None:
     Appends to the intermediate_checkpoints JSON list.
     """
     conn = get_conn()
-    res = conn.execute("SELECT intermediate_checkpoints FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    res = conn.execute("SELECT intermediate_checkpoints FROM runs WHERE run_id = $1", (run_id,)).fetchone()
     if res and res[0]:
         checkpoints = json.loads(res[0])
     else:
@@ -74,8 +74,8 @@ def add_intermediate_checkpoint(run_id: str, checkpoint_path: str) -> None:
     conn.execute(
         """
         UPDATE runs 
-        SET intermediate_checkpoints = ?
-        WHERE run_id = ?
+        SET intermediate_checkpoints = $1
+        WHERE run_id = $2
         """,
         (json.dumps(checkpoints), run_id)
     )
@@ -85,8 +85,8 @@ def set_training_stats_csv(run_id: str, path: str) -> None:
     conn.execute(
         """
         UPDATE runs 
-        SET training_stats_csv = ?
-        WHERE run_id = ?
+        SET training_stats_csv = $1
+        WHERE run_id = $2
         """,
         (path, run_id)
     )
@@ -100,8 +100,8 @@ def get_latest_checkpoint(config_id: str) -> str | None:
         """
         SELECT checkpoint_path 
         FROM runs 
-        WHERE config_id = ? AND run_type IN ('train', 'train+eval') AND status = 'completed'
-        ORDER BY completed_at DESC 
+        WHERE config_id = $1 AND run_type IN ('train', 'train+eval') AND status = 'completed'
+        ORDER BY completed_at DESC NULLS LAST
         LIMIT 1
         """,
         (config_id,)

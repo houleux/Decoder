@@ -1,10 +1,10 @@
 """
-The single DuckDB writer for MATLAB-produced results.
+The ingester for MATLAB-produced results.
 
-Polls a spool directory and commits each completed chunk into experiments.db
-via expdb's public API. Exactly one instance of this should run per sweep --
-that is the whole point: DuckDB permits one writer, and funnelling N MATLAB
-workers through this process is what keeps them from fighting over the lock.
+Polls a spool directory and commits each completed chunk into the experiment
+database via expdb's public API. Exactly one instance of this should run per
+spool: the spool's ledger file is the idempotency key, and two ingesters
+appending to the same ledger could both commit the same chunk.
 
 Reuses expdb.commit_chunk() rather than issuing its own SQL, deliberately: the
 BER/FER arithmetic in this repo is already duplicated in four places
@@ -46,8 +46,7 @@ def ingest_once(spool_dir: Path, config_id: str, manifest: dict,
     committed = 0
     deferred = 0
 
-    # Read and validate everything first, so the (expensive) connection is held
-    # only for the writes.
+    # Read and validate everything first, then write.
     batch = []
     for path in pending_chunks(spool_dir, ingested):
         try:
@@ -60,44 +59,36 @@ def ingest_once(spool_dir: Path, config_id: str, manifest: dict,
     if not batch:
         return 0, deferred
 
-    # ONE connection for the whole batch. Opening a connection re-runs
-    # _init_schema and, against a ~72 MB database on NFS, costs multiple
-    # seconds -- measured at ~15 s here, which is why the per-chunk version of
-    # this loop ingested 0.03 chunks/s against a production rate of 0.4/s and
-    # fell irrecoverably behind. Batching moves that cost from per-chunk to
-    # per-poll. It also shortens the total time the single writer lock is held,
-    # which is what lets the dashboard read during a sweep.
+    # One connection for the whole batch, so the poll pays one TLS handshake
+    # rather than one per chunk.
     conn = get_conn()
-    try:
-        for path, payload in batch:
-            chunk_id = payload["chunk_id"]
-            snr_db = float(payload["snr_db"])
-            tfe = int(payload["target_frame_errors"])
-            maxf = int(payload["max_frames"])
+    for path, payload in batch:
+        chunk_id = payload["chunk_id"]
+        snr_db = float(payload["snr_db"])
+        tfe = int(payload["target_frame_errors"])
+        maxf = int(payload["max_frames"])
 
-            # Ledger BEFORE commit: a crash in between drops this chunk rather
-            # than double-counting it on restart. See spool.py for why that
-            # direction is the safe one.
-            append_ledger(spool_dir, chunk_id)
-            ingested.add(chunk_id)
+        # Ledger BEFORE commit: a crash in between drops this chunk rather
+        # than double-counting it on restart. See spool.py for why that
+        # direction is the safe one.
+        append_ledger(spool_dir, chunk_id)
+        ingested.add(chunk_id)
 
-            ensure_eval_row(config_id, snr_db, tfe, maxf, conn=conn)
-            commit_chunk(config_id, snr_db, tfe, maxf, {
-                "frames": int(payload["frames"]),
-                "bit_errors": int(payload["bit_errors"]),
-                "total_bits": int(payload["total_bits"]),
-                "frame_errors": int(payload["frame_errors"]),
-                "messages": int(payload["messages"]),
-            }, conn=conn)
-            archive_chunk(spool_dir, path)
-            committed += 1
+        ensure_eval_row(config_id, snr_db, tfe, maxf, conn=conn)
+        commit_chunk(config_id, snr_db, tfe, maxf, {
+            "frames": int(payload["frames"]),
+            "bit_errors": int(payload["bit_errors"]),
+            "total_bits": int(payload["total_bits"]),
+            "frame_errors": int(payload["frame_errors"]),
+            "messages": int(payload["messages"]),
+        }, conn=conn)
+        archive_chunk(spool_dir, path)
+        committed += 1
 
-            if verbose:
-                ber = payload["bit_errors"] / max(1, payload["total_bits"])
-                print(f"  ingested {chunk_id}: snr={snr_db} frames={payload['frames']} "
-                      f"ber={ber:.4g}", flush=True)
-    finally:
-        conn.close()
+        if verbose:
+            ber = payload["bit_errors"] / max(1, payload["total_bits"])
+            print(f"  ingested {chunk_id}: snr={snr_db} frames={payload['frames']} "
+                  f"ber={ber:.4g}", flush=True)
 
     return committed, deferred
 
@@ -105,7 +96,7 @@ def ingest_once(spool_dir: Path, config_id: str, manifest: dict,
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="matlab_bridge.ingest",
-        description="Commit MATLAB spool chunks into experiments.db (sole writer).")
+        description="Commit MATLAB spool chunks into the experiment database (one ingester per spool).")
     ap.add_argument("--spool-dir", required=True,
                     help="Spool directory written by run_quartile_eval.m")
     ap.add_argument("--poll-interval", type=float, default=2.0,

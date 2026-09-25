@@ -11,7 +11,7 @@ Layout::
         ingested.ledger        append-only, fsync'd list of ingested chunk_ids
 
 The ledger is the idempotency key, not the file location. A chunk is recorded
-in the ledger *before* it is committed to DuckDB, so a crash between the two
+in the ledger *before* it is committed to the database, so a crash between the two
 leaves the chunk marked as ingested and it is skipped on restart. That ordering
 biases toward dropping at most one chunk rather than double-counting it: a
 double count silently corrupts an aggregate BER, whereas a dropped 250-frame

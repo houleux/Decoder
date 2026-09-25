@@ -1,5 +1,11 @@
 # MATLAB round-robin baseline (z=1, z=4) — `matlab_round_robin`
 
+> **Update 2026-09-25:** the experiment database moved from the DuckDB file `experiments.db`
+> to a central Postgres (Neon); see [`postgres_migration.md`](postgres_migration.md). The bridge
+> code is unchanged apart from docstrings, and all rows it ingested were migrated. What follows
+> is the record as of the date above; its DuckDB-specific constraints (single writer, lock
+> contention, NFS open cost) no longer apply.
+
 Date: 2026-09-15/16. Companion to
 [`matlab_bridge_quartile_k3.md`](matlab_bridge_quartile_k3.md), which documents
 the bridge infrastructure (spool/ingester design, the earlier scheduling-fairness

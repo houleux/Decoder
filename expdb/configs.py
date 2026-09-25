@@ -14,7 +14,7 @@ def get_or_create_config(config: dict) -> str:
     conn.execute(
         """
         INSERT INTO configs (config_id, config_json) 
-        VALUES (?, ?) 
+        VALUES ($1, $2) 
         ON CONFLICT (config_id) DO NOTHING
         """, 
         (config_id, config_json)
@@ -23,7 +23,7 @@ def get_or_create_config(config: dict) -> str:
 
 def get_config(config_id: str) -> dict | None:
     conn = get_conn()
-    res = conn.execute("SELECT config_json FROM configs WHERE config_id = ?", (config_id,)).fetchone()
+    res = conn.execute("SELECT config_json FROM configs WHERE config_id = $1", (config_id,)).fetchone()
     if res:
         return json.loads(res[0])
     return None

@@ -67,7 +67,7 @@ above.
 
 ## Comparison against stored `rl/` (Python) RELDEC results
 
-`experiments.db` has a stored, more-completed run of this repo's own Python
+The experiment database (then `experiments.db`, now the central Postgres) has a stored, more-completed run of this repo's own Python
 `reldec` (`rl/agents/reldec.py`, hard-decision state — **not** the MATLAB
 `external_ref/` implementation) on the **same matrix**
 (`matrices/WRAN_irreg_384_256.csv`, verified identical shape/degree profile

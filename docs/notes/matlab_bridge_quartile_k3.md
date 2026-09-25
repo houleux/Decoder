@@ -2,6 +2,12 @@
 
 Date: 2026-09-15
 
+> **Update 2026-09-25:** the experiment database moved from the DuckDB file `experiments.db`
+> to a central Postgres (Neon); see [`postgres_migration.md`](postgres_migration.md). The bridge
+> code is unchanged apart from docstrings, and all rows it ingested were migrated. What follows
+> is the record as of the date above; its DuckDB-specific constraints (single writer, lock
+> contention, NFS open cost) no longer apply.
+
 Companion to [`quartile_llr_reldec.md`](quartile_llr_reldec.md) (architecture),
 [`quartile_llr_reldec_results.md`](quartile_llr_reldec_results.md) (the original
 30000-episode run) and [`quartile_llr_handoff.md`](quartile_llr_handoff.md).

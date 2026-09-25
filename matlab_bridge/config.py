@@ -5,7 +5,7 @@ The one rule this module enforces: every method name originating from MATLAB
 carries the ``matlab_`` prefix. MATLAB results are produced by
 ``external_ref/ldpc_rl/`` — a different codebase, a different training rule,
 and a different scheduling loop from this repo's Python ``rl/``. Mixing them
-into ``experiments.db`` under an unprefixed name would make two genuinely
+into the experiment database under an unprefixed name would make two genuinely
 different algorithms look like one method with noisy results.
 
 The prefix is enforced here rather than left to the caller so it cannot be
@@ -90,7 +90,7 @@ def enforce_matlab_prefix(method: str) -> str:
     raise MethodPrefixError(
         f"MATLAB-produced result has method={method!r}, which lacks the "
         f"required {MATLAB_PREFIX!r} prefix. MATLAB results must be "
-        f"distinguishable from this repo's Python rl/ runs in experiments.db. "
+        f"distinguishable from this repo's Python rl/ runs in the experiment database. "
         f"Fix the producing script (run_quartile_eval.m sets this) rather "
         f"than renaming here."
     )
@@ -111,7 +111,7 @@ def config_from_manifest(manifest: dict) -> dict:
     if missing:
         raise KeyError(
             f"manifest is missing required config keys: {missing}. "
-            f"Refusing to write a partial config to experiments.db."
+            f"Refusing to write a partial config to the experiment database."
         )
 
     cfg = {k: manifest[k] for k in _CONFIG_KEYS if k in manifest}

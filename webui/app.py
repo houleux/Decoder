@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 # Ensure we can import expdb
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from expdb.db import get_conn
+from expdb.db import connect
 import glob
 import subprocess
 
@@ -22,7 +22,6 @@ def index():
 
 @app.route('/api/configs')
 def get_configs():
-    conn = get_conn()
     query = """
         SELECT c.config_id, c.created_at, c.description, c.tags, c.config_json,
                COALESCE(MAX(e.frames_done), 0) as max_frames_done
@@ -31,7 +30,8 @@ def get_configs():
         GROUP BY c.config_id, c.created_at, c.description, c.tags, c.config_json
         ORDER BY c.created_at DESC
     """
-    rows = conn.execute(query).fetchall()
+    with connect() as conn:
+        rows = conn.execute(query).fetchall()
     
     configs = []
     for row in rows:
@@ -48,17 +48,21 @@ def get_configs():
 
 @app.route('/api/configs/<config_id>')
 def get_config_details(config_id):
-    conn = get_conn()
-    
-    # Get config
-    row = conn.execute("SELECT config_json, description, tags FROM configs WHERE config_id = ?", (config_id,)).fetchone()
-    if not row:
-        return jsonify({"error": "Config not found"}), 404
+    with connect() as conn:
+        row = conn.execute("SELECT config_json, description, tags FROM configs WHERE config_id = $1", (config_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "Config not found"}), 404
+        run_rows = conn.execute("SELECT run_id, run_type, status, episodes_done, completed_at FROM runs WHERE config_id = $1", (config_id,)).fetchall()
+        eval_rows = conn.execute("""
+            SELECT snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages 
+            FROM eval_results 
+            WHERE config_id = $1 
+            ORDER BY target_frame_errors, max_frames, snr_db
+        """, (config_id,)).fetchall()
         
     config_dict = json.loads(row[0])
     
     # Get runs
-    run_rows = conn.execute("SELECT run_id, run_type, status, episodes_done, completed_at FROM runs WHERE config_id = ?", (config_id,)).fetchall()
     runs = []
     for r in run_rows:
         runs.append({
@@ -70,13 +74,6 @@ def get_config_details(config_id):
         })
         
     # Get evaluations
-    eval_rows = conn.execute("""
-        SELECT snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages 
-        FROM eval_results 
-        WHERE config_id = ? 
-        ORDER BY target_frame_errors, max_frames, snr_db
-    """, (config_id,)).fetchall()
-    
     evals = []
     for e in eval_rows:
         snr, tfe, mf, done, comp, be, tb, fe, msg = e
@@ -110,11 +107,20 @@ def plot_configs():
     if not config_ids:
         return jsonify({"error": "No config IDs provided"}), 400
         
-    conn = get_conn()
-    placeholders = ','.join(['?'] * len(config_ids))
+    placeholders = ','.join(f'${i}' for i in range(1, len(config_ids) + 1))
     
-    # Get configs for titles/legends
-    config_rows = conn.execute(f"SELECT config_id, config_json FROM configs WHERE config_id IN ({placeholders})", config_ids).fetchall()
+    with connect() as conn:
+        # Get configs for titles/legends
+        config_rows = conn.execute(f"SELECT config_id, config_json FROM configs WHERE config_id IN ({placeholders})", config_ids).fetchall()
+        
+        # Get evaluations
+        eval_rows = conn.execute(f"""
+            SELECT config_id, snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages 
+            FROM eval_results 
+            WHERE config_id IN ({placeholders})
+            ORDER BY target_frame_errors, max_frames, snr_db
+        """, config_ids).fetchall()
+    
     config_titles = {}
     for row in config_rows:
         cfg = json.loads(row[1])
@@ -122,14 +128,6 @@ def plot_configs():
         z = cfg.get("z", "?")
         config_titles[row[0]] = f"{method} (z={z})"
         
-    # Get evaluations
-    eval_rows = conn.execute(f"""
-        SELECT config_id, snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages 
-        FROM eval_results 
-        WHERE config_id IN ({placeholders})
-        ORDER BY target_frame_errors, max_frames, snr_db
-    """, config_ids).fetchall()
-    
     # Group by config_id
     grouped_data = {}
     for cid in config_ids:
@@ -207,7 +205,7 @@ def get_matrices():
     return jsonify({"matrices": sorted(rel_matrices)})
 
 # Methods produced by the MATLAB reference tree (external_ref/ldpc_rl), ingested
-# into experiments.db via matlab_bridge. They are listed so their results are
+# into the experiment database via matlab_bridge. They are listed so their results are
 # visible/filterable in the dashboard, but run_experiments.py cannot produce
 # them -- see the guard in run_experiment() below.
 MATLAB_METHODS = [

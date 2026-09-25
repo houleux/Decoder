@@ -14,7 +14,7 @@ def extend_eval(config_id: str, snr_db: float, target_frame_errors: int, from_ma
         """
         SELECT frames_done, completed, bit_errors, total_bits, frame_errors, messages
         FROM eval_results
-        WHERE config_id = ? AND snr_db = ? AND target_frame_errors = ? AND max_frames = ?
+        WHERE config_id = $1 AND snr_db = $2 AND target_frame_errors = $3 AND max_frames = $4
         """,
         (config_id, snr_db, target_frame_errors, from_max_frames)
     ).fetchone()
@@ -32,7 +32,7 @@ def extend_eval(config_id: str, snr_db: float, target_frame_errors: int, from_ma
         """
         INSERT INTO eval_results 
         (config_id, snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages)
-        VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9)
         ON CONFLICT (config_id, snr_db, target_frame_errors, max_frames) DO NOTHING
         """,
         (config_id, snr_db, target_frame_errors, to_max_frames, frames_done, bit_errors, total_bits, frame_errors, messages)

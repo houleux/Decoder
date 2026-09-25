@@ -5,8 +5,10 @@ import os
 import pandas as pd
 from tabulate import tabulate
 
+# Ensure we can import expdb when run as `python3 cli/exp.py` from the repo root
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from expdb import get_or_create_config, create_run, update_run_status, query_ber, get_coverage
-from expdb.db import get_conn
+from expdb.db import get_conn, init_schema
 
 def cmd_show(args):
     if args.config_id:
@@ -18,7 +20,7 @@ def cmd_show(args):
         return
         
     conn = get_conn()
-    row = conn.execute("SELECT config_json, description, tags FROM configs WHERE config_id = ?", (config_id,)).fetchone()
+    row = conn.execute("SELECT config_json, description, tags FROM configs WHERE config_id = $1", (config_id,)).fetchone()
     if not row:
         print(f"Config {config_id} not found.")
         return
@@ -32,13 +34,13 @@ def cmd_show(args):
     for k, v in config_dict.items():
         print(f"  {k}: {v}")
         
-    runs = conn.execute("SELECT run_id, run_type, status, episodes_done, completed_at FROM runs WHERE config_id = ?", (config_id,)).fetchall()
+    runs = conn.execute("SELECT run_id, run_type, status, episodes_done, completed_at FROM runs WHERE config_id = $1", (config_id,)).fetchall()
     print("\nRuns:")
     for r in runs:
         print(f"  {r[0]} | {r[1]} | {r[2]} | eps: {r[3]} | {r[4]}")
         
     print("\nEvaluations:")
-    evals = conn.execute("SELECT snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages FROM eval_results WHERE config_id = ? ORDER BY target_frame_errors, max_frames, snr_db", (config_id,)).fetchall()
+    evals = conn.execute("SELECT snr_db, target_frame_errors, max_frames, frames_done, completed, bit_errors, total_bits, frame_errors, messages FROM eval_results WHERE config_id = $1 ORDER BY target_frame_errors, max_frames, snr_db", (config_id,)).fetchall()
     
     if evals:
         headers = ["SNR", "Target FE", "Max Frames", "Done", "Completed", "BER", "FER", "Avg Msg"]
@@ -59,13 +61,18 @@ def cmd_ls(args):
     params = []
     
     if args.tag:
-        query += " WHERE tags LIKE ?"
+        query += " WHERE tags LIKE $1"
         params.append(f"%{args.tag}%")
         
     rows = conn.execute(query, params).fetchall()
     
     headers = ["Config ID", "Created At", "Description", "Tags"]
     print(tabulate(rows, headers=headers))
+
+def cmd_init_db(args):
+    """Creates the expdb tables in the database EXPDB_URL points at (idempotent)."""
+    init_schema(get_conn())
+    print("Schema is in place (configs, runs, eval_results).")
 
 def main():
     parser = argparse.ArgumentParser(description="Experiment Management CLI")
@@ -76,6 +83,8 @@ def main():
     
     ls_parser = subparsers.add_parser("ls", help="List configs")
     ls_parser.add_argument("--tag", type=str, help="Filter by tag")
+
+    subparsers.add_parser("init-db", help="Create the expdb tables (run once per database)")
     
     args = parser.parse_args()
     
@@ -83,6 +92,8 @@ def main():
         cmd_show(args)
     elif args.command == "ls":
         cmd_ls(args)
+    elif args.command == "init-db":
+        cmd_init_db(args)
     else:
         parser.print_help()
 

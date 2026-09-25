@@ -651,7 +651,7 @@ async function plotSelected() {
         
         // Setup download button
         dlBtn.href = data.image;
-        dlBtn.download = "duckdb_plot.png";
+        dlBtn.download = "ber_plot.png";
         
     } catch (error) {
         console.error('Error fetching plot data:', error);

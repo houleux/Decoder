@@ -48,7 +48,7 @@ Notes on each:
 - **Matrices** (`matrices/`): `wran_384_256.mat` (384×256 WRAN, the most-used), `p_mackey.mat` (96×48 Mackay, rate 1/2), `P_520.mat`/`P_156.mat`/`P_2176.mat`/`P_3840.mat` (quasi-cyclic *base* matrices — expanded at runtime via `ldpcQuasiCyclicMatrix(blocksize, P)`, not parity-check matrices themselves).
 - **Checkpoints** (`checkpoints/`): `Q_wran_snr_*` ← `reldec_test.m`-family, `Q_wran_residue_reward_*` / `Q_wran_snr_0_new_reward` ← `reldec_residue.m`, `Q_wran_crt_llr_*` ← `reldec_residue_reward.m`, `Q_*_rl_nips_snr_*` ← `rl_nips_test.m`, `Q_wran_0_tanh_mi` / `Q_mackey_0.5_tanh_mi` ← the tanh/MI trainer.
 - **`lib/`**: `ldpc_cluster.m` is the single-cluster CN→VN update used by most `eval/` harnesses. `Jfun.m`/`Jinv.m` are the standard J-function / inverse-J EXIT-chart approximations, used by the MI-reward trainer and `misc/M2I2_cluster.m`. `ldpc_layered.m`, `ldpc_residue_cluster.m`, `ldpcdec_cluster.m`, `ldpcdec_edge.m`, `scheduler_c_v.m` are baseline/alternative schedulers used by the older `eval/test_ldpc*.m` harnesses.
-- **Outputs**: nothing writes CSV or JSON. Trainers `save` a `.mat`; eval harnesses accumulate `ber_t(i)` arrays and `semilogy` them to a figure. Nothing is persisted in a form this repo's `expdb`/`experiments.db` can ingest — any comparison against our numbers has to be transcribed by hand.
+- **Outputs**: nothing writes CSV or JSON. Trainers `save` a `.mat`; eval harnesses accumulate `ber_t(i)` arrays and `semilogy` them to a figure. Nothing is persisted in a form this repo's `expdb` database can ingest — any comparison against our numbers has to be transcribed by hand.
 - **Toolboxes required**: Communications Toolbox (`ldpcEncode`/`ldpcDecode`/`ldpcEncoderConfig`/`ldpcDecoderConfig`/`ldpcQuasiCyclicMatrix`/`quantiz`/`lloyds`/`biterr`), Parallel Computing Toolbox (`parfor` in most `eval/` scripts).
 
 ### What was archived, and why
@@ -83,27 +83,24 @@ Added at explicit user request (2026-09-11) — see `docs/notes/quartile_llr_rel
 
 This repo has accumulated significant dead code and stale documentation from multiple refactors. Do not trust a doc or comment just because it exists — verify against the actual code before relying on it. Verified-stale items as of the last audit:
 
-- **`docs/architecture.md` is stale and wrong.** It describes a `RELDEC/` package (`train_reldec.py`, `TrainerFactory`, `MethodDispatcher`, etc.) that does not exist anywhere in this repo. The real, current architecture is described in the root [architecture.md](architecture.md) and matches the actual `rl/` and `global_mdp/` directories. Don't consult `docs/architecture.md` for anything.
-- **`docs/notes/REFACTORING_STATUS.md`** documents that same old `RELDEC/` refactor plan. Ignore it.
-- **`tests/test_expdb.py` is broken at collection**: it imports `_local` from `expdb.db`, which doesn't exist there (`expdb/db.py` opens a fresh `duckdb.connect()` per call — no thread-local caching). `pytest` fails on import. Fix the test against current `expdb/db.py` rather than assuming it passes. It is the only test file in the repo.
-- **`pyproject.toml` is unrelated to this project** — it declares a package named `gymnasium_env` depending on `gymnasium`/`pygame`, none of which this codebase uses. Real runtime deps (`duckdb`, `pandas`, `tqdm`, `torch`, `scipy`, `numpy`, `tabulate`, `flask`, `matplotlib`) are declared nowhere; there is no requirements file. Check imports directly. A working `.venv/` exists at the repo root with everything installed, including the vendored `ldpc` package.
+- **There is no architecture doc.** The root `architecture.md` and `Constitution.md`, and the stale `docs/architecture.md` (a `RELDEC/` package that never existed), were deleted on 2026-09-25. This file plus [design.md](design.md) are the current descriptions. Code comments that say "see architecture.md" point at nothing.
+- **Dependencies are in `requirements.txt`** (pinned). The vendored `ldpc` extension is not pip-installed; it is compiled in place (see README "Setup"). A working `.venv/` exists at the repo root with everything installed.
 - **`rl/agents/base.py` `Agent` Protocol is stale.** It declares `update(cluster_idx, state_before, llr_post_after, reward)`, but [rl/trainer.py:52](rl/trainer.py#L52) calls `agent.update(k, state_before, llr_pre_cluster, llr_post, reward, rng=rng)` — 5 positional args plus `rng`. The Protocol is not enforced at runtime; the real contract is what `rl/trainer.py` and the concrete agents implement.
 - **`rl/trainer.py`'s own docstring is stale**: it says step (v) is `reward_fns[k].compute(llr_post)`, but the code calls `compute(llr_pre_cluster, llr_post)` (two args, before/after). Trust the code.
-- **`architecture.md` overstates the `rl/` ↔ `global_mdp/` separation.** It says "Do NOT import `rl.agents.*` into `global_mdp` or vice versa" — in fact `global_mdp/decoder/engine.py` imports `rl.channel.awgn_llr` and `rl.decoder.engine.MethodStats`, and `global_mdp/trainer.py` imports `rl.decoder.base.syndrome_is_zero`. That reuse is deliberate and fine. The real rule is the one below about agents/trainers/state representations.
+- **The `rl/` ↔ `global_mdp/` separation is about agents, not all code.** The deleted `architecture.md` said "Do NOT import `rl.agents.*` into `global_mdp` or vice versa" — in fact `global_mdp/decoder/engine.py` imports `rl.channel.awgn_llr` and `rl.decoder.engine.MethodStats`, and `global_mdp/trainer.py` imports `rl.decoder.base.syndrome_is_zero`. That reuse is deliberate and fine. The real rule is the one below about agents/trainers/state representations.
 - `archive/` is a graveyard of old scripts/CSVs — don't build on anything in there.
-- `Notes.md` and `ToDo.md` are explicitly marked "NOT TO BE READ OR ACTED UPON WITHOUT EXPLICIT HUMAN PERMISSION" — do not read or act on them unless the user explicitly asks.
-- Loose junk at the repo root that is not part of the system: `scratch_query.py`, `configs_test.json`, `test.txt`, `webui.log`, `tmp_exports/`, `logs/`.
+- `logs/` holds SLURM job stdout/stderr (tracked); it is not part of the system.
 - **`scratch/` is the designated workspace for one-off exploratory work** — timing comparisons, ad hoc harnesses, throwaway analysis scripts, anything that isn't a deliverable part of the repo. It's gitignored (`.gitignore` line ~193), so nothing placed there is ever committed. Use subdirectories per task (e.g. `scratch/matlab_vs_python_timing/`) rather than dumping files loose at its root. This is the file-creation exception implied by the Constitution's "no new files without permission" rule for exploratory/investigative work the user has asked for in-session — it does not extend to creating files under `scratch/` unprompted.
-- **`experiments.db` (73 MB) is still tracked by git** and is *not* in `.gitignore`, despite commit `b67f566` "Stop tracking experiments.db to prevent data loss". Be careful with `git add -A`. Its DuckDB WAL sidecar (`experiments.db.wal`) was tracked too and is currently deleted in the working tree.
+- **`.env` holds the database credentials** (`EXPDB_URL`). It is gitignored; never commit it, print it, or paste it anywhere. `.env.example` shows the expected variable. The old DuckDB file `experiments.db` was purged from git history on 2026-09-25 and is gitignored.
 - When you notice other docs/comments contradicting the code, trust the code and flag the discrepancy to the user rather than silently propagating the stale doc.
 
-## Agent Constitution (from `Constitution.md`)
+## Agent Constitution (originally `Constitution.md`, since deleted)
 
-- Read [architecture.md](architecture.md) before making changes; extend existing structures rather than inventing new ones.
+- Read this file and [design.md](design.md) before making changes; extend existing structures rather than inventing new ones.
 - Do not create new files without explicit user permission (experiment config files are the exception).
 - If new files are approved, make them modular and reusable.
 - No silent fallbacks: never introduce default behaviors or broad exception handling that could silently alter results. Fail loudly and require explicit configuration — this is a research codebase where silently-wrong numbers are worse than a crash.
-- Per-change markdown notes go in `docs/notes/`; `docs/architecture.md` is meant to be the periodic purge target — but per the warning above, it is badly out of date, so don't treat it as authoritative until/unless it's resynced.
+- Per-change markdown notes go in `docs/notes/`.
 
 ## What this repo is
 
@@ -134,23 +131,32 @@ There is no shared method registry. Adding or renaming a method means touching a
 
 ### Other components
 
-- **`expdb/`** — DuckDB-backed experiment tracking (`experiments.db` at repo root; a single embedded-DB file, no server). Configs are hashed (`expdb/config.py::compute_config_hash`, with `HASH_EXCLUSIONS` for execution-only params like `workers`/`chunk_size`/`max_frames`) so identical configs dedupe to the same `config_id` and resume automatically. Tables: `configs`, `runs`, `eval_results` (schema in `expdb/db.py::_init_schema`, created on every connect). Public API re-exported through `expdb/__init__.py`.
-- **`webui/app.py`** — Flask dashboard, **the current primary way to view results and launch runs**. Reads `experiments.db` directly and renders Matplotlib (headless `Agg`) to base64 PNG on demand instead of writing static files. `python3 webui/app.py`, then `http://localhost:5000`. Frontend is `webui/templates/index.html` + `webui/static/js/main.js` (~660 lines, vanilla JS, no build step). Endpoints: `/api/configs`, `/api/configs/<id>`, `/api/plot`, `/api/matrices`, `/api/methods`, `/api/run_experiment`.
-- **`cli/exp.py`** — small CLI over `expdb` (`show`, `ls`). Largely superseded by the web UI (see below).
-- **`ldpc/`** — Vendored third-party BP decoder library (Cython extension, upstream `quantumgizmos/ldpc`). Treat as external/read-only; the compiled `.so` already exists under `ldpc/src_python/ldpc/bp_decoder/`. Only `rl/decoder/base.py` and `rl/decoder/flooding.py` import it (`from ldpc.bp_decoder import BpDecoder`).
+- **`expdb/`** — experiment tracking in a **central PostgreSQL database hosted on Neon** (region `ap-southeast-1`), shared by every machine. The connection string is `EXPDB_URL`, from the environment or the repo-root `.env`; if it is missing, every call raises (no local fallback). Configs are hashed (`expdb/config.py::compute_config_hash`, with `HASH_EXCLUSIONS` for execution-only params like `workers`/`chunk_size`/`max_frames`) so identical configs dedupe to the same `config_id` and resume automatically. Tables: `configs`, `runs`, `eval_results` (schema in `expdb/db.py::init_schema`, created once with `python3 cli/exp.py init-db`, **not** on connect). Public API re-exported through `expdb/__init__.py`. See "The database is reached over HTTPS" below for how `expdb/db.py` talks to it.
+- **`webui/app.py`** — Flask dashboard, **the current primary way to view results and launch runs**. Queries the database through `expdb.db.connect()` (one short-lived connection per request) and renders Matplotlib (headless `Agg`) to base64 PNG on demand instead of writing static files. `python3 webui/app.py`, then `http://localhost:5000`. Frontend is `webui/templates/index.html` + `webui/static/js/main.js` (~660 lines, vanilla JS, no build step). Endpoints: `/api/configs`, `/api/configs/<id>`, `/api/plot`, `/api/matrices`, `/api/methods`, `/api/run_experiment`.
+- **`cli/exp.py`** — small CLI over `expdb` (`show`, `ls`, `init-db`). Largely superseded by the web UI.
+- **`ldpc/`** — Vendored third-party BP decoder library (Cython extension, upstream `quantumgizmos/ldpc`). Treat as external/read-only. Its compiled `.so` files are gitignored and built in place under `ldpc/src_python/ldpc/*/` (`cd ldpc && python setup.py build_ext --inplace`); this machine's `.venv` checkout already has them. Only `rl/decoder/base.py` and `rl/decoder/flooding.py` import it (`from ldpc.bp_decoder import BpDecoder`).
 - **`matrices/`** — Parity-check matrix CSVs (sparse `row,col` format) plus `.md` descriptions; `CATALOG.md` indexes them.
 - **`results/`** — Output CSVs/JSONs and `.json` checkpoints from training/eval runs, organized by sweep subdirectory.
 - **`utils/`** — **dead code.** Nothing in the repo imports it. `utils/awgn_channel.py::AWGNChannel` is a worse duplicate of the live `rl/channel.py::awgn_llr` (uses global `np.random`, and a different SNR convention: raw SNR vs. Eb/N0-with-code-rate).
 
 ### Entry points
 
-- **`run_experiments.py`** — the primary unified entry point: trains any missing checkpoints, then runs a fully interruptible/resumable multiprocessing (`forkserver`) evaluation sweep across methods × cluster sizes (`z`) × SNRs, chunk-committing progress into `experiments.db`. Reach for this by default. It is the **only** script that inserts `ldpc/src_python` onto `sys.path`.
+- **`run_experiments.py`** — the primary unified entry point: trains any missing checkpoints, then runs a fully interruptible/resumable multiprocessing (`forkserver`) evaluation sweep across methods × cluster sizes (`z`) × SNRs, chunk-committing progress into the central database. Reach for this by default. It is the **only** script that inserts `ldpc/src_python` onto `sys.path`.
 - **`run_train.py`** / **`run_eval.py`** — lower-level single-method train/eval scripts (also wired through `expdb`); use when you need finer control, or for `global_dqn`, which `run_experiments.py` does not support. Unlike `run_experiments.py` they do *not* patch `sys.path` for `ldpc`, so they only work with the repo `.venv` (or another env where `ldpc` is importable) active.
-- **`run_ada_job.sh`** — example SLURM `sbatch` script for the IIIT Ada cluster (see the `ada-cluster-usage` skill for the full SLURM workflow).
 
 ## Cross-cutting gotchas
 
-**DuckDB is single-writer, and the web UI holds the lock.** `expdb/db.py::get_conn()` opens a *read-write* connection and retries on lock contention for up to 120 s (1200 × 0.1 s) before raising. Every `expdb` call opens a fresh connection and relies on it going out of scope to release the lock. `webui/app.py` does the same per HTTP request. Running the dashboard alongside a sweep therefore means real lock contention — if a writer stalls for 120 s and dies, this is why. Do not add a long-lived module-level connection.
+**The database is reached over HTTPS, not the Postgres protocol.** Ada compute nodes only allow outbound ports 22/80/443/8080/8443, so psycopg (port 5432) cannot reach Neon. `expdb/db.py` is a small stdlib client for Neon's SQL-over-HTTPS endpoint (`POST https://<host>/sql`, the transport of Neon's official serverless driver). Consequences:
+- Placeholders are **`$1, $2, …`** — not `?` (DuckDB) or `%s` (psycopg).
+- **No interactive transactions.** `conn.execute_batch([(sql, params), ...])` runs a list of statements atomically; a read-then-write sequence cannot be made atomic.
+- Values arrive as text and are parsed by column type OID in `expdb/db.py::_PARSERS`; an unknown type raises. Add a parser there if you select a new type (e.g. `json`).
+- Timestamps are `TIMESTAMPTZ` and come back timezone-aware in UTC. Rows migrated from DuckDB were stored as IST wall-clock and converted.
+- **Writes are never retried** (a resend could double-count a `commit_chunk` increment); reads are retried. A failed write crashes the caller; rerunning `run_experiments.py` resumes from what the database holds.
+- `get_conn()` caches one keep-alive connection per process+thread. Unlike DuckDB there is no lock: many machines can write concurrently (increments are row-level atomic).
+
+**Running the same sweep on two machines at once double-counts.** Eval RNG seeds are `seed + frames_done`, and both machines read the same `frames_done`, so they simulate identical frames and both commit them. Split work across machines by method/SNR/config, never by running the same command twice.
+
+**RELDEC-family evaluation is not reproducible run-to-run.** `rl/agents/reldec.py` breaks Q-value ties with an unseeded `np.random.default_rng()`, so the same checkpoint and seed give different BER/FER on each run (flooding is bit-identical). Verified on 2026-09-25 with the pre-migration DuckDB code; it is not a database effect.
 
 **Config identity is not consistent across entry points.** `run_experiments.py` builds a config dict with `matrix, method, z, alpha, gamma, epsilon, l_max, train_episodes, train_snr_vals, seed`, while `run_eval.py` builds only `matrix, method, z, seed`. They hash to **different `config_id`s for the same underlying experiment**, so their `eval_results` rows do not merge or dedupe. Match `run_experiments.py`'s dict if you want rows to combine.
 
@@ -181,23 +187,25 @@ python3 run_eval.py --matrix-csv matrices/H_Mackay_96_48.csv --method reldec --z
     --checkpoint results/ckpt.json --snr-db 1.0 2.0 3.0 --i-max 50 \
     --seed 42 --output-csv results/eval.csv
 
-# Live dashboard (reads experiments.db directly; primary results UI)
+# Live dashboard (queries the central database; primary results UI)
 python3 webui/app.py   # -> http://localhost:5000
 
 # Inspect stored experiment configs/runs from the terminal (expdb)
 python3 cli/exp.py ls
 python3 cli/exp.py show --config-id <hash>
+python3 cli/exp.py init-db        # create tables in a new database (idempotent)
 
-# Tests — currently fail at collection (see warning above)
+# Tests — run against a throwaway database created next to production and dropped after
 python3 -m pytest tests/
-python3 -m pytest tests/test_expdb.py::TestExpDB::test_config_hash_stability   # single test
+python3 -m pytest tests/test_expdb.py::TestConfigHash::test_config_hash_stability   # single test
+python3 matlab_bridge/test_bridge.py
 
 # Lint/format (.pre-commit-config.yaml: black 22.3.0 + ruff v0.0.275)
 pre-commit run --all-files
 ```
 
-There is no build step for this repo's own code (pure Python); the only compiled component is the vendored `ldpc` Cython extension, whose `.so` is already built. Resuming is automatic and safe: killing `run_experiments.py` mid-sweep and rerunning the same command picks up at the exact SNR and chunk.
+There is no build step for this repo's own code (pure Python); the only compiled component is the vendored `ldpc` Cython extension (see README "Setup" to build it on a new machine). Resuming is automatic and safe: killing `run_experiments.py` mid-sweep and rerunning the same command picks up at the exact SNR and chunk.
 
 ## SLURM / Ada cluster
 
-Use the `ada-cluster-usage` skill for anything involving the IIIT Ada HPC cluster (SSH, interactive `srun` vs. batch `sbatch`, GPU requests, job monitoring/pending-reason triage, storage policy across `/home`, `/share1`, `/scratch`, Jupyter/VS Code tunneling). Key defaults: account `research`, partition `long` for GPU work, QoS `medium`. When launching `run_experiments.py` via `sbatch`, `--cpus-per-task` must match `--workers` or SLURM cgroups will throttle all worker processes onto one core. To view the dashboard from a laptop, SSH with `-L 5000:localhost:5000` and run `python3 webui/app.py` on the node.
+Use the `ada-cluster-usage` skill for anything involving the IIIT Ada HPC cluster (SSH, interactive `srun` vs. batch `sbatch`, GPU requests, job monitoring/pending-reason triage, storage policy across `/home`, `/share1`, `/scratch`, Jupyter/VS Code tunneling). Key defaults: account `research`, partition `long` for GPU work, QoS `medium`. When launching `run_experiments.py` via `sbatch`, `--cpus-per-task` must match `--workers` or SLURM cgroups will throttle all worker processes onto one core. To view the dashboard from a laptop, SSH with `-L 5000:localhost:5000` and run `python3 webui/app.py` on the node — or, since the database is central, run the dashboard on the laptop itself with its own `.env`. SLURM jobs inherit `EXPDB_URL` from the submitting shell, or read it from the repo's `.env`.

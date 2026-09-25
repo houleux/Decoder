@@ -1,12 +1,16 @@
-"""Validate matlab_bridge crash-safety/idempotency against a TEMP db."""
-import json, os, shutil, sys, tempfile
+"""Validate matlab_bridge crash-safety/idempotency against a TEMP database."""
+import atexit, json, shutil, sys, tempfile
 from pathlib import Path
-sys.path.insert(0, "/home2/harshitlalwani/Decoder")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import expdb.db as _db
+from expdb.db import temporary_database
+
+# A throwaway database next to the production one, dropped on exit (including
+# on a crash part-way through).
+_tmp_db = temporary_database(prefix="bridge_test_")
+print("temp db:", _tmp_db.__enter__())
+atexit.register(_tmp_db.__exit__, None, None, None)
 tmpdir = tempfile.mkdtemp(prefix="bridge_test_")
-_db.DB_PATH = os.path.join(tmpdir, "test.db")      # never experiments.db
-print("temp db:", _db.DB_PATH)
 
 from matlab_bridge.ingest import ingest_once
 from matlab_bridge.config import config_from_manifest, enforce_matlab_prefix, MethodPrefixError

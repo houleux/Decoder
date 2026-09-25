@@ -7,7 +7,7 @@ Action : cluster index to schedule, k ∈ {0, …, num_clusters-1}
 Reward : increase in global average MI across ALL variable nodes
 Algo   : DQN (see global_mdp/algorithms/dqn.py)
 
-NOTE: incompatible with rl/ (Factored MDP) — see architecture.md.
+NOTE: incompatible with rl/ (Factored MDP) — see CLAUDE.md.
 """
 from __future__ import annotations
 
