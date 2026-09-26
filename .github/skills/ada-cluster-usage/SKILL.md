@@ -20,9 +20,9 @@ Use this skill to run ML or decoding experiments on the IIIT Ada cluster with sa
 - Default partition for GPU work: `long`
 - Recommended explicit QoS for research account: `medium`
 
-If your actual Ada login differs from your email identifier, always use the Ada login username in commands.
+If your actual Ada login differs from your email identifier, always use the Ada login username in commands. The Ada login username is `harshitlalwani`.
 
-Authentication on Ada is password-based (no SSH auth keys). Whenever running SSH/rsync/tunneling commands, always prompt the user to enter their password in the terminal.
+Authentication on Ada supports SSH keys. The laptop `LAPTOP-5AEL1NPO` (both its WSL `root` account and its Windows `harsh` account) is already authorized, so from there `ssh ada` / `ssh gnodeXX` need no password once the SSH config in section 8 is in place. From any other machine, or if a command prompts for a password, follow section 8 to set up a key rather than asking the user to type a password.
 
 ## Workflow
 
@@ -141,21 +141,44 @@ Completion checks:
 - Browser opens Jupyter token/password page.
 - Kernel runs on compute node, not head node.
 
-### 8. VS Code Remote SSH to compute node
-Add local SSH config:
+### 8. Passwordless SSH (keys) and SSH config
+Needed for Claude Code or any other non-interactive tool, which cannot type a password or passphrase. `$HOME` is shared across Ada, so one entry in `~/.ssh/authorized_keys` works for the head node and every compute node.
+
+On the local machine (inside WSL if the tool runs in WSL; WSL and Windows have separate `~/.ssh` directories):
+
+1. Check for an existing key: `cat ~/.ssh/id_ed25519.pub`. If there is none, create one with `ssh-keygen -t ed25519` and leave the passphrase empty, or keep a passphrase and load the key into `ssh-agent` with `ssh-add` every session.
+2. Authorize it on Ada (asks for the password one last time):
+   - Linux/macOS/WSL: `ssh-copy-id harshitlalwani@ada.iiit.ac.in`
+   - Windows PowerShell: `type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh harshitlalwani@ada.iiit.ac.in "cat >> ~/.ssh/authorized_keys"`
+   - Or, from a session already on Ada, append the `.pub` line to `~/.ssh/authorized_keys` (the directory must be `700` and the file `600`).
+3. Add `~/.ssh/config`, then `chmod 600 ~/.ssh/config`:
 
 ```sshconfig
 Host ada
-  HostName ada.iiit.ac.in
-  User <ada_username>
+    HostName ada.iiit.ac.in
+    User harshitlalwani
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60
 
-Host gnode
-  HostName <gnodeXX>
-  User <ada_username>
-  ProxyCommand ssh -W %h:%p ada
+Host gnode*
+    User harshitlalwani
+    ProxyJump ada
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking accept-new
 ```
 
-Then connect to `gnode` via Remote SSH.
+4. Accept host keys once interactively (`ssh ada hostname`, then `ssh gnodeXX hostname`), then verify non-interactively:
+   - `ssh -o BatchMode=yes ada hostname` should print `ada.iiit.ac.in`
+   - `ssh -o BatchMode=yes gnodeXX hostname` should print `gnodeXX`
+
+Gotchas:
+- `root@ada's password:` means SSH sent the local username (`root` in WSL) because the config's `User` line is missing or not being read. Ada has no root login, so no password will work.
+- `Host key verification failed` under `BatchMode=yes` means the host key has never been accepted, since BatchMode suppresses the prompt. Connect once without BatchMode. If you get `REMOTE HOST IDENTIFICATION HAS CHANGED`, run `ssh-keygen -R <host>` first.
+- `Could not resolve hostname gnodeXX` means the `Host gnode*` / `ProxyJump` block is missing. Compute node names resolve only from inside Ada.
+- Compute nodes use `pam_slurm_adopt`, so SSH to a `gnodeXX` is allowed only while you have a running job on that node. Otherwise connect to `ada`.
+- The `connection is not using a post-quantum key exchange algorithm` warning is harmless (Ada's server is older than the client).
+
+For VS Code Remote SSH, connect to `ada` or `gnodeXX` using the same config.
 
 ## Quality Criteria
 - Never run long GPU jobs on login/head node.
