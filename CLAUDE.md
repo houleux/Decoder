@@ -84,7 +84,7 @@ Added at explicit user request (2026-09-11) — see `docs/notes/quartile_llr_rel
 This repo has accumulated significant dead code and stale documentation from multiple refactors. Do not trust a doc or comment just because it exists — verify against the actual code before relying on it. Verified-stale items as of the last audit:
 
 - **There is no architecture doc.** The root `architecture.md` and `Constitution.md`, and the stale `docs/architecture.md` (a `RELDEC/` package that never existed), were deleted on 2026-09-25. This file plus [design.md](design.md) are the current descriptions. Code comments that say "see architecture.md" point at nothing.
-- **Dependencies are in `requirements.txt`** (pinned). The vendored `ldpc` extension is not pip-installed; it is compiled in place (see README "Setup"). A working `.venv/` exists at the repo root with everything installed.
+- **Dependencies are in `requirements.txt`** (pinned). The vendored `ldpc` extension is not pip-installed; it is compiled in place (see README "Setup"). A working `.venv/` exists at the repo root with everything installed — **Python 3.12** (rebuilt 2026-09-29: numpy 2.2.6 / scipy 1.15.3 have no 3.14 wheels and a source build needs gfortran), torch as the CPU build of the pinned version, plus `numba`. The previous 3.14 venv is parked at `.venv-py314.bak` pending deletion.
 - **`rl/agents/base.py` `Agent` Protocol is stale.** It declares `update(cluster_idx, state_before, llr_post_after, reward)`, but [rl/trainer.py:52](rl/trainer.py#L52) calls `agent.update(k, state_before, llr_pre_cluster, llr_post, reward, rng=rng)` — 5 positional args plus `rng`. The Protocol is not enforced at runtime; the real contract is what `rl/trainer.py` and the concrete agents implement.
 - **`rl/trainer.py`'s own docstring is stale**: it says step (v) is `reward_fns[k].compute(llr_post)`, but the code calls `compute(llr_pre_cluster, llr_post)` (two args, before/after). Trust the code.
 - **The `rl/` ↔ `global_mdp/` separation is about agents, not all code.** The deleted `architecture.md` said "Do NOT import `rl.agents.*` into `global_mdp` or vice versa" — in fact `global_mdp/decoder/engine.py` imports `rl.channel.awgn_llr` and `rl.decoder.engine.MethodStats`, and `global_mdp/trainer.py` imports `rl.decoder.base.syndrome_is_zero`. That reuse is deliberate and fine. The real rule is the one below about agents/trainers/state representations.
@@ -113,7 +113,7 @@ Two **independent, incompatible** decoding frameworks live side by side — do n
 
 Never pass a `GlobalDQNAgent` into `rl.trainer.train_episode()` or a `ReldecAgent` into `global_mdp.trainer.train_episode_dqn()` — the state representations are incompatible (tuple-per-cluster vs. float32 array).
 
-Note that `global_mdp` (`global_dqn`) is reachable **only** from `run_train.py`/`run_eval.py`. The primary runner `run_experiments.py` and the web UI do not support it.
+Note that `global_dqn` is reachable **only** from `run_train.py`/`run_eval.py`; the primary runner `run_experiments.py` and the web UI do not support it. `global_ppo` (`global_mdp/agents/global_ppo_agent.py`, added 2026-09-29) is the opposite: it trains in `run_experiments.py` and evaluates through `rl/decoder/engine.py`, and is not wired into `run_train.py`/`run_eval.py`. See `docs/notes/bg2_fast_sched_and_ppo.md`.
 
 ### The method registry is duplicated in four places, and they disagree
 
@@ -121,13 +121,13 @@ There is no shared method registry. Adding or renaming a method means touching a
 
 | Location | What it lists | Current gap |
 |---|---|---|
-| `rl/decoder/engine.py::_worker` | the real dispatch — 19 eval methods (`if/elif` chain ending in `raise ValueError`) | authoritative for **evaluation** |
-| `run_train.py` `--method` choices | 13 trainable methods incl. `global_dqn` | missing `ave_mi_ave_mi` |
-| `run_eval.py` `--method` choices | 19 methods incl. `global_dqn` | missing `ave_mi_ave_mi` |
-| `run_experiments.py` training phase | only `reldec`, `ave_tanh_ave_mi`, `ave_mi_ave_mi` | see landmine below |
-| `webui/app.py::/api/methods` | hardcoded list of 19 | offers methods the runner cannot train |
+| `rl/decoder/engine.py::_worker` | the real dispatch — 20 eval methods incl. `global_ppo` (`if/elif` chain ending in `raise ValueError`) | authoritative for **evaluation** |
+| `run_train.py` `--method` choices | 13 trainable methods incl. `global_dqn` | missing `ave_mi_ave_mi`, `global_ppo` |
+| `run_eval.py` `--method` choices | 19 methods incl. `global_dqn` | missing `ave_mi_ave_mi`, `global_ppo` |
+| `run_experiments.py` `--methods` choices | trains `reldec`, `ave_tanh_ave_mi`, `ave_mi_ave_mi`, `global_ppo`; evaluates those plus the untrained `flooding`, `round_robin`, `random`, `rbl`, `ave_rbl`, `max_rbl` | other RL methods rejected at argument parsing |
+| `webui/app.py::/api/methods` | hardcoded list of 20 | offers methods the runner rejects (the launch then fails loudly) |
 
-**Landmine (violates the no-silent-fallbacks rule):** `run_experiments.py`'s training phase prints `Unknown agent type for method: X` and `continue`s for any method outside its three. The evaluation phase then proceeds anyway and hands `rl/decoder/engine.py` a checkpoint path that was never written. The web UI's "Launch New Experiment" form exposes all 19 methods, so it can trigger exactly this. Prefer failing loudly here.
+The old landmine — `run_experiments.py` printing `Unknown agent type` and `continue`-ing into an evaluation with a never-written checkpoint — was removed on 2026-09-29: `--methods` is now validated against the table above. The config dict for every method is built by `run_experiments.py::make_config()`, byte-identical to the old inline dicts for pre-existing methods (their `config_id`s are unchanged).
 
 ### Other components
 
@@ -155,6 +155,8 @@ There is no shared method registry. Adding or renaming a method means touching a
 - `get_conn()` caches one keep-alive connection per process+thread. Unlike DuckDB there is no lock: many machines can write concurrently (increments are row-level atomic).
 
 **Running the same sweep on two machines at once double-counts.** Eval RNG seeds are `seed + frames_done`, and both machines read the same `frames_done`, so they simulate identical frames and both commit them. Split work across machines by method/SNR/config, never by running the same command twice.
+
+**`ReldecAgent`, `AveTanhAveMIAgent`, and `RoundRobinDecoder` run on numba kernels** (`rl/decoder/fast_sched.py`, 2026-09-29), not on ldpc `decode_cluster`: the per-CN BP update is bit-identical to ldpc, and greedy selection uses a segment tree with uniform tie-breaking (`tests/test_fast_sched.py`; stored WRAN FERs reproduced within 0.6σ). This is what makes 5G NR BG2 (`matrices/H_BG2_Z384.csv`, m=16128) feasible — the generic path costs O(nnz+n) per CN update and O(m²) per RELDEC iteration. The fast path is keyed on the **exact** class (`_fast_kind` in the class body), so the other `ReldecAgent` subclasses still use the generic path; their Q-tables live in `agent._fast`, and `select_cluster()`/`update()` raise on fast agents. Adding a new state/reward kind means adding it to the kernel.
 
 **RELDEC-family evaluation is not reproducible run-to-run.** `rl/agents/reldec.py` breaks Q-value ties with an unseeded `np.random.default_rng()`, so the same checkpoint and seed give different BER/FER on each run (flooding is bit-identical). Verified on 2026-09-25 with the pre-migration DuckDB code; it is not a database effect.
 

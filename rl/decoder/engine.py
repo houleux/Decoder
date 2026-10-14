@@ -134,6 +134,11 @@ def _worker(args: tuple) -> MethodStats:
         from rl.agents.ave_mi_ave_mi_agent import AveMIAveMIAgent
         agent = AveMIAveMIAgent.load(checkpoint_path, h_csr)
         decoder = agent
+    elif method == "global_ppo":
+        import torch
+        torch.set_num_threads(1)   # one core per worker; the policy net is tiny
+        from global_mdp.agents.global_ppo_agent import GlobalPPOAgent
+        decoder = GlobalPPOAgent.load(checkpoint_path, h_csr)
 
     else:
         raise ValueError(f"Unknown method: {method!r}")

@@ -1,21 +1,22 @@
 import numpy as np
 import scipy.sparse as sp
 from rl.decoder.base import DecodeResult, SequentialDecoderBase, syndrome_is_zero
+from rl.decoder.fast_sched import FastBP
 
 
 class RoundRobinDecoder(SequentialDecoderBase):
-    """Schedules each CN once per iteration, in index order 0..m-1."""
+    """Schedules each CN once per iteration, in index order 0..m-1 (layered BP).
+
+    Runs on rl.decoder.fast_sched.FastBP, which is bit-exact with the per-CN
+    _schedule_cn path (tests/test_fast_sched.py) but O(deg) per CN update.
+    """
+
+    def __init__(self, h_csr: sp.csr_matrix):
+        super().__init__(h_csr)
+        self._fast = FastBP(self.h)
 
     def decode(self, llr: np.ndarray, i_max: int) -> DecodeResult:
-        llr_post, x_hat = self._init_decode(llr)
-        messages = 0
-        for iter_idx in range(1, int(i_max) + 1):
-            for cn in range(self.m):
-                llr_post = self._schedule_cn(cn, llr_post, x_hat)
-                messages += int(self.degrees[cn])
-            if syndrome_is_zero(self.h, x_hat):
-                return DecodeResult(bits=x_hat.copy(), converged=True, iterations=iter_idx, messages=messages)
-        return DecodeResult(bits=x_hat.copy(), converged=False, iterations=int(i_max), messages=messages)
+        return self._fast.round_robin(llr, i_max)
 
 
 class RandomDecoder(SequentialDecoderBase):

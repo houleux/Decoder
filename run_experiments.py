@@ -16,6 +16,8 @@ from rl.decoder.engine import evaluate_snr_point
 from rl.agents.reldec import ReldecAgent
 from rl.agents.ave_tanh_ave_mi_agent import AveTanhAveMIAgent
 from rl.agents.ave_mi_ave_mi_agent import AveMIAveMIAgent
+from global_mdp.agents.global_ppo_agent import GlobalPPOAgent, PPO_OPTIONAL_DEFAULTS
+from global_mdp.trainer import train_episode_ppo
 
 from expdb import get_or_create_config, create_run, update_run_status, set_checkpoint, ensure_eval_row, get_coverage, commit_chunk
 
@@ -31,11 +33,81 @@ def load_matrix(csv_path: str) -> tuple[sp.csr_matrix, float]:
     code_rate = 1.0 - (m / n)
     return h_csr, code_rate
 
+# Decoders with nothing to train; evaluated directly by rl/decoder/engine.py.
+UNTRAINED_METHODS = {"flooding", "round_robin", "random", "rbl", "ave_rbl", "max_rbl"}
+TABULAR_AGENTS = {
+    "reldec": ReldecAgent,
+    "ave_tanh_ave_mi": AveTanhAveMIAgent,
+    "ave_mi_ave_mi": AveMIAveMIAgent,
+}
+# Chosen from WRAN probes (docs/notes/bg2_fast_sched_and_ppo.md): sparse success
+# reward with gamma=1 learned fastest; 8192-step rollouts (~15 WRAN episodes per update)
+# were needed for a usable advantage signal.
+PPO_HYPER = {
+    "lr": 1e-3, "gamma": 1.0, "gae_lambda": 0.95, "clip_eps": 0.2,
+    "update_epochs": 4, "minibatch_size": 512, "rollout_steps": 8192,
+    "ent_coef": 0.003, "vf_coef": 0.5, "max_grad_norm": 0.5,
+    "hidden": 32, "reward": "success",
+}
+
+
+def make_config(args, method: str, z: int) -> dict:
+    # Keys for the pre-existing methods must stay exactly as they were, or their
+    # config_ids change and completed rows stop resuming.
+    config = {
+        "matrix": args.matrix,
+        "method": method,
+        "z": z,
+        "alpha": 0.1,
+        "gamma": 0.99,
+        "epsilon": 0.1,
+        "l_max": args.l_max,
+        "train_episodes": args.train_episodes,
+        "train_snr_vals": args.train_snrs,
+        "seed": args.seed,
+        "workers": args.workers,
+        "chunk_size": args.chunk_size
+    }
+    if method == "global_ppo":
+        for k in ("alpha", "gamma", "epsilon"):
+            del config[k]
+        config["ppo"] = dict(PPO_HYPER)
+        types = {k: type(v) for k, v in {**PPO_HYPER, **PPO_OPTIONAL_DEFAULTS}.items()}
+        for item in args.ppo_override:
+            key, _, raw = item.partition("=")
+            if key not in types or not raw:
+                raise ValueError(f"--ppo-override {item!r}: expected KEY=VALUE with KEY in {sorted(types)}")
+            if types[key] is bool:
+                if raw not in ("True", "False"):
+                    raise ValueError(f"--ppo-override {item!r}: boolean must be True or False")
+                config["ppo"][key] = raw == "True"
+            else:
+                config["ppo"][key] = types[key](raw)
+    return config
+
+
+def checkpoint_path(results_dir: str, method: str, z: int, config_id: str) -> str | None:
+    if method in UNTRAINED_METHODS:
+        return None
+    ext = ".pt" if method == "global_ppo" else ".json"
+    return os.path.join(results_dir, f"{method}_z{z}_{config_id[:8]}{ext}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Unified Experiment Runner for RL Decoders")
     parser.add_argument("--matrix", type=str, required=True, help="Path to matrix CSV")
-    parser.add_argument("--methods", nargs='+', required=True, help="List of methods to run (e.g. flooding reldec ave_mi_ave_mi)")
+    parser.add_argument("--methods", nargs='+', required=True,
+                        choices=sorted(UNTRAINED_METHODS | set(TABULAR_AGENTS) | {"global_ppo"}),
+                        help="List of methods to run (e.g. flooding reldec ave_mi_ave_mi)")
     parser.add_argument("--z-vals", nargs='+', type=int, default=[1], help="List of cluster sizes (z)")
+    parser.add_argument("--device", type=str, default="cpu",
+                        help="Device for global_ppo gradient updates during training (cpu or cuda); evaluation is always CPU")
+    parser.add_argument("--train-threads", type=int, default=1,
+                        help="torch threads for global_ppo gradient updates (rollouts stay single-threaded)")
+    parser.add_argument("--train-only", action="store_true",
+                        help="Stop after the (single-process) training phase; run again without it to evaluate")
+    parser.add_argument("--ppo-override", nargs='*', default=[], metavar="KEY=VALUE",
+                        help="Override entries of PPO_HYPER for global_ppo (part of the config hash)")
     parser.add_argument("--train-snrs", nargs='+', type=float, default=[1.0, 1.5, 2.0, 2.5, 3.0], help="Training SNRs")
     parser.add_argument("--eval-snrs", nargs='+', type=float, default=[1.0, 1.5, 2.0, 2.5, 3.0], help="Evaluation SNRs")
     parser.add_argument("--train-episodes", type=int, default=100, help="Number of training episodes")
@@ -59,52 +131,45 @@ def main():
     # 1. Training Phase
     print("=== Training Phase ===")
     for method in args.methods:
-        if method == "flooding":
+        if method in UNTRAINED_METHODS:
             continue
         for z in args.z_vals:
-            config = {
-                "matrix": MATRIX_PATH,
-                "method": method,
-                "z": z,
-                "alpha": 0.1,
-                "gamma": 0.99,
-                "epsilon": 0.1,
-                "l_max": args.l_max,
-                "train_episodes": args.train_episodes,
-                "train_snr_vals": args.train_snrs,
-                "seed": args.seed,
-                "workers": args.workers,
-                "chunk_size": args.chunk_size
-            }
+            config = make_config(args, method, z)
             config_id = get_or_create_config(config)
             
-            ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_{config_id[:8]}.json")
+            ckpt_path = checkpoint_path(RESULTS_DIR, method, z, config_id)
             if os.path.exists(ckpt_path):
                 print(f"[{method} z={z}] Checkpoint already exists. Skipping training.")
                 continue
             
             run_id = create_run(config_id, "train", config)
             print(f"[{method} z={z}] Training for {args.train_episodes} episodes...")
-            if method == "reldec":
-                agent = ReldecAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
-            elif method == "ave_tanh_ave_mi":
-                agent = AveTanhAveMIAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
-            elif method == "ave_mi_ave_mi":
-                agent = AveMIAveMIAgent(h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
+            if method == "global_ppo":
+                torch.set_num_threads(args.train_threads)
+                agent = GlobalPPOAgent(h_csr, z=z, hyper=config["ppo"], seed=args.seed, device=args.device)
             else:
-                print(f"Unknown agent type for method: {method}")
-                continue
-            
+                agent = TABULAR_AGENTS[method](h_csr=h_csr, z=z, epsilon=0.1, alpha=0.1, gamma=0.99)
+
             rng = np.random.default_rng(args.seed)
             snr_schedule = [args.train_snrs[i % len(args.train_snrs)] for i in range(args.train_episodes)]
-            for ep_idx, snr_db in enumerate(snr_schedule):
+            pbar = tqdm(snr_schedule, desc=f"train {method} z={z}", mininterval=30)
+            recent = []
+            for ep_idx, snr_db in enumerate(pbar):
                 llr = awgn_llr(n, snr_db, code_rate, rng)
-                train_episode(agent, h_csr, llr, args.l_max, rng)
+                if method == "global_ppo":
+                    recent.append(train_episode_ppo(agent, llr, args.l_max))
+                else:
+                    recent.append(train_episode(agent, h_csr, llr, args.l_max, rng))
+                if (ep_idx + 1) % 100 == 0:
+                    pbar.set_postfix(mean_reward_last100=f"{np.mean(recent[-100:]):.4f}")
             
             agent.save(ckpt_path)
             set_checkpoint(run_id, ckpt_path, args.train_episodes)
             update_run_status(run_id, "completed")
             print(f"[{method} z={z}] Training complete. Saved to {ckpt_path}.")
+
+    if args.train_only:
+        return
 
     # 2. Evaluation Phase
     print("\n=== Evaluation Phase ===")
@@ -118,20 +183,7 @@ def main():
                 # Usually we just run flooding at z=1 for comparison.
                 continue
                 
-            config = {
-                "matrix": MATRIX_PATH,
-                "method": method,
-                "z": z if method != "flooding" else 1,
-                "alpha": 0.1,
-                "gamma": 0.99,
-                "epsilon": 0.1,
-                "l_max": args.l_max,
-                "train_episodes": args.train_episodes,
-                "train_snr_vals": args.train_snrs,
-                "seed": args.seed,
-                "workers": args.workers,
-                "chunk_size": args.chunk_size
-            }
+            config = make_config(args, method, z if method != "flooding" else 1)
             config_id = get_or_create_config(config)
             coverage = get_coverage(config_id, args.target_frame_errors, args.max_frames)
             
@@ -172,23 +224,10 @@ def main():
                 if frames_done >= args.max_frames:
                     continue
                     
-                config = {
-                    "matrix": MATRIX_PATH,
-                    "method": method,
-                    "z": z,
-                    "alpha": 0.1,
-                    "gamma": 0.99,
-                    "epsilon": 0.1,
-                    "l_max": args.l_max,
-                    "train_episodes": args.train_episodes,
-                    "train_snr_vals": args.train_snrs,
-                    "seed": args.seed,
-                    "workers": args.workers,
-                    "chunk_size": args.chunk_size
-                }
+                config = make_config(args, method, z)
                 config_id = get_or_create_config(config)
                 
-                ckpt_path = os.path.join(RESULTS_DIR, f"{method}_z{z}_{config_id[:8]}.json") if method != "flooding" else None
+                ckpt_path = checkpoint_path(RESULTS_DIR, method, z, config_id)
                     
                 frames_to_run = min(args.chunk_size, args.max_frames - frames_done)
                 

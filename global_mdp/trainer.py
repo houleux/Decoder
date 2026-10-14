@@ -85,3 +85,17 @@ def train_episode_dqn(
                 return episode_reward
 
     return episode_reward
+
+
+def train_episode_ppo(agent, llr_channel: np.ndarray, l_max: int) -> float:
+    """
+    Train GlobalPPOAgent for one episode (one noisy codeword): roll out the
+    sampled policy, then run a PPO update once the buffer holds at least
+    rollout_steps transitions (updates only ever happen at episode ends).
+
+    Returns the total episode reward (global MI increase).
+    """
+    _, reward = agent.run_episode(llr_channel, l_max, training=True)
+    if agent.ppo.ready():
+        agent.ppo.update()
+    return reward

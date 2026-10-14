@@ -31,6 +31,9 @@ def train_episode(
     Returns:
         Total summed reward across all scheduling steps.
     """
+    if getattr(agent, "_fast", None) is not None:
+        return agent._fast.train_episode(llr_channel, l_max, int(rng.integers(0, 2**31)))
+
     llr_post, x_hat = agent._init_decode(llr_channel)
     episode_reward = 0.0
 

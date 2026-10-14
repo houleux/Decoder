@@ -1,17 +1,21 @@
 # Runtime dependencies of this repo's own Python code (rl/, global_mdp/, expdb/,
 # webui/, cli/, matlab_bridge/, run_*.py). Pinned to the versions verified on
-# 2026-09-25. Setup steps, including building the vendored ldpc extension, are
+# 2026-09-25 (numba added 2026-09-29). Python 3.12: numpy 2.2.6 / scipy 1.15.3 have no
+# 3.14 wheels and fall back to a source build that needs a Fortran compiler. Setup steps, including building the vendored ldpc extension, are
 # in README.md.
 numpy==2.2.6
 scipy==1.15.3
 pandas==2.3.3
 tqdm==4.70.0
+# CPU build is enough (the policy/Q networks are tiny) and avoids ~3 GB of CUDA wheels:
+#   pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
 torch==2.13.0
 tabulate==0.10.0
 Flask==3.1.3
 matplotlib==3.10.9
 python-dotenv==1.2.3
 pytest==9.1.1
+numba==0.67.0   # rl/decoder/fast_sched.py kernels
 
 # Build-only: compile the vendored ldpc Cython extension in place.
 cython>=3.0.2

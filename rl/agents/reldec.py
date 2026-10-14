@@ -8,6 +8,7 @@ from rl.decoder.base import DecodeResult, SequentialDecoderBase, syndrome_is_zer
 from rl.states.local_binary_vector import LocalBinaryVectorState
 from rl.rewards.local_fraction import LocalFractionReward
 from rl.algorithms.factored_q_learning import FactoredQLearning
+from rl.decoder.fast_sched import FastTabularScheduler, KIND_BINARY_FRACTION
 
 
 class ReldecAgent(SequentialDecoderBase):
@@ -28,7 +29,13 @@ class ReldecAgent(SequentialDecoderBase):
         epsilon: Exploration probability during training.
         alpha:   Learning rate.
         gamma:   Discount factor.
+
+    Classes that set `_fast_kind` in their own class body (not inherited) run
+    decode/training through rl.decoder.fast_sched instead of the per-step
+    Python loop; Q-tables then live in self._fast, not self.algorithms.
     """
+
+    _fast_kind = KIND_BINARY_FRACTION
 
     def __init__(
         self,
@@ -65,6 +72,18 @@ class ReldecAgent(SequentialDecoderBase):
             FactoredQLearning(alpha=alpha, gamma=gamma) for _ in range(self.num_clusters)
         ]
 
+        kind = type(self).__dict__.get("_fast_kind")
+        self._fast = None if kind is None else FastTabularScheduler(
+            self.h, self.clusters, self.cluster_neighborhoods, kind, epsilon, alpha, gamma
+        )
+
+    def _require_slow_path(self) -> None:
+        if self._fast is not None:
+            raise RuntimeError(
+                f"{type(self).__name__} keeps its Q-tables in the fast scheduler; "
+                "train with rl.trainer.train_episode and evaluate with decode()."
+            )
+
     def select_cluster(
         self,
         llr_post: np.ndarray,
@@ -76,6 +95,7 @@ class ReldecAgent(SequentialDecoderBase):
         Epsilon-greedy selection when training=True. Greedy when training=False.
         Greedy ties broken uniformly at random.
         """
+        self._require_slow_path()
         if training and rng.random() < self.epsilon:
             return int(rng.choice(available_clusters))
 
@@ -100,6 +120,7 @@ class ReldecAgent(SequentialDecoderBase):
         Updates the Q-table for the specified sub-MDP using the local state transition.
         Accepts **kwargs to maintain a uniform training interface with DynaReldecAgent (which needs rng).
         """
+        self._require_slow_path()
         next_state = self.state_encoders[cluster_idx].encode(llr_post_after)
         self.algorithms[cluster_idx].update(state_before, reward, next_state)
 
@@ -108,6 +129,8 @@ class ReldecAgent(SequentialDecoderBase):
         Greedy inference. Schedules every cluster exactly once per iteration.
         Stops early if syndrome == 0.
         """
+        if self._fast is not None:
+            return self._fast.decode(llr, i_max)
         rng = np.random.default_rng()   # Used only for tie-breaking — no exploration
         llr_post, x_hat = self._init_decode(llr)
         messages = 0
@@ -146,6 +169,10 @@ class ReldecAgent(SequentialDecoderBase):
             ]
         }
         """
+        q_tables = (
+            self._fast.to_q_tables() if self._fast is not None
+            else [self.algorithms[k].q_table for k in range(self.num_clusters)]
+        )
         data = {
             "z": self.z,
             "m": self.m,
@@ -156,7 +183,7 @@ class ReldecAgent(SequentialDecoderBase):
             "sub_mdps": [
                 {
                     "cluster_idx": k,
-                    "q_table": {str(s): v for s, v in self.algorithms[k].q_table.items()},
+                    "q_table": {str(s): v for s, v in q_tables[k].items()},
                 }
                 for k in range(self.num_clusters)
             ],
@@ -190,10 +217,16 @@ class ReldecAgent(SequentialDecoderBase):
                 f"do not match provided h_csr ({agent.m}x{agent.n})."
             )
 
+        q_tables = [{} for _ in range(agent.num_clusters)]
         for entry in data["sub_mdps"]:
             k = int(entry["cluster_idx"])
-            agent.algorithms[k].q_table = {
+            q_tables[k] = {
                 ast.literal_eval(s): float(v) for s, v in entry["q_table"].items()
             }
+        if agent._fast is not None:
+            agent._fast.load_q_tables(q_tables)
+        else:
+            for k, table in enumerate(q_tables):
+                agent.algorithms[k].q_table = table
 
         return agent

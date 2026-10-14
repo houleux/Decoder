@@ -201,3 +201,5 @@ smoke_variants_plot.png
 *.npy
 *.log
 experiments.db*
+
+temp/

@@ -220,7 +220,7 @@ def get_methods():
         "reldec", "dyna_reldec", "ave_res_q", "max_res_q",
         "llr_vec_ave_res", "llr_vec_ave_mi", "ave_llr_ave_res", "ave_llr_ave_mi",
         "tanh_vec_ave_res", "tanh_vec_ave_mi", "ave_tanh_ave_res", "ave_tanh_ave_mi",
-        "ave_mi_ave_mi"
+        "ave_mi_ave_mi", "global_ppo"
     ]
     return jsonify({
         "methods": methods + MATLAB_METHODS,
