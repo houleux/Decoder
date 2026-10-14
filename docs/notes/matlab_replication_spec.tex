@@ -1,0 +1,497 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,xcolor,enumitem,microtype}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!60!black]{hyperref}
+\setlist{nosep,leftmargin=1.4em}
+\setlength{\parskip}{0.45em}\setlength{\parindent}{0pt}
+\newcommand{\Lch}{L^{\mathrm{ch}}}
+\title{Replication specification: MATLAB cluster-scheduling decoders\\[2pt]\large flooding, layered (round-robin), RELDEC, tanh-MI and PPO on WRAN and 5G~NR BG2}
+\author{Repository \href{https://github.com/houleux/Decoder}{houleux/Decoder}, branch \texttt{June\_26\_Refactor}, commit \href{https://github.com/houleux/Decoder/tree/620ae0cc7a28c18792826c7daaab86634b8d3ca6}{\texttt{620ae0cc7a28}}}
+\date{Generated 14 October 2026}
+\begin{document}\maketitle
+
+\section{Scope}
+This document lists everything needed to reproduce the \texttt{matlab\_*} results produced between 8 and 14 October 2026:
+the exact code (all links point to commit \texttt{620ae0cc7a28c18792826c7daaab86634b8d3ca6}), the parity-check matrices, every equation the code evaluates,
+all hyperparameters, the random-number scheme and seed of every run, and the evaluation protocol. Appendix~\ref{app:res}
+lists the reference numbers a replication should match. Everything here describes the MATLAB implementation in
+\texttt{external\_ref/ldpc\_rl/} (it was written to follow this repository's Python semantics, so the same equations
+also describe the Python code, but the Python runs are not covered).
+
+\paragraph{Software.} MATLAB R2024a with the Parallel Computing Toolbox (no Communications Toolbox is needed: all
+decoders are written out). The Python side (\texttt{matlab\_bridge/}) only orchestrates runs and writes the database;
+it is not needed to reproduce the numbers (Section~\ref{sec:howto}). A few stages ran under GNU Octave 9.2 executing the
+same \texttt{.m} files (Section~\ref{sec:dev}).
+
+\section{Files}
+\subsection{Parity-check matrices}
+\begin{longtable}{p{0.27\linewidth}p{0.66\linewidth}}\toprule
+File & Content \\\midrule
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/matrices/wran_384_256.mat}{\texttt{\detokenize{wran_384_256.mat}}} & variable \texttt{wran\_384\_256}: the WRAN code, $m=128$ checks, $n=384$ bits, 1296 ones, rate $R=1-m/n=2/3$, check degrees 10--11. Byte-identical to \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matrices/WRAN_irreg_384_256.csv}{\texttt{\detokenize{matrices/WRAN_irreg_384_256.csv}}} (0-based \texttt{row,col} pairs). \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/matrices/P_520.mat}{\texttt{\detokenize{P_520.mat}}} & variable \texttt{P\_520}: the 5G NR base graph~2 shift table ($42\times 52$, entries $-1$ or $0..9$). Expanded with lifting size $Z=10$ (rule below) it gives the $[520,100]$ code of the RELDEC paper: $m=420$, $n=520$, 1970 ones, $R=1-420/520=0.1923$, check degrees 3--10, 380 degree-1 bits. Identical to \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matrices/H_BG2_Z10.csv}{\texttt{\detokenize{matrices/H_BG2_Z10.csv}}}. \\
+\bottomrule\end{longtable}
+\textbf{QC expansion} (\texttt{sched\_env.m}, \texttt{qc\_expand}): every entry $P_{ij}\ge 0$ becomes the $Z\times Z$ identity cyclically shifted right by $P_{ij}$: block row $i$, block column $j$ (0-based) contributes ones at $\big(iZ+r,\; jZ+((r+P_{ij})\bmod Z)\big)$ for $r=0,\dots,Z-1$; $P_{ij}=-1$ is the zero block. This equals MATLAB's \texttt{ldpcQuasiCyclicMatrix(10, P\_520)}.
+
+\subsection{MATLAB code}
+\begin{longtable}{p{0.36\linewidth}p{0.57\linewidth}}\toprule File (\texttt{external\_ref/ldpc\_rl/}) & Role\\\midrule
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/sched_env.m}{\texttt{\detokenize{lib/sched_env.m}}} & loads/expands the matrix, builds clusters, neighborhoods, lookup tables \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/build_clusters.m}{\texttt{\detokenize{lib/build_clusters.m}}} & contiguous groups of $z$ check nodes \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/sched_frame.m}{\texttt{\detokenize{lib/sched_frame.m}}} & one frame: sequential BP with round-robin / RELDEC / tanh-MI / PPO scheduling; training updates \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/flood_frame.m}{\texttt{\detokenize{lib/flood_frame.m}}} & flooding BP \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/mi_llr.m}{\texttt{\detokenize{lib/mi_llr.m}}} & J-function mutual information (tanh-MI reward) \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/ppo_features.m}{\texttt{\detokenize{lib/ppo_features.m}}} & PPO observation \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/ppo_init.m}{\texttt{\detokenize{lib/ppo_init.m}}} & PPO weight initialisation \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/ppo_lossgrad.m}{\texttt{\detokenize{lib/ppo_lossgrad.m}}} & PPO loss and hand-written gradient \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/ppo_update.m}{\texttt{\detokenize{lib/ppo_update.m}}} & GAE, minibatch PPO update, Adam \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/ppo_gradcheck.m}{\texttt{\detokenize{lib/ppo_gradcheck.m}}} & finite-difference check of the gradient \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/sched_policy_pack.m}{\texttt{\detokenize{lib/sched_policy_pack.m}}} & saves the RELDEC hash-map store as plain arrays \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/lib/sched_policy_unpack.m}{\texttt{\detokenize{lib/sched_policy_unpack.m}}} & rebuilds it on load \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/train/sched_train.m}{\texttt{\detokenize{train/sched_train.m}}} & training driver (episodes, SNR cycling, seeds, checkpoint) \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/train/sched_train_json.m}{\texttt{\detokenize{train/sched_train_json.m}}} & runs one training from a JSON config \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/train/sched_train_batch.m}{\texttt{\detokenize{train/sched_train_batch.m}}} & several trainings in a parallel pool \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/parallel_eval/run_sched_eval.m}{\texttt{\detokenize{parallel_eval/run_sched_eval.m}}} & evaluation sweep: shards, substreams, parallel pool, spool output \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/parallel_eval/sched_eval_shard.m}{\texttt{\detokenize{parallel_eval/sched_eval_shard.m}}} & evaluates one shard of frames \\
+\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/parallel_eval/spool_write_chunk.m}{\texttt{\detokenize{parallel_eval/spool_write_chunk.m}}} & writes one chunk result file \\
+\bottomrule\end{longtable}
+\textbf{Orchestration} (only needed to rerun exactly as done): \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matlab_bridge/sched_driver.py}{\texttt{\detokenize{matlab_bridge/sched_driver.py}}} defines every stage below (code, method, $z$, episodes, SNRs, seeds) and skips stages already in the database; \href{https://github.com/houleux/Decoder/tree/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matlab_bridge/ada_jobs}{\texttt{\detokenize{matlab_bridge/ada_jobs/}}} holds the SLURM scripts that ran on the Ada cluster (\href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matlab_bridge/ada_jobs/README.md}{\texttt{\detokenize{README}}} explains each); \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/matlab_bridge/ingest.py}{\texttt{\detokenize{matlab_bridge/ingest.py}}} is the Python ingester. Trained policies: \href{https://github.com/houleux/Decoder/tree/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched}{\texttt{\detokenize{external_ref/ldpc_rl/checkpoints/sched/}}} (one \texttt{.mat} per stage, variables \texttt{pol}, \texttt{meta}).
+
+\section{Channel, decoder, metrics}
+\paragraph{Channel.} The all-zero codeword is sent with BPSK (bit $0\mapsto +1$) over AWGN. For a point $E_b/N_0$ (dB),
+\[ \sigma^2=\frac{1}{2R\,10^{(E_b/N_0)/10}},\qquad y_v=1+\sigma w_v,\ w_v\sim\mathcal N(0,1),\qquad \Lch_v=\frac{2y_v}{\sigma^2},\quad v=1,\dots,n, \]
+with $R=1-m/n$. All $n$ bits are transmitted (no puncturing). One frame draws $w_1,\dots,w_n$ with \texttt{randn(st,1,n)}.
+
+\paragraph{Sequential (check-node) BP.} Posteriors $L_v$ start at $\Lch_v$; check-to-bit messages $r_{c,v}$ start at 0.
+Scheduling check $c$ with neighbours $\mathcal N(c)$ (ascending) performs, for every $v\in\mathcal N(c)$ (all $q_v$ are formed before any $L_v$ changes):
+\begin{align*}
+q_v&=L_v-r_{c,v},\\
+t_v&=\tanh(q_v/2),\quad |t_v|\ \text{floored at }10^{-12}\ (\text{sign kept; }t_v=0\mapsto+10^{-12}),\\
+p_v&=\Big(\textstyle\prod_{u\in\mathcal N(c)}t_u\Big)\big/\,t_v,\quad\text{clipped to }\big[-(1-10^{-15}),\,1-10^{-15}\big],\\
+r'_{c,v}&=\ln\frac{1+p_v}{1-p_v},\qquad L_v\leftarrow q_v+r'_{c,v},\qquad r_{c,v}\leftarrow r'_{c,v}.
+\end{align*}
+Scheduling a \emph{cluster} applies this to its checks one after another in increasing index order.
+
+\paragraph{Iterations and stopping.} One iteration schedules every cluster exactly once; the policy only chooses the order.
+After each iteration the syndrome of $\hat x_v=\mathbb 1[L_v<0]$ is checked and decoding stops when it is zero. At most
+$\ell_{\max}$ iterations ($\ell_{\max}=5$ for WRAN, $50$ for BG2~Z=10), same value in training and evaluation.
+
+\paragraph{Flooding.} Per iteration all checks update from the previous iteration's bit-to-check messages
+(same $t$/$p$/$\ln$ formulas and clamps), then $L_v=\Lch_v+\sum_c r_{c,v}$ and bit-to-check messages $L_v-r_{c,v}$;
+syndrome of $\mathbb 1[L_v\le 0]$ checked after every iteration.
+
+\paragraph{Metrics.} Over $F$ frames of $n$ bits: $\mathrm{BER}=\sum(\text{bits with }L_v<0)/(Fn)$ (flooding: $L_v\le 0$),
+$\mathrm{FER}=\#\{\text{frames with any bit error}\}/F$, average iterations $=\text{messages}/(F\cdot\mathrm{nnz}(H))$ where scheduling a check adds its degree to \emph{messages} (flooding adds $\mathrm{nnz}(H)$ per iteration).
+
+\section{Clusters, states, rewards, policies}
+\paragraph{Clusters.} $C_k$, $k=1..K$, are contiguous groups of $z$ checks ($K=\lceil m/z\rceil$; the last group may be smaller). The neighbourhood $\mathcal N_k$ is the sorted union of its checks' bits: $v_{k,1}<\dots<v_{k,|\mathcal N_k|}$. WRAN: $|\mathcal N_k|\in\{10,11\}$ ($z=1$), up to 44 ($z=4$), 160--176 ($z=16$).
+
+\paragraph{Round-robin (layered).} Order $1,2,\dots,K$ every iteration.
+
+\subsection{RELDEC (binary-vector state)}
+State of cluster $k$: $b_{k,i}=\mathbb 1[L_{v_{k,i}}>0]$, $i=1..|\mathcal N_k|$. Reward after scheduling $a$:
+$\displaystyle R=\frac{1}{|\mathcal N_a|}\sum_{i}\mathbb 1[L_{v_{a,i}}>0]$ (evaluated after the update).
+Q storage (implementation only; values are identical): integer key $\sum_i b_{k,i}2^{i-1}$, dense $2^{|\mathcal N|}\times K$ table if the largest neighbourhood has $\le 20$ bits ($z=1$), otherwise a list of visited keys per cluster ($\le 52$ bits, $z=4$), otherwise one hash map per cluster keyed by the bit string ($z=16$). Unvisited states have $Q=0$.
+
+\subsection{tanh-MI (averaged soft state, MI reward)}
+State: $\displaystyle x_k=\frac{1}{|\mathcal N_k|}\sum_{v\in\mathcal N_k}\tanh(L_v)$ (note: $\tanh(L_v)$, not $\tanh(L_v/2)$; $L_v$ unclipped), $\ s_k=\big\lfloor 10\,(\mathrm{clip}(x_k,-1,1)+1)+0.5\big\rfloor\in\{0,\dots,20\}$.
+Reward after scheduling $a$: $\displaystyle R=\frac{1}{|\mathcal N_a|}\sum_{v\in\mathcal N_a}\big[I(L_v^{\text{after}})-I(L_v^{\text{before}})\big]$, with
+\[ s=\sqrt{\max(2L,0)},\qquad I(L)=\mathrm{clip}_{[0,1]}\begin{cases}-0.0421061\,s^3+0.209252\,s^2-0.00640081\,s, & s\le 1.6363,\\ 1-\exp(0.00181491\,s^3-0.142675\,s^2-0.0822054\,s+0.0549608), & 1.6363<s<10,\\ 1, & s\ge 10.\end{cases} \]
+Q table: $21\times K$, initialised to 0.
+
+\subsection{Tabular Q-learning (RELDEC and tanh-MI)}
+Each cluster is a one-action sub-MDP with value $Q_k(s)$. After scheduling cluster $a$ (state $s$ just before, $s'$ just after, both of cluster $a$):
+\[ Q_a(s)\leftarrow Q_a(s)+\alpha\big(R+\gamma\,Q_a(s')-Q_a(s)\big),\qquad \alpha=0.1,\ \gamma=0.99. \]
+No maximum over other clusters. Selection among clusters not yet scheduled in the current iteration: training is $\varepsilon$-greedy ($\varepsilon=0.1$: with probability $\varepsilon$ a uniformly random available cluster, otherwise $\arg\max_k Q_k(s_k)$); evaluation is greedy. Ties in the arg\,max are broken uniformly at random (\texttt{randi} over the tied set).
+
+\subsection{PPO}
+\textbf{Observation} (\texttt{ppo\_features.m}), one row per cluster $k$, computed before each decision:
+\begin{itemize}
+\item $f_{k,1}=\frac{1}{|\mathcal N_k|}\sum_{v\in\mathcal N_k}\tanh(\mathrm{clip}(L_v,-30,30))$;
+\item $f_{k,2}$ = fraction of $C_k$'s checks unsatisfied under $\mathbb 1[L_v<0]$;
+\item $f_{k,3}=\min_{v\in\mathcal N_k}|\tanh(L_v/2)|$;
+\item $f_{k,4},f_{k,5}$ = $f_{\cdot,1}$ and $f_{\cdot,3}$ z-scored across all $K$ clusters: $(f-\bar f)/(\mathrm{std}_{\text{pop}}(f)+10^{-6})$;
+\item $f_{k,6}=\mathbb 1[k\text{ still available this iteration}]$; $f_{k,7}=(k-1)/(K-1)$ only if \emph{pos\_feature};
+\item three global features appended to every row: $(\ell-1)/\ell_{\max}$, $(j-1)/K$ ($j$ = step within the iteration), fraction of all checks unsatisfied. Input width $D=F+3$ ($F=6$ or 7).
+\end{itemize}
+
+\textbf{Network} (hidden width $h=32$, all activations $\tanh$): actor $s_k=W_3\tanh(W_2\tanh(W_1x_k+b_1)+b_2)+b_3$ shared over clusters,
+$\pi(a)=\mathrm{softmax}$ of $s$ over available clusters; critic $e_k=\tanh(E_2\tanh(E_1x_k+c_1)+c_2)$,
+$V=C_2\tanh(C_1[\bar e;g]+d_1)+d_2$ with $\bar e$ the mean over all $K$ clusters and $g$ the 3 global features.
+Initialisation (\texttt{ppo\_init.m}): every weight and bias uniform in $\pm1/\sqrt{\text{fan-in}}$.
+
+\textbf{Acting.} Training samples $a=\min\{k:\sum_{i\le k}\pi_i\ge u\}$, $u\sim U(0,1)$; evaluation takes $\arg\max_k s_k$ (first index on ties). Training checks the syndrome after every step and ends the episode on success.
+
+\textbf{Reward} (both codes used \emph{success}): $R_t=1$ on the step the syndrome becomes zero, else 0.
+
+\textbf{Update} (\texttt{ppo\_update.m}), run at the end of an episode once the buffer holds at least \emph{rollout\_steps} steps ($d_t=1$ on terminal steps, so no bootstrap is needed):
+\begin{align*}
+\delta_t&=R_t+\gamma V_{t+1}(1-d_t)-V_t, \qquad \hat A_t=\delta_t+\gamma\lambda(1-d_t)\hat A_{t+1}, \qquad \hat R_t=\hat A_t+V_t,\\
+\tilde A_t&=(\hat A_t-\overline{\hat A})/(\mathrm{std}(\hat A)+10^{-8})\quad(\text{unbiased std, over the whole rollout}),\\
+\mathcal L&=-\overline{\min\!\big(\rho_t\tilde A_t,\ \mathrm{clip}(\rho_t,1-\epsilon,1+\epsilon)\,\tilde A_t\big)}+c_v\,\overline{(V_t-\hat R_t)^2}-c_e\,\overline{H(\pi_t)},\qquad \rho_t=\exp(\log\pi(a_t)-\log\pi_{\text{old}}(a_t)),
+\end{align*}
+averaged over a minibatch; \emph{update\_epochs} passes over a fresh random permutation each; global gradient norm clipped to \emph{max\_grad\_norm}; Adam with $\beta_1=0.9$, $\beta_2=0.999$, $\epsilon_{\text{Adam}}=10^{-8}$, bias-corrected, learning rate \emph{lr}. $\lambda$ = \emph{gae\_lambda}, $\epsilon$ = \emph{clip\_eps}, $c_v$ = \emph{vf\_coef}, $c_e$ = \emph{ent\_coef}.
+
+\begin{center}\begin{tabular}{lll}\toprule Hyperparameter & WRAN & BG2 Z=10\\\midrule
+\texttt{\detokenize{lr}} & 0.001 & 0.001\\
+\texttt{\detokenize{gamma}} & 1.0 & 0.999\\
+\texttt{\detokenize{gae_lambda}} & 0.95 & 0.95\\
+\texttt{\detokenize{clip_eps}} & 0.2 & 0.2\\
+\texttt{\detokenize{update_epochs}} & 4 & 4\\
+\texttt{\detokenize{minibatch_size}} & 512 & 2048\\
+\texttt{\detokenize{rollout_steps}} & 8192 & 32768\\
+\texttt{\detokenize{ent_coef}} & 0.003 & 0.003\\
+\texttt{\detokenize{vf_coef}} & 0.5 & 0.5\\
+\texttt{\detokenize{max_grad_norm}} & 0.5 & 0.5\\
+\texttt{\detokenize{hidden}} & 32 & 32\\
+\texttt{\detokenize{reward}} & success & success\\
+\texttt{\detokenize{pos_feature}} & False & True\\
+\bottomrule\end{tabular}\end{center}
+
+\section{Training protocol and random numbers}\label{sec:train}
+\texttt{train/sched\_train.m}: episode $e=1,\dots,E$ is one fresh frame at training SNR \texttt{train\_snrs}$[(e-1)\bmod |\texttt{train\_snrs}|]$ (cycled in order),
+decoded with $\ell_{\max}$ iterations under training rules. Training SNRs (dB): WRAN \{1, 1.5, 2, 2.5, 3\}; BG2 Z=10 \{1, 1.5, 2, 2.5, 3, 3.5\}.
+\textbf{Seeds} (all learned policies use \texttt{seed} $=42$). Noise comes from its own stream, everything else (exploration,
+tie-breaks, PPO sampling, PPO initialisation, minibatch shuffling) from the global stream, set before the policy is created:
+\begin{verbatim}
+st = RandStream('Threefry', 'Seed', 42);          % noise: randn(st, 1, n) per episode
+RandStream.setGlobalStream(RandStream('Threefry', 'Seed', 42 + 7919));
+\end{verbatim}
+Under Octave (Section~\ref{sec:dev}): \texttt{randn('state',42)} for noise and \texttt{rand('state',42+7919)} for the rest.
+MATLAB threads: 1 (\texttt{maxNumCompThreads(1)}). Checkpoints are saved with \texttt{save(...,'-v7')} after \texttt{sched\_policy\_pack}.
+
+\section{Evaluation protocol and random numbers}
+\texttt{parallel\_eval/run\_sched\_eval.m}: for the SNR list of the stage (in the order given), each SNR is split into chunks
+of 1000 frames; chunks are numbered with one global counter $k=1,2,\dots$ in that order (SNR-major). Chunk $k$ draws all its frames from
+\texttt{st = RandStream('Threefry','Seed',base\_seed); st.Substream = k} (frame noise \texttt{randn(st,1,n)}, sequentially), so
+the frames do not depend on the number of workers or on which worker ran the chunk. 100000 frames per SNR (no early stop),
+greedy policy, same $\ell_{\max}$ as training. The \texttt{base\_seed} of every run is in Table~\ref{tab:runs}.
+Tie-breaking draws (\texttt{rand}/\texttt{randi} inside the policy) come from each parallel worker's default global stream and are
+\emph{not} pinned to the chunk (Section~\ref{sec:dev}).
+
+\section{Runs}\label{tab:runs}
+One row per evaluation. \emph{cfg} is the first 8 characters of the database \texttt{config\_id}; each learned stage's
+checkpoint is \texttt{<stage>.mat} in the checkpoint folder of Section~2 (linked). A config evaluated in two runs (different SNRs) appears twice with
+its two \texttt{base\_seed}s. Code: W = WRAN ($\ell_{\max}=5$), B = BG2 Z=10 ($\ell_{\max}=50$).
+{\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{longtable}{lllrlllll}\toprule
+Method & Code & $z$ & Episodes & Eval SNRs (dB) & Seed & cfg & Stage / checkpoint & Run with\\\midrule\endhead
+\texttt{\detokenize{flooding}} & W & 1 & -- & 1, 2, 3, 4, 5, 6 & 41001 & \texttt{191a6e4a} & \texttt{\detokenize{wran_flooding_z1}} & Octave\\
+\texttt{\detokenize{reldec}} & W & 1 & 500 & 1, 2, 3, 4, 5, 6 & 41011 & \texttt{0bdbaeef} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z1_ep500.mat}{\texttt{\detokenize{wran_reldec_z1_ep500}}} & MATLAB$^{*\dagger}$\\
+\texttt{\detokenize{reldec}} & W & 4 & 500 & 1, 2, 3, 4, 5, 6 & 41014 & \texttt{48d7f503} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep500.mat}{\texttt{\detokenize{wran_reldec_z4_ep500}}} & MATLAB$^{*}$\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 500 & 1, 2, 3, 4, 5, 6 & 41021 & \texttt{04418b2b} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep500.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep500}}} & MATLAB$^{*}$\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 500 & 1, 2, 3, 4, 5, 6 & 41024 & \texttt{a1f7d2bf} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep500.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep500}}} & MATLAB$^{*}$\\
+\texttt{\detokenize{PPO}} & W & 1 & 3000 & 1, 2, 3, 4, 5, 6 & 41031 & \texttt{e38bd192} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_ppo_z1_ep3000.mat}{\texttt{\detokenize{wran_ppo_z1_ep3000}}} & MATLAB\\
+\texttt{\detokenize{PPO}} & W & 4 & 3000 & 1, 2, 3, 4, 5, 6 & 41034 & \texttt{6989e598} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_ppo_z4_ep3000.mat}{\texttt{\detokenize{wran_ppo_z4_ep3000}}} & MATLAB\\
+\texttt{\detokenize{flooding}} & B & 1 & -- & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42001 & \texttt{2b4eb95d} & \texttt{\detokenize{bg2_z10_flooding_z1}} & MATLAB\\
+\texttt{\detokenize{round-robin}} & B & 1 & -- & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42002 & \texttt{384a5b0e} & \texttt{\detokenize{bg2_z10_round_robin_z1}} & MATLAB\\
+\texttt{\detokenize{reldec}} & B & 1 & 15000 & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42011 & \texttt{21a1f824} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/bg2_z10_reldec_z1_ep15000.mat}{\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & B & 1 & 15000 & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42021 & \texttt{5aa2d5dc} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/bg2_z10_tanh_mi_z1_ep15000.mat}{\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}}} & MATLAB\\
+\texttt{\detokenize{PPO}} & B & 1 & 3000 & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42031 & \texttt{a8b51960} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/bg2_z10_ppo_z1_ep3000.mat}{\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & B & 1 & 50000 & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42012 & \texttt{2846df83} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/bg2_z10_reldec_z1_ep50000.mat}{\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & B & 1 & 50000 & 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5 & 42022 & \texttt{ff8e2521} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/bg2_z10_tanh_mi_z1_ep50000.mat}{\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 10 & 2, 3 & 43000 & \texttt{b65436d9} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep10.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep10}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 100 & 2, 3 & 43001 & \texttt{0d253776} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep100.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep100}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 1000 & 2, 3 & 43003 & \texttt{137c9e98} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep1000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 3000 & 2, 3 & 43004 & \texttt{2cf6d2f4} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep3000.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep3000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 5000 & 2, 3 & 43005 & \texttt{796e0a56} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep5000.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep5000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 10 & 2, 3 & 44400 & \texttt{9ccdf733} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep10.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep10}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 100 & 2, 3 & 44401 & \texttt{63aa36e9} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep100.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep100}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 1000 & 2, 3 & 44403 & \texttt{0099d504} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep1000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 3000 & 2, 3 & 44404 & \texttt{dd8898dd} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep3000.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep3000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 5000 & 2, 3 & 44405 & \texttt{8a285f04} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep5000.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep5000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 10 & 2, 3 & 44410 & \texttt{62d0e3ec} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep10.mat}{\texttt{\detokenize{wran_reldec_z4_ep10}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 100 & 2, 3 & 44411 & \texttt{0d94f3d8} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep100.mat}{\texttt{\detokenize{wran_reldec_z4_ep100}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 1000 & 2, 3 & 44413 & \texttt{0822c3b3} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep1000.mat}{\texttt{\detokenize{wran_reldec_z4_ep1000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 3000 & 2, 3 & 44414 & \texttt{b158aa96} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep3000.mat}{\texttt{\detokenize{wran_reldec_z4_ep3000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 5000 & 2, 3 & 44415 & \texttt{a01a9cb5} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep5000.mat}{\texttt{\detokenize{wran_reldec_z4_ep5000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 10 & 2, 3 & 45600 & \texttt{a682f34f} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep10.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep10}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 100 & 2, 3 & 45601 & \texttt{c7e009d1} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep100.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep100}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 500 & 2, 3 & 45602 & \texttt{e5209d94} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep500.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep500}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 1000 & 2, 3 & 45603 & \texttt{b7e2ea55} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep1000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 3000 & 2, 3 & 45604 & \texttt{d3982eac} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep3000.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep3000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 5000 & 2, 3 & 45605 & \texttt{f131b444} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep5000.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep5000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 10 & 2, 3 & 45610 & \texttt{34ebaa44} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep10.mat}{\texttt{\detokenize{wran_reldec_z16_ep10}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 100 & 2, 3 & 45611 & \texttt{5c993dfe} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep100.mat}{\texttt{\detokenize{wran_reldec_z16_ep100}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 500 & 2, 3 & 45612 & \texttt{3d4a37ff} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep500.mat}{\texttt{\detokenize{wran_reldec_z16_ep500}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 1000 & 2, 3 & 45613 & \texttt{e2095b51} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep1000.mat}{\texttt{\detokenize{wran_reldec_z16_ep1000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 3000 & 2, 3 & 45614 & \texttt{b3bf842b} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep3000.mat}{\texttt{\detokenize{wran_reldec_z16_ep3000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 5000 & 2, 3 & 45615 & \texttt{21c90ce0} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep5000.mat}{\texttt{\detokenize{wran_reldec_z16_ep5000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 1 & 1000 & 1, 4, 5, 6 & 45010 & \texttt{137c9e98} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z1_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z1_ep1000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 1 & 1000 & 1, 2, 3, 4, 5, 6 & 45011 & \texttt{f1fae020} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z1_ep1000.mat}{\texttt{\detokenize{wran_reldec_z1_ep1000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 4 & 1000 & 1, 4, 5, 6 & 45040 & \texttt{0099d504} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z4_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z4_ep1000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 4 & 1000 & 1, 4, 5, 6 & 45041 & \texttt{0822c3b3} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z4_ep1000.mat}{\texttt{\detokenize{wran_reldec_z4_ep1000}}} & MATLAB\\
+\texttt{\detokenize{tanh-MI}} & W & 16 & 1000 & 1, 4, 5, 6 & 45160 & \texttt{b7e2ea55} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_tanh_mi_z16_ep1000.mat}{\texttt{\detokenize{wran_tanh_mi_z16_ep1000}}} & MATLAB\\
+\texttt{\detokenize{reldec}} & W & 16 & 1000 & 1, 4, 5, 6 & 45161 & \texttt{e2095b51} & \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/checkpoints/sched/wran_reldec_z16_ep1000.mat}{\texttt{\detokenize{wran_reldec_z16_ep1000}}} & MATLAB\\
+\bottomrule\end{longtable}}
+$^{*}$\,policy trained in Octave 9.2 (same \texttt{.m} code), evaluated in MATLAB. $^{\dagger}$\,61 of the 600 evaluation chunks were run in Octave. \emph{Octave}: evaluated in Octave 9.2.
+
+Baseline also shown in the results: WRAN round-robin, \texttt{matlab\_round\_robin} $z=1$ (cfg \texttt{5fa28715}) and $z=4$ (\texttt{5359f7f2}), from an earlier run (16 Sep 2026) with \href{https://github.com/houleux/Decoder/blob/620ae0cc7a28c18792826c7daaab86634b8d3ca6/external_ref/ldpc_rl/parallel_eval/round_robin_eval_shard.m}{\texttt{\detokenize{round_robin_eval_shard.m}}}: chunks of 250 frames, 2400 shards, Threefry substream $=(\text{SNR index}-1)\cdot 400+\text{chunk index}+1$, \texttt{base\_seed} 20001 ($z=1$) and 20004 ($z=4$); its check update is $r'=2\,\mathrm{atanh}(\prod t/t_v)$ without the clamps above.
+
+\section{How to reproduce}\label{sec:howto}
+From \texttt{external\_ref/ldpc\_rl/} in MATLAB:
+\begin{verbatim}
+addpath('lib'); addpath('train'); addpath('parallel_eval');
+% 1) train (example: tanh-MI, WRAN, z = 1, 1000 episodes)
+cfg = struct('code','wran', 'z',1, 'method','tanh_mi', 'episodes',1000, ...
+             'l_max',5, 'train_snrs',[1 1.5 2 2.5 3], 'seed',42, ...
+             'alpha',0.1, 'gamma',0.99, 'epsilon',0.1, ...
+             'out','my_tanh_z1_ep1000.mat');
+ck = sched_train(cfg);
+% PPO: method 'ppo' plus a field cfg.ppo holding the Section 4.4 values.
+% 2) evaluate: write a JSON file with fields
+%    manifest   struct: method ('matlab_...'), target_frame_errors, max_frames
+%    code, z, kind ('flooding'|'round_robin'|'reldec'|'tanh_mi'|'ppo')
+%    checkpoint (learned kinds), snr_db, n_frames (100000), chunk_size (1000)
+%    i_max, base_seed (Section 7), n_workers, spool_dir
+%  then
+run_sched_eval('eval_cfg.json');
+\end{verbatim}
+Each chunk is written to \texttt{spool\_dir/<kind>\_snr<SNR>\_c<index>.json} with \texttt{frames}, \texttt{bit\_errors},
+\texttt{total\_bits}, \texttt{frame\_errors}, \texttt{messages}, \texttt{iterations}; sum them per SNR and apply the metric definitions
+of Section~3. To use the exact trained policies, point \texttt{checkpoint} at the files in \texttt{checkpoints/sched/}.
+The exact JSON written for every run is produced by \texttt{matlab\_bridge/sched\_driver.py} (\texttt{run\_stage}).
+
+\section{Deviations and reproducibility limits}\label{sec:dev}
+\begin{itemize}
+\item \textbf{Octave.} Ada's MATLAB license server failed (error $-97$) during part of the work. GNU Octave 9.2
+(container \texttt{docker://gnuoctave/octave:9.2.0}) ran the same \texttt{.m} files for: WRAN flooding (evaluation), and the training
+of WRAN RELDEC $z{=}1,4$ and tanh-MI $z{=}1,4$ at 500 episodes; 61 of the 600 WRAN RELDEC $z{=}1$ evaluation chunks were also run in Octave.
+Octave lacks \texttt{RandStream}: it seeds training with \texttt{randn/rand('state',\dots)} (Section~\ref{sec:train}) and evaluation
+chunk $k$ with \texttt{randn('state', base\_seed$\cdot$100003$+k$)}. Those Octave checkpoints were re-saved in MATLAB format
+(\texttt{matlab\_bridge/ada\_jobs/convert\_ckpt.m}); values unchanged.
+\item \textbf{Bit-exactness.} Flooding, round-robin and PPO (greedy, deterministic) are bit-reproducible from the seeds.
+RELDEC and tanh-MI evaluations break Q ties with worker-local random streams, so individual frames can differ between runs;
+the statistics are reproducible within Monte-Carlo error (as for the Python implementation, whose tie-breaking is unseeded).
+\item \textbf{Retries.} Two BG2 Z=10 15k-episode stages failed once (a parallel-pool worker crashed at start-up) and were rerun;
+chunk results do not depend on worker count, so partially completed sweeps were resumed.
+\item \textbf{Cancelled.} BG2 PPO with 10\,000 episodes was not completed; it has no results.
+\item \textbf{PPO on WRAN.} MATLAB PPO $z{=}1$ has FER 0.416 at 2~dB versus 0.221 for the Python PPO run. The PPO update and features
+were verified equal to the Python implementation (to float32 rounding); the difference is single-seed training variance.
+\end{itemize}
+
+\appendix\section{Reference results}\label{app:res}
+FER / BER / average iterations from the database (100\,000 frames per point unless stated).
+{\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{longtable}{llrrrrrrr}\toprule
+Stage & cfg & SNR (dB) & Frames & Frame err. & FER & BER & Avg it.\\\midrule\endhead
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 1 & 100000 & 99914 & 9.991e-01 & 7.944e-02 & 5.00\\
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 2 & 100000 & 86402 & 8.640e-01 & 3.272e-02 & 4.92\\
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 3 & 100000 & 25841 & 2.584e-01 & 4.137e-03 & 4.01\\
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 4 & 100000 & 1587 & 1.587e-02 & 1.457e-04 & 2.60\\
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 5 & 100000 & 30 & 3.000e-04 & 1.589e-06 & 1.69\\
+\texttt{\detokenize{wran_flooding_z1}} & \texttt{191a6e4a} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.19\\
+\midrule
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 1 & 100000 & 96762 & 9.676e-01 & 7.690e-02 & 4.96\\
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 2 & 100000 & 33541 & 3.354e-01 & 1.607e-02 & 3.56\\
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 3 & 100000 & 569 & 5.690e-03 & 1.896e-04 & 1.86\\
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 4 & 100000 & 1 & 1.000e-05 & 2.604e-07 & 1.29\\
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.06\\
+\texttt{\detokenize{wran_reldec_z1_ep500}} & \texttt{0bdbaeef} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 1 & 100000 & 98128 & 9.813e-01 & 7.802e-02 & 4.98\\
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 2 & 100000 & 49024 & 4.902e-01 & 2.259e-02 & 4.16\\
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 3 & 100000 & 3119 & 3.119e-02 & 9.669e-04 & 2.30\\
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 4 & 100000 & 44 & 4.400e-04 & 1.245e-05 & 1.40\\
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.08\\
+\texttt{\detokenize{wran_reldec_z4_ep500}} & \texttt{48d7f503} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 1 & 100000 & 95488 & 9.549e-01 & 7.621e-02 & 4.93\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 2 & 100000 & 26137 & 2.614e-01 & 1.315e-02 & 3.19\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 3 & 100000 & 267 & 2.670e-03 & 9.010e-05 & 1.71\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 4 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.23\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.05\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep500}} & \texttt{04418b2b} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 1 & 100000 & 98173 & 9.817e-01 & 7.799e-02 & 4.98\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 2 & 100000 & 48785 & 4.879e-01 & 2.236e-02 & 4.14\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 3 & 100000 & 3116 & 3.116e-02 & 9.456e-04 & 2.27\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 4 & 100000 & 34 & 3.400e-04 & 9.635e-06 & 1.35\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.05\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep500}} & \texttt{a1f7d2bf} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.00\\
+\midrule
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 1 & 100000 & 98274 & 9.827e-01 & 7.793e-02 & 4.97\\
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 2 & 100000 & 41598 & 4.160e-01 & 2.049e-02 & 3.46\\
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 3 & 100000 & 845 & 8.450e-03 & 3.866e-04 & 1.71\\
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 4 & 100000 & 4 & 4.000e-05 & 1.979e-06 & 1.43\\
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.15\\
+\texttt{\detokenize{wran_ppo_z1_ep3000}} & \texttt{e38bd192} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.03\\
+\midrule
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 1 & 100000 & 98664 & 9.866e-01 & 7.829e-02 & 4.99\\
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 2 & 100000 & 53912 & 5.391e-01 & 2.367e-02 & 4.35\\
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 3 & 100000 & 4190 & 4.190e-02 & 1.162e-03 & 2.59\\
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 4 & 100000 & 76 & 7.600e-04 & 2.107e-05 & 1.65\\
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.22\\
+\texttt{\detokenize{wran_ppo_z4_ep3000}} & \texttt{6989e598} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.05\\
+\midrule
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 1.75 & 100000 & 615 & 6.150e-03 & 9.482e-04 & 7.19\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 2 & 100000 & 246 & 2.460e-03 & 3.613e-04 & 6.43\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 2.25 & 100000 & 91 & 9.100e-04 & 1.305e-04 & 5.88\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 2.5 & 100000 & 32 & 3.200e-04 & 4.467e-05 & 5.45\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 2.75 & 100000 & 12 & 1.200e-04 & 1.285e-05 & 5.10\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 3 & 100000 & 3 & 3.000e-05 & 1.269e-06 & 4.81\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 3.25 & 100000 & 3 & 3.000e-05 & 3.788e-06 & 4.56\\
+\texttt{\detokenize{bg2_z10_flooding_z1}} & \texttt{2b4eb95d} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 4.35\\
+\midrule
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 1.75 & 100000 & 377 & 3.770e-03 & 5.734e-04 & 4.10\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 2 & 100000 & 130 & 1.300e-03 & 2.045e-04 & 3.66\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 2.25 & 100000 & 58 & 5.800e-04 & 7.865e-05 & 3.37\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 2.5 & 100000 & 11 & 1.100e-04 & 1.385e-05 & 3.15\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 2.75 & 100000 & 1 & 1.000e-05 & 1.019e-06 & 2.97\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 3 & 100000 & 2 & 2.000e-05 & 1.885e-06 & 2.82\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.66\\
+\texttt{\detokenize{bg2_z10_round_robin_z1}} & \texttt{384a5b0e} & 3.5 & 100000 & 1 & 1.000e-05 & 8.846e-07 & 2.51\\
+\midrule
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 1.75 & 100000 & 57 & 5.700e-04 & 6.206e-05 & 2.64\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 2 & 100000 & 21 & 2.100e-04 & 1.788e-05 & 2.48\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 2.25 & 100000 & 7 & 7.000e-05 & 6.538e-06 & 2.35\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 2.5 & 100000 & 1 & 1.000e-05 & 6.346e-07 & 2.25\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 2.75 & 100000 & 2 & 2.000e-05 & 1.423e-06 & 2.18\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 3 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.13\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.09\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep15000}} & \texttt{21a1f824} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.06\\
+\midrule
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 1.75 & 100000 & 76 & 7.600e-04 & 8.321e-05 & 2.55\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 2 & 100000 & 28 & 2.800e-04 & 2.594e-05 & 2.36\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 2.25 & 100000 & 7 & 7.000e-05 & 6.038e-06 & 2.23\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 2.5 & 100000 & 1 & 1.000e-05 & 5.000e-07 & 2.13\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 2.75 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.07\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 3 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.04\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.01\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep15000}} & \texttt{5aa2d5dc} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.00\\
+\midrule
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 1.75 & 100000 & 108 & 1.080e-03 & 1.522e-04 & 3.29\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 2 & 100000 & 43 & 4.300e-04 & 5.952e-05 & 3.11\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 2.25 & 100000 & 14 & 1.400e-04 & 2.100e-05 & 2.96\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 2.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.83\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 2.75 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.72\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 3 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.60\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.49\\
+\texttt{\detokenize{bg2_z10_ppo_z1_ep3000}} & \texttt{a8b51960} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.39\\
+\midrule
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 1.75 & 100000 & 70 & 7.000e-04 & 7.035e-05 & 2.72\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 2 & 100000 & 19 & 1.900e-04 & 1.575e-05 & 2.55\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 2.25 & 100000 & 6 & 6.000e-05 & 5.423e-06 & 2.41\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 2.5 & 100000 & 1 & 1.000e-05 & 7.308e-07 & 2.30\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 2.75 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.22\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 3 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.15\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.10\\
+\texttt{\detokenize{bg2_z10_reldec_z1_ep50000}} & \texttt{2846df83} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.07\\
+\midrule
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 1.75 & 100000 & 85 & 8.500e-04 & 8.658e-05 & 2.56\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 2 & 100000 & 22 & 2.200e-04 & 2.110e-05 & 2.36\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 2.25 & 100000 & 2 & 2.000e-05 & 2.769e-06 & 2.23\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 2.5 & 100000 & 4 & 4.000e-05 & 2.250e-06 & 2.14\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 2.75 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.07\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 3 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.04\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 3.25 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.01\\
+\texttt{\detokenize{bg2_z10_tanh_mi_z1_ep50000}} & \texttt{ff8e2521} & 3.5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 2.00\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep10}} & \texttt{b65436d9} & 2 & 100000 & 53828 & 5.383e-01 & 2.301e-02 & 4.28\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep10}} & \texttt{b65436d9} & 3 & 100000 & 8733 & 8.733e-02 & 2.183e-03 & 2.73\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep100}} & \texttt{0d253776} & 2 & 100000 & 29429 & 2.943e-01 & 1.448e-02 & 3.34\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep100}} & \texttt{0d253776} & 3 & 100000 & 516 & 5.160e-03 & 1.641e-04 & 1.77\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 1 & 100000 & 95722 & 9.572e-01 & 7.648e-02 & 4.94\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 2 & 100000 & 26859 & 2.686e-01 & 1.344e-02 & 3.22\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 3 & 100000 & 244 & 2.440e-03 & 8.990e-05 & 1.71\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 4 & 100000 & 1 & 1.000e-05 & 1.198e-06 & 1.22\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.04\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep1000}} & \texttt{137c9e98} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep3000}} & \texttt{2cf6d2f4} & 2 & 100000 & 27314 & 2.731e-01 & 1.372e-02 & 3.25\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep3000}} & \texttt{2cf6d2f4} & 3 & 100000 & 278 & 2.780e-03 & 9.354e-05 & 1.74\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z1_ep5000}} & \texttt{796e0a56} & 2 & 100000 & 27459 & 2.746e-01 & 1.382e-02 & 3.25\\
+\texttt{\detokenize{wran_tanh_mi_z1_ep5000}} & \texttt{796e0a56} & 3 & 100000 & 294 & 2.940e-03 & 1.022e-04 & 1.73\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep10}} & \texttt{9ccdf733} & 2 & 100000 & 52712 & 5.271e-01 & 2.346e-02 & 4.29\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep10}} & \texttt{9ccdf733} & 3 & 100000 & 4189 & 4.189e-02 & 1.228e-03 & 2.46\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep100}} & \texttt{63aa36e9} & 2 & 100000 & 48783 & 4.878e-01 & 2.228e-02 & 4.14\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep100}} & \texttt{63aa36e9} & 3 & 100000 & 3112 & 3.112e-02 & 9.676e-04 & 2.28\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 1 & 100000 & 98185 & 9.819e-01 & 7.806e-02 & 4.98\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 2 & 100000 & 49390 & 4.939e-01 & 2.257e-02 & 4.16\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 3 & 100000 & 3114 & 3.114e-02 & 9.633e-04 & 2.28\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 4 & 100000 & 59 & 5.900e-04 & 1.773e-05 & 1.35\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.05\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep1000}} & \texttt{0099d504} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.00\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep3000}} & \texttt{dd8898dd} & 2 & 100000 & 49691 & 4.969e-01 & 2.263e-02 & 4.18\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep3000}} & \texttt{dd8898dd} & 3 & 100000 & 3337 & 3.337e-02 & 1.026e-03 & 2.32\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z4_ep5000}} & \texttt{8a285f04} & 2 & 100000 & 49379 & 4.938e-01 & 2.252e-02 & 4.16\\
+\texttt{\detokenize{wran_tanh_mi_z4_ep5000}} & \texttt{8a285f04} & 3 & 100000 & 3344 & 3.344e-02 & 1.014e-03 & 2.29\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep10}} & \texttt{62d0e3ec} & 2 & 100000 & 56378 & 5.638e-01 & 2.478e-02 & 4.39\\
+\texttt{\detokenize{wran_reldec_z4_ep10}} & \texttt{62d0e3ec} & 3 & 100000 & 5867 & 5.867e-02 & 1.664e-03 & 2.62\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep100}} & \texttt{0d94f3d8} & 2 & 100000 & 51878 & 5.188e-01 & 2.352e-02 & 4.26\\
+\texttt{\detokenize{wran_reldec_z4_ep100}} & \texttt{0d94f3d8} & 3 & 100000 & 4105 & 4.105e-02 & 1.220e-03 & 2.43\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 1 & 100000 & 98141 & 9.814e-01 & 7.804e-02 & 4.98\\
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 2 & 100000 & 48838 & 4.884e-01 & 2.258e-02 & 4.16\\
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 3 & 100000 & 3004 & 3.004e-02 & 9.223e-04 & 2.29\\
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 4 & 100000 & 30 & 3.000e-04 & 8.359e-06 & 1.39\\
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.08\\
+\texttt{\detokenize{wran_reldec_z4_ep1000}} & \texttt{0822c3b3} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep3000}} & \texttt{b158aa96} & 2 & 100000 & 48143 & 4.814e-01 & 2.234e-02 & 4.13\\
+\texttt{\detokenize{wran_reldec_z4_ep3000}} & \texttt{b158aa96} & 3 & 100000 & 3049 & 3.049e-02 & 9.732e-04 & 2.26\\
+\midrule
+\texttt{\detokenize{wran_reldec_z4_ep5000}} & \texttt{a01a9cb5} & 2 & 100000 & 47959 & 4.796e-01 & 2.231e-02 & 4.12\\
+\texttt{\detokenize{wran_reldec_z4_ep5000}} & \texttt{a01a9cb5} & 3 & 100000 & 2733 & 2.733e-02 & 8.612e-04 & 2.23\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep10}} & \texttt{a682f34f} & 2 & 100000 & 61473 & 6.147e-01 & 2.633e-02 & 4.53\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep10}} & \texttt{a682f34f} & 3 & 100000 & 7638 & 7.638e-02 & 2.199e-03 & 2.87\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep100}} & \texttt{c7e009d1} & 2 & 100000 & 58829 & 5.883e-01 & 2.571e-02 & 4.46\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep100}} & \texttt{c7e009d1} & 3 & 100000 & 6770 & 6.770e-02 & 2.031e-03 & 2.74\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep500}} & \texttt{e5209d94} & 2 & 100000 & 59555 & 5.956e-01 & 2.567e-02 & 4.48\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep500}} & \texttt{e5209d94} & 3 & 100000 & 6970 & 6.970e-02 & 2.006e-03 & 2.78\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 1 & 100000 & 98863 & 9.886e-01 & 7.829e-02 & 4.99\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 2 & 100000 & 59400 & 5.940e-01 & 2.557e-02 & 4.50\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 3 & 100000 & 6918 & 6.918e-02 & 1.959e-03 & 2.82\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 4 & 100000 & 224 & 2.240e-03 & 6.344e-05 & 1.66\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 5 & 100000 & 6 & 6.000e-05 & 2.578e-06 & 1.16\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep1000}} & \texttt{b7e2ea55} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.03\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep3000}} & \texttt{d3982eac} & 2 & 100000 & 58784 & 5.878e-01 & 2.543e-02 & 4.47\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep3000}} & \texttt{d3982eac} & 3 & 100000 & 6596 & 6.596e-02 & 1.904e-03 & 2.75\\
+\midrule
+\texttt{\detokenize{wran_tanh_mi_z16_ep5000}} & \texttt{f131b444} & 2 & 100000 & 59114 & 5.911e-01 & 2.558e-02 & 4.48\\
+\texttt{\detokenize{wran_tanh_mi_z16_ep5000}} & \texttt{f131b444} & 3 & 100000 & 6761 & 6.761e-02 & 1.939e-03 & 2.79\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep10}} & \texttt{34ebaa44} & 2 & 100000 & 63084 & 6.308e-01 & 2.684e-02 & 4.55\\
+\texttt{\detokenize{wran_reldec_z16_ep10}} & \texttt{34ebaa44} & 3 & 100000 & 8375 & 8.375e-02 & 2.264e-03 & 2.87\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep100}} & \texttt{5c993dfe} & 2 & 100000 & 62795 & 6.280e-01 & 2.671e-02 & 4.55\\
+\texttt{\detokenize{wran_reldec_z16_ep100}} & \texttt{5c993dfe} & 3 & 100000 & 8293 & 8.293e-02 & 2.300e-03 & 2.86\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep500}} & \texttt{3d4a37ff} & 2 & 100000 & 62274 & 6.227e-01 & 2.666e-02 & 4.53\\
+\texttt{\detokenize{wran_reldec_z16_ep500}} & \texttt{3d4a37ff} & 3 & 100000 & 7956 & 7.956e-02 & 2.224e-03 & 2.84\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 1 & 100000 & 98971 & 9.897e-01 & 7.852e-02 & 4.99\\
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 2 & 100000 & 62001 & 6.200e-01 & 2.664e-02 & 4.53\\
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 3 & 100000 & 8006 & 8.006e-02 & 2.229e-03 & 2.84\\
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 4 & 100000 & 283 & 2.830e-03 & 7.320e-05 & 1.68\\
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 5 & 100000 & 8 & 8.000e-05 & 2.943e-06 & 1.16\\
+\texttt{\detokenize{wran_reldec_z16_ep1000}} & \texttt{e2095b51} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.02\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep3000}} & \texttt{b3bf842b} & 2 & 100000 & 61684 & 6.168e-01 & 2.658e-02 & 4.52\\
+\texttt{\detokenize{wran_reldec_z16_ep3000}} & \texttt{b3bf842b} & 3 & 100000 & 7622 & 7.622e-02 & 2.144e-03 & 2.82\\
+\midrule
+\texttt{\detokenize{wran_reldec_z16_ep5000}} & \texttt{21c90ce0} & 2 & 100000 & 61613 & 6.161e-01 & 2.647e-02 & 4.52\\
+\texttt{\detokenize{wran_reldec_z16_ep5000}} & \texttt{21c90ce0} & 3 & 100000 & 7870 & 7.870e-02 & 2.176e-03 & 2.82\\
+\midrule
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 1 & 100000 & 96669 & 9.667e-01 & 7.687e-02 & 4.96\\
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 2 & 100000 & 33142 & 3.314e-01 & 1.592e-02 & 3.55\\
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 3 & 100000 & 566 & 5.660e-03 & 1.851e-04 & 1.85\\
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 4 & 100000 & 1 & 1.000e-05 & 1.302e-07 & 1.28\\
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 5 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.06\\
+\texttt{\detokenize{wran_reldec_z1_ep1000}} & \texttt{f1fae020} & 6 & 100000 & 0 & 0.000e+00 & 0.000e+00 & 1.01\\
+\midrule
+\bottomrule\end{longtable}}
+\end{document}
