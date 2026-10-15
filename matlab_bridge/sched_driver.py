@@ -50,14 +50,20 @@ TABULAR = {"alpha": 0.1, "gamma": 0.99, "epsilon": 0.1}       # same as run_expe
 PPO_BASE = {"lr": 1e-3, "gamma": 1.0, "gae_lambda": 0.95, "clip_eps": 0.2, "update_epochs": 4,
             "minibatch_size": 512, "rollout_steps": 8192, "ent_coef": 0.003, "vf_coef": 0.5,
             "max_grad_norm": 0.5, "hidden": 32, "reward": "success", "pos_feature": False}
+# fast_ppo (2026-10-16): same network/loss/update as ppo, batched + parallel collection
+# (external_ref/ldpc_rl/lib/fast_ppo_*.m), 2 update epochs, 1 dB dropped from training.
+PPO_FAST = dict(PPO_BASE, update_epochs=2, batch_frames=64, collect_workers=1)
+FAST_TRAIN_SNRS = [1.5, 2.0, 2.5, 3.0]
 PPO_BG2 = dict(PPO_BASE, gamma=0.999, pos_feature=True, rollout_steps=32768, minibatch_size=2048)
 
 METHOD = {"flooding": "matlab_flooding", "round_robin": "matlab_round_robin", "reldec": "matlab_reldec",
-          "tanh_mi": "matlab_ave_tanh_ave_mi", "ppo": "matlab_global_ppo"}
+          "tanh_mi": "matlab_ave_tanh_ave_mi", "ppo": "matlab_global_ppo",
+          "fast_ppo": "matlab_fast_ppo"}
 STATE = {"flooding": "none", "round_robin": "none", "reldec": "binary_vector",
-         "tanh_mi": "ave_tanh_21bin", "ppo": "ppo_cluster_features"}
+         "tanh_mi": "ave_tanh_21bin", "ppo": "ppo_cluster_features",
+         "fast_ppo": "ppo_cluster_features"}
 SCHED = {"flooding": "flooding", "round_robin": "round_robin_fixed_order", "reldec": "sweep",
-         "tanh_mi": "sweep", "ppo": "sweep"}
+         "tanh_mi": "sweep", "ppo": "sweep", "fast_ppo": "sweep"}
 
 # (code, kind, z, train_episodes or None, eval base seed)
 # WRAN round_robin z=1/z=4 is deliberately absent: matlab_round_robin already has
@@ -93,7 +99,25 @@ for _st in EP_SWEEP_Z4_Z16:
 # a new eval seed per stage keeps the added SNR points' noise independent of those.
 EP1K_FULL = [("wran", kind, z, 1000, 45000 + 10 * z + j, CODES["wran"][2])
              for z in (1, 4, 16) for j, kind in enumerate(("tanh_mi", "reldec"))]
-STAGE_SETS = {"main": STAGES, "tanh_ep_sweep": EP_SWEEP, "ep_sweep_z4_z16": EP_SWEEP_Z4_Z16, "ep1k_full": EP1K_FULL}
+# PPO training-episode sweep on WRAN z = 4, 16 (2026-10-15), 2 and 3 dB, 3 training seeds.
+# The 10k/50k policies are snapshots of the 100k run (see cmd_train_list).
+PPO_EP_SWEEP = [("wran", "ppo", z, ep, 46000 + 100 * z + 10 * i + j, [2.0, 3.0], seed)
+                for z in (4, 16) for i, seed in enumerate((42, 43, 44)) for j, ep in enumerate((10_000, 50_000, 100_000))]
+# PPO 100k episodes at the standard 1..6 dB (2026-10-16): the z=4,16 100k policies above get the
+# remaining SNRs (same configs, new eval seeds). z=1 was dropped (~1.9 s/episode, ~2 days).
+PPO_100K = [("wran", "ppo", z, 100_000, 47000 + 100 * z + i, CODES["wran"][2], seed)
+            for z in (4, 16) for i, seed in enumerate((42, 43, 44))]
+# PPO at 1k episodes, WRAN z = 1, 4, 16, 1..6 dB (2026-10-16), to sit next to EP1K_FULL's tabular policies.
+PPO_EP1K = [("wran", "ppo", z, 1000, 48000 + z, CODES["wran"][2]) for z in (1, 4, 16)]
+# 10k episodes, WRAN z = 1, 4, 16, 1..6 dB (2026-10-16): fast_ppo (replaces ppo in the results
+# PDF), tanh-MI and RELDEC; seed 42 like EP1K_FULL.
+FINAL_10K = [("wran", kind, z, 10_000, 49000 + 100 * j + z, CODES["wran"][2])
+             for j, kind in enumerate(("fast_ppo", "tanh_mi", "reldec")) for z in (1, 4, 16)]
+# fast_ppo training threads (maxNumCompThreads; the PPO update is the bottleneck). Execution
+# only: not part of the config.
+TRAIN_THREADS = {("fast_ppo", 1): 8}
+STAGE_SETS = {"main": STAGES, "tanh_ep_sweep": EP_SWEEP, "ep_sweep_z4_z16": EP_SWEEP_Z4_Z16, "ep1k_full": EP1K_FULL,
+              "ppo_ep_sweep": PPO_EP_SWEEP, "ppo_100k": PPO_100K, "ppo_ep1k": PPO_EP1K, "final_10k": FINAL_10K}
 
 
 def eval_snrs(st):
@@ -103,18 +127,32 @@ def eval_snrs(st):
     return EVAL_SNRS.get(stage_name(st), CODES[st[0]][2])
 
 
+def train_seed(st) -> int:
+    """A 7th tuple element, if present, is the training seed (default 42)."""
+    return st[6] if len(st) > 6 else 42
+
+
 def stage_name(st) -> str:
     code, kind, z, ep, _ = st[:5]
-    return f"{code}_{kind}_z{z}" + (f"_ep{ep}" if ep else "")
+    return f"{code}_{kind}_z{z}" + (f"_ep{ep}" if ep else "") + (f"_s{train_seed(st)}" if train_seed(st) != 42 else "")
 
 
-def ppo_hyper(code):
+def ppo_hyper(code, kind="ppo"):
+    if kind == "fast_ppo":
+        if code != "wran":
+            raise ValueError("fast_ppo is only set up for WRAN")
+        return PPO_FAST
     return PPO_BG2 if code == "bg2_z10" else PPO_BASE
+
+
+def train_snrs_of(code, kind):
+    return FAST_TRAIN_SNRS if kind == "fast_ppo" else CODES[code][3]
 
 
 def manifest(st) -> dict:
     code, kind, z, ep, eval_seed = st[:5]
-    matrix, i_max, _, train_snrs = CODES[code]
+    matrix, i_max, _, _ = CODES[code]
+    train_snrs = train_snrs_of(code, kind)
     m = {"method": METHOD[kind], "matrix": matrix, "z": z, "state_encoding": STATE[kind],
          "scheduling": SCHED[kind], "eval_maxIter": i_max,
          "target_frame_errors": MAX_FRAMES, "max_frames": MAX_FRAMES,
@@ -122,9 +160,9 @@ def manifest(st) -> dict:
     if ep is None:
         m["seed"] = eval_seed                     # baselines: seed = eval seed (matlab_round_robin convention)
     else:
-        m.update(seed=42, l_max=i_max, train_episodes=ep, train_snr_vals=train_snrs)
-        if kind == "ppo":
-            m["ppo"] = ppo_hyper(code)
+        m.update(seed=train_seed(st), l_max=i_max, train_episodes=ep, train_snr_vals=train_snrs)
+        if kind in ("ppo", "fast_ppo"):
+            m["ppo"] = ppo_hyper(code, kind)
         else:
             m.update(TABULAR)
     return m
@@ -132,11 +170,13 @@ def manifest(st) -> dict:
 
 def train_cfg(st) -> dict:
     code, kind, z, ep, _ = st[:5]
-    _, i_max, _, train_snrs = CODES[code]
+    _, i_max, _, _ = CODES[code]
+    train_snrs = train_snrs_of(code, kind)
     c = {"code": code, "z": z, "method": kind, "episodes": ep, "l_max": i_max, "train_snrs": train_snrs,
-         "seed": 42, "out": str(CKPT / f"{stage_name(st)}.mat"), "threads": 1}
-    if kind == "ppo":
-        c["ppo"] = ppo_hyper(code)
+         "seed": train_seed(st), "out": str(CKPT / f"{stage_name(st)}.mat"),
+         "threads": TRAIN_THREADS.get((kind, z), 1)}
+    if kind in ("ppo", "fast_ppo"):
+        c["ppo"] = ppo_hyper(code, kind)
     else:
         c.update(TABULAR)
     return c
@@ -170,17 +210,29 @@ def cmd_status(args):
 def cmd_train_list(args):
     need = [st for st in selected(args.skip, args.stage_set) if st[3] and not complete(st) and not Path(train_cfg(st)["out"]).exists()]
     # longest first, so the parfor starts the slow trainings immediately
-    weight = {"ppo": 50, "reldec": 1, "tanh_mi": 1}
+    weight = {"ppo": 50, "fast_ppo": 5, "reldec": 1, "tanh_mi": 1}
     need.sort(key=lambda st: -(st[3] * weight[st[1]] * (100 if st[0] == "bg2_z10" else 1)))
+    # Stages differing only in episode count share one training run: the shorter ones
+    # are saved as snapshots of the longest (sched_train.m: identical to separate runs).
+    runs = {}
+    for st in need:
+        runs.setdefault((st[0], st[1], st[2], train_seed(st)), []).append(st)
+    cfgs = []
+    for group in runs.values():
+        group.sort(key=lambda st: st[3])
+        c = train_cfg(group[-1])
+        if len(group) > 1:
+            c.update(snapshots=[st[3] for st in group[:-1]], snapshot_outs=[train_cfg(st)["out"] for st in group[:-1]])
+        cfgs.append(c)
     CKPT.mkdir(parents=True, exist_ok=True)
     if args.per_config:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
-        for st in need:
-            (out / f"{stage_name(st)}.json").write_text(json.dumps(train_cfg(st)))
+        for c in cfgs:
+            (out / f"{Path(c['out']).stem}.json").write_text(json.dumps(c))
     else:
-        Path(args.out).write_text(json.dumps([train_cfg(st) for st in need], indent=1))
-    print(f"{len(need)} training configs -> {args.out}: " + ", ".join(stage_name(st) for st in need))
+        Path(args.out).write_text(json.dumps(cfgs, indent=1))
+    print(f"{len(cfgs)} training runs for {len(need)} stages -> {args.out}: " + ", ".join(Path(c["out"]).stem for c in cfgs))
 
 
 def run_stage(st, workers, py, engine="matlab"):
@@ -191,7 +243,8 @@ def run_stage(st, workers, py, engine="matlab"):
                engine_detail=os.environ.get("OCTAVE_CMD", "matlab") if engine == "octave" else "matlab")
     (spool / "manifest.json").write_text(json.dumps(man))
     code, kind, z, ep, eval_seed = st[:5]
-    cfg = {"manifest": manifest(st), "code": code, "z": z, "kind": kind,
+    # a fast_ppo checkpoint is an ordinary 'ppo' policy: evaluated by the same greedy decoder
+    cfg = {"manifest": manifest(st), "code": code, "z": z, "kind": "ppo" if kind == "fast_ppo" else kind,
            "snr_db": eval_snrs(st), "n_frames": MAX_FRAMES, "chunk_size": CHUNK,
            "i_max": CODES[code][1], "base_seed": eval_seed, "n_workers": workers, "spool_dir": str(spool)}
     if ep:

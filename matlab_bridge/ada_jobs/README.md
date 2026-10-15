@@ -18,6 +18,11 @@ See `docs/notes/matlab_sched_runs.md` for the run record.
 | `job_tanh_sweep.sh` | tanh-MI WRAN z=1 episode sweep (2 and 3 dB) |
 | `job_ep_sweep2.sh` | tanh-MI + RELDEC WRAN z=4,16 episode sweep (2 and 3 dB) |
 | `job_ep1k_full.sh` | 1k-episode tanh-MI + RELDEC WRAN z=1,4,16 at 1-6 dB |
+| `job_ppo_ep_sweep.sh` | PPO training-episode sweep, WRAN z=4,16, 3 seeds, 10k/50k/100k (snapshots of one run), 2 and 3 dB |
+| `job_ppo_100k.sh` | PPO 100k-episode z=4,16 policies evaluated at the remaining SNRs (1, 4, 5, 6 dB) |
+| `job_ppo_ep1k.sh` | PPO 1k episodes z=1,4,16 (cancelled before it ran; replaced by fast_ppo) |
+| `fast_ppo_profile.m`, `job_fast_ppo_profile.sh` | MATLAB fast_ppo smoke test + ppo vs fast_ppo training-speed profile |
+| `job_final_10k.sh`, `job_final_10k_eval.sh` | 10k-episode fast_ppo, tanh-MI, RELDEC on WRAN z=1,4,16 at 1-6 dB (eval-only resume after a parpool crash) |
 | `launch.sh` | Laptop-side rsync + submit helper |
 
 Trained policies are in `external_ref/ldpc_rl/checkpoints/sched/<stage>.mat`.

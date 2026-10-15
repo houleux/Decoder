@@ -32,6 +32,24 @@ flooding = strcmp(pol.kind, 'flooding');
 
 bit_errors = 0;  frame_errors = 0;  messages = 0;  converged_frames = 0;  iterations = 0;
 t0 = tic;
+if strcmp(pol.kind, 'ppo')
+    % Batched greedy decoding (lib/fast_ppo_rollout.m; lib/fast_ppo_smoketest.m
+    % checks it against sched_frame.m). Noise is drawn frame by frame exactly as
+    % below, so the shard's frames are unchanged.
+    Lall = zeros(shard.n_frames, n);
+    for f = 1:shard.n_frames, Lall(f, :) = 2 * (1 + sigma * draw()) / sigma^2; end
+    for s = 1:250:shard.n_frames
+        o = fast_ppo_rollout(Lall(s:min(s + 249, shard.n_frames), :), env, pol.net, pol.pos_feature, i_max, false, []);
+        nerr = sum(o.L < 0, 2);
+        bit_errors = bit_errors + sum(nerr);  frame_errors = frame_errors + nnz(nerr);
+        messages = messages + sum(o.messages);  iterations = iterations + sum(o.iterations);
+        converged_frames = converged_frames + nnz(o.converged);
+    end
+    stats = struct('frames', shard.n_frames, 'bit_errors', bit_errors, 'total_bits', shard.n_frames * n, ...
+                   'frame_errors', frame_errors, 'messages', messages, ...
+                   'converged_frames', converged_frames, 'iterations', iterations, 'wall_s', toc(t0));
+    return;
+end
 for f = 1:shard.n_frames
     rx  = 1 + sigma * draw();
     Lch = 2 * rx / sigma^2;

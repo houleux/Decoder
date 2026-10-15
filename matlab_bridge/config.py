@@ -62,7 +62,7 @@ _OPTIONAL_ARCH_KEYS = (
     "k",
     "max_state_bits",
     "eval_maxIter",
-    "ppo",            # PPO hyperparameters (dict), for matlab_global_ppo
+    "ppo",            # PPO hyperparameters (dict), for matlab_global_ppo / matlab_fast_ppo
 )
 
 _OPTIONAL_KEYS = _OPTIONAL_TRAINING_KEYS + _OPTIONAL_ARCH_KEYS
